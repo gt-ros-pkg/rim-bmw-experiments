@@ -44,10 +44,12 @@
   <build_depend>rospy</build_depend>
   <build_depend>trajectory_gen</build_depend>
   <build_depend>ur_kin_py</build_depend>
+  <build_depend>bin_manager</build_depend>
   <run_depend>hrl_geom</run_depend>
   <run_depend>rospy</run_depend>
   <run_depend>trajectory_gen</run_depend>
   <run_depend>ur_kin_py</run_depend>
+  <run_depend>bin_manager</run_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->

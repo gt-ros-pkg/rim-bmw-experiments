@@ -19,6 +19,8 @@ class BinGoalPlanner(object):
         self.cur_grasp_bin_id = None
         self.cur_ar_place_tag_pose = None
 
+        self.pose_array_pub = rospy.Publisher('/ar_pose_array', PoseArray)
+
     # given semanic bin/slot IDs, determine the necessary grasp pose
     # and place pose to complete the task
     def generate_bin_location_goals(self, grasp_bin_id, place_slot_id):
@@ -53,6 +55,19 @@ class BinGoalPlanner(object):
     # tag location, it just sets it to where it just placed it
     def update_bin_location(self):
         self.ar_tag_man.set_bin_location(self.cur_grasp_bin_id, self.cur_ar_place_tag_pose)
+
+    def publish_bin_locs(self):
+        pose_dict = self.ar_tag_man.get_all_bin_poses()
+        poses = []
+        for binid in pose_dict:
+            poses.append(pose_dict[binid])
+
+        pose_array = PoseArray()
+        pose_array.header.stamp = rospy.Time.now()
+        pose_array.header.frame_id = '/base_link'
+        for pose in poses:
+            pose_array.poses.append(PoseConv.to_pose_msg(pose))
+        self.pose_array_pub.publish(pose_array)
     
 def publish_poses(topic, poses):
     pose_array_pub = rospy.Publisher('/ar_pose_array', PoseArray)

@@ -5,6 +5,8 @@ from trajectory_gen.spline_traj_executor import SplineTraj
 
 def avoid_traj(xi, xf, distmove, midptfrac1, midptfrac2, wayptvel, 
                qd_i=None, qd_f=None, qdd_i=None, qdd_f=None):
+    xi = np.array(xi)
+    xf = np.array(xf)
     diff = xf-xi
     normdiff = np.linalg.norm(diff)
     unitdiff = diff/normdiff
@@ -32,7 +34,7 @@ def avoid_traj(xi, xf, distmove, midptfrac1, midptfrac2, wayptvel,
     tknots = np.cumsum([0., time1, time2, time3])
 
     st = SplineTraj.generate(tknots,q,qd_i=qd_i,qd_f=qd_f,qdd_i=qdd_i,qdd_f=qdd_f)
-    return st, q
+    return tknots, q, st
 
 def main():
     import matplotlib.pyplot as plt
@@ -43,7 +45,7 @@ def main():
     midptfrac2 = 0.8
     wayptvels = [0.3, 0.10]
 
-    st, qknots = avoid_traj(xi0, xf, 0.1, midptfrac1, midptfrac2, wayptvels[0])
+    _, qknots, st = avoid_traj(xi0, xf, 0.1, midptfrac1, midptfrac2, wayptvels[0])
     qmid, qdmid, qddmid = st.sample(2.7)
     print qmid, qdmid, qddmid
     #qd_is = [None, None]
