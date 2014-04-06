@@ -1,3 +1,4 @@
+#! /usr/bin/python
 
 import numpy as np
 import yaml
@@ -149,6 +150,18 @@ class ARTagManagerInterface(object):
                     empty_slots.append(slot_ids[ind])
         return empty_slots
 
+    def get_random_empty_slot(self, slots_to_check=None, invert_set=False):
+        empty_slots = self.get_empty_slots(slots_to_check, invert_set)
+        rand_slot = empty_slots[np.random.randint(len(empty_slots))]
+        rand_slot_loc = self.get_bin_slot(rand_slot)
+        return rand_slot, rand_slot_loc
+
+    def get_random_bin(self, slots_to_check=None, invert_set=False):
+        bins = self.get_filled_slots(slots_to_check, invert_set)
+        rand_bin = bins[np.random.randint(len(bins))]
+        rand_bin_loc = self.get_bin_pose(rand_bin)
+        return rand_bin, rand_bin_loc
+
 class ARTagManagerSimulator(ARTagManagerInterface):
     def __init__(self, bin_slots, bin_init_locs, available_bins=None):
         super(ARTagManagerSimulator, self).__init__(
@@ -157,26 +170,28 @@ class ARTagManagerSimulator(ARTagManagerInterface):
             self.ar_poses[i] = deque()
             self.ar_poses[i].append([0., bin_init_locs[i]])
 
-def main():
-    def load_bin_slots(filename):
-        f = file(resolve_args(filename), 'r')
-        bin_slots = yaml.load(f)['data']
-        f.close()
-        return bin_slots
-    bin_slots = load_bin_slots('test_bin_slots.yaml')
-    bin_locs = load_bin_slots('test_bin_locs.yaml')
+def load_bin_slots(filename):
+    f = file(resolve_args(filename), 'r')
+    bin_slots = yaml.load(f)['data']
+    f.close()
+    return bin_slots
 
+def setup_ar_tag_man_simulator():
+    bin_slots = load_bin_slots('$(find bin_manager)/test/test_bin_slots.yaml')
+    bin_locs = load_bin_slots('$(find bin_manager)/test/test_bin_locs.yaml')
     ar_man_sim = ARTagManagerSimulator(bin_slots, bin_locs)
+    return ar_man_sim, bin_slots, bin_locs
+
+def main():
+    ar_man_sim, bin_slots, bin_locs = setup_ar_tag_man_simulator()
 
     empty_slots = ar_man_sim.get_empty_slots()
     print "Current slot states:", ar_man_sim.get_bin_slot_states()
     print "Empty slots:", empty_slots
-    rand_slot = empty_slots[np.random.randint(len(empty_slots))]
-    rand_slot_loc = ar_man_sim.get_bin_slot(rand_slot)
+    rand_slot, rand_slot_loc = ar_man_sim.get_random_empty_slot()
     available_bins = ar_man_sim.get_available_bins()
     print "Bins available:", available_bins
-    rand_bin = available_bins[np.random.randint(len(available_bins))]
-    rand_bin_loc = ar_man_sim.get_bin_pose(rand_bin)
+    rand_bin, rand_bin_loc = ar_man_sim.get_random_bin()
 
     print "Moving bin", rand_bin, "at location", rand_bin_loc
     print "to slot", rand_slot, "at location", rand_slot_loc
