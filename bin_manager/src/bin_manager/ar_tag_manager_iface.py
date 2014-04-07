@@ -152,12 +152,16 @@ class ARTagManagerInterface(object):
 
     def get_random_empty_slot(self, slots_to_check=None, invert_set=False):
         empty_slots = self.get_empty_slots(slots_to_check, invert_set)
+        if len(empty_slots) == 0:
+            return None, None
         rand_slot = empty_slots[np.random.randint(len(empty_slots))]
         rand_slot_loc = self.get_bin_slot(rand_slot)
         return rand_slot, rand_slot_loc
 
     def get_random_bin(self, slots_to_check=None, invert_set=False):
         bins = self.get_filled_slots(slots_to_check, invert_set)
+        if len(bins) == 0:
+            return None, None
         rand_bin = bins[np.random.randint(len(bins))]
         rand_bin_loc = self.get_bin_pose(rand_bin)
         return rand_bin, rand_bin_loc
