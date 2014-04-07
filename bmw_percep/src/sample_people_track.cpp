@@ -156,8 +156,6 @@ int main(int argc, char** argv)
       cv::waitKey(15);
 
       //add in non-human as background
-      
-      
       cloud_mutex.unlock (); // let go of current cloud
     }
   }

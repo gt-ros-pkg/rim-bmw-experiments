@@ -125,6 +125,15 @@ add_executable(publish_kinect
 add_executable(sample_track
   src/pcl_cv_utils.cpp
   src/sample_people_track.cpp)
+
+add_executable(sample_ground
+  src/groundPlane.cpp
+  src/sample_groundPlane.cpp)
+
+add_executable(sample_groundReader
+  src/groundPlane.cpp
+  src/sample_groundPlaneReader.cpp)
+
 #add_executable(people_pcl src/people_pcl.cpp)
 
 ## Add cmake target dependencies of the executable/library
@@ -137,6 +146,8 @@ add_executable(sample_track
 # )
 target_link_libraries(publish_kinect ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_track ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(sample_ground ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(sample_groundReader ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
 ## Install ##
