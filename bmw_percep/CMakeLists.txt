@@ -1,15 +1,27 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(bmw_percep)
 
+#non catkin packages
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_include_dirs})
+
+#find_package(PCL 1.7 REQUIRED)
+#include_directories(${PCL_include_dirs})
+#link_directories(${PCL_LIBRARY_DIRS})
+#add_definitions(${PCL_DEFINITIONS})
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  opencv
-  pcl
+  cv_bridge
+  image_transport
+  pcl_conversions
+  pcl_ros
   roscpp
   rospy
   std_msgs
+  sensor_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -82,7 +94,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+INCLUDE_DIRS include
 #  LIBRARIES bmw_percep
 #  CATKIN_DEPENDS opencv pcl roscpp rospy std_msgs
 #  DEPENDS system_lib
@@ -96,6 +108,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -105,7 +118,14 @@ include_directories(
 # )
 
 ## Declare a cpp executable
-# add_executable(bmw_percep_node src/bmw_percep_node.cpp)
+add_executable(publish_kinect 
+    src/pcl_cv_utils.cpp
+    src/pub_kinect_msgs.cpp)
+
+add_executable(sample_track
+  src/sample_people_track.cpp
+  src/pub_kinect_msgs.cpp)
+#add_executable(people_pcl src/people_pcl.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -115,6 +135,8 @@ include_directories(
 # target_link_libraries(bmw_percep_node
 #   ${catkin_LIBRARIES}
 # )
+target_link_libraries(publish_kinect ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(sample_track ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
 ## Install ##
