@@ -123,8 +123,8 @@ add_executable(publish_kinect
     src/pub_kinect_msgs.cpp)
 
 add_executable(sample_track
-  src/sample_people_track.cpp
-  src/pub_kinect_msgs.cpp)
+  src/pcl_cv_utils.cpp
+  src/sample_people_track.cpp)
 #add_executable(people_pcl src/people_pcl.cpp)
 
 ## Add cmake target dependencies of the executable/library

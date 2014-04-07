@@ -24,4 +24,9 @@ void paint_at_point(cv::Mat& img, const cv::Point loc, const cv::Mat& orig, int 
 //Extract only RGB, Depth, and Valid-depth maps from point cloud
 bool pc_to_img(const PointCloudT::Ptr& cloud, cv::Mat& d_rgb, cv::Mat& d_depth, 
 		 cv::Mat& d_dmask);
+
+// Find blobs in a binary image as a vector of a vector of 2D points
+// returns the area of largest blob
+  int find_blobs(const cv::Mat &binary, 
+			   vector < vector<cv::Point2i> > &blobs);
 }
