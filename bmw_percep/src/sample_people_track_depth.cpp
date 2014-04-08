@@ -55,7 +55,7 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
   bool bg_detectShadow=false;
   double init_learn=-1.0; // learning rate for initialization
   //TODO: fix learning rates
-  double general_learn= 0.5; // after initial period
+  double general_learn= 0.1; // after initial period
   double after_img=0.3;
   cv::BackgroundSubtractorMOG2 cvBg(bg_history, bg_varThresh, bg_detectShadow);
   cvBg.setInt("nmixtures", 2);
