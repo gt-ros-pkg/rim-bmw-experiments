@@ -68,7 +68,7 @@ bool cv_utils::pc_to_img(const PointCloudT::Ptr& cloud, cv::Mat& d_rgb,
       if (d_depth.size()!=cv::Size(pc_rows, pc_cols) || d_depth.depth()!= CV_64F)
 	d_depth = cv::Mat::zeros(pc_rows, pc_cols, CV_64F);
       else
-	d_depth = cv::Scalar(0.0);
+	d_depth = cv::Scalar(10.0);
 
       if (d_dmask.size()!=cv::Size(pc_rows, pc_cols) || d_dmask.depth()!= CV_8U)
 	d_dmask = cv::Mat::zeros(pc_rows, pc_cols, CV_8U);

@@ -55,7 +55,7 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
   bool bg_detectShadow=false;
   double init_learn=-1.0; // learning rate for initialization
   //TODO: fix learning rates
-  double general_learn= 0.1; // after initial period
+  double general_learn= 0.0;//0.001; // after initial period
   double after_img=0.3;
   cv::BackgroundSubtractorMOG2 cvBg(bg_history, bg_varThresh, bg_detectShadow);
   cvBg.setInt("nmixtures", 2);
@@ -169,20 +169,23 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
       //cv::Mat dep_norm;
       //cv::normalize (depth_im, dep_norm);
       //cv::imshow("Depth", dep_norm);
-      cv::imshow("Fore Image", foreMask);
-      cv::waitKey(10);
-      cloud_mutex.unlock();
-      continue;
 
       //apply depth-mask
-      foreMask.copyTo(foreMask, foreMask);
+      foreMask.copyTo(foreMask, valid_depth);
+
       
       //debug
       //cout << "Foregrounding ..." << endl;
 
       //ground-subtract -- not required
-      ground_obj.planePtsMask(cloud, ground_mask);
+      ground_obj.planePtsMask(cloud, ground_mask, 0.03);
       foreMask.copyTo(foreMask, ground_mask);
+
+      cv::imshow("Fore Image", foreMask);
+      cv::waitKey(10);
+      cloud_mutex.unlock();
+      continue;
+
       //foreMask = 255 * foreMask;
 
       //find human component in foreground
