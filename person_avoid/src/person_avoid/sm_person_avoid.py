@@ -289,7 +289,7 @@ class SMJointTrajActionStart(smach.State):
 def main():
     rospy.init_node('sm_person_avoid')
 
-    if True:
+    if False:
         # simulation setup
         ar_tag_man, bin_slots, bin_locs = setup_ar_tag_man_simulator()
         grasp_slots = np.array(range(0, 7))
@@ -300,7 +300,9 @@ def main():
         gripper = SimGripper()
     else:
         gripper = RobotiqCGripper()
+        print 'Waiting for gripper...', 
         gripper.wait_for_connection()
+        print 'found.'
 
     ################ setup utility classes #######################
     cman = URControllerManager()
