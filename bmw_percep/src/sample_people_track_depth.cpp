@@ -104,7 +104,6 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
    
       // get image, depth-map, valid mask
       cv_utils::pc_to_img(cloud, rgb_im, depth_im, valid_depth);
-
       
       //back-ground initialize
       if (!bg_init){
@@ -182,11 +181,17 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
       foreMask.copyTo(foreMask, ground_mask);
 
       cv::imshow("Fore Image", foreMask);
+      cv::Mat disp_rgb;
+      rgb_im.copyTo(disp_rgb, foreMask);
+      cv::imshow("masked", rgb_im);
       cv::waitKey(10);
       cloud_mutex.unlock();
       continue;
 
       //foreMask = 255 * foreMask;
+
+      //translate then rotate point cloud
+      double translate[] = {-1.1073859, -0.73154575, -2.3490002};
 
       //find human component in foreground
       vector< vector <cv::Point2i> > fore_blobs;
