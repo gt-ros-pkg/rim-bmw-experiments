@@ -4,7 +4,7 @@
 #include<opencv2/opencv.hpp>
 #include<bmw_percep/pcl_cv_utils.hpp>
 #include<bmw_percep/particleFilter.hpp>
-
+#include<pcl/common/transforms.h>
 //ros-includes
 #include<ros/ros.h>
 /**
@@ -50,6 +50,7 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
 
   //Various objects
   PointCloudT::Ptr cloud (new PointCloudT);
+  PointCloudT::Ptr cloud2 (new PointCloudT);
   int bg_history = 50;
   double bg_varThresh=0.03;
   bool bg_detectShadow=false;
@@ -192,6 +193,19 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
 
       //translate then rotate point cloud
       double translate[] = {-1.1073859, -0.73154575, -2.3490002};
+      double z_rot_cos = 0.3764;
+      double z_rot_sin = sqrt(1-pow(z_rot_cos,2));
+      Eigen::Matrix4f t1;
+      t1 << 
+	1, 0, 0, translate[0],
+	0, 1, 0, translate[1],
+	0, 0, 1, translate[2],
+	0, 0, 0, 1;
+      
+      cout << t1<< endl;
+      pcl::PointIndices ::Ptr unmasked_indi (new pcl::PointIndices());
+      unmasked_indi->indices.push_back(1);
+      //pcl::transformPointCloud(cloud, cloud2, &t1);
 
       //find human component in foreground
       vector< vector <cv::Point2i> > fore_blobs;
