@@ -170,7 +170,7 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
       //cv::normalize (depth_im, dep_norm);
       //cv::imshow("Depth", dep_norm);
       cv::imshow("Fore Image", foreMask);
-      cv::waitKey(0);
+      cv::waitKey(10);
       cloud_mutex.unlock();
       continue;
 

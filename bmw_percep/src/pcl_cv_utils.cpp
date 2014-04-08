@@ -84,7 +84,7 @@ bool cv_utils::pc_to_img(const PointCloudT::Ptr& cloud, cv::Mat& d_rgb,
 	for (int c=0; c<pc_cols; c++){
 	  PointT point = cloud->at(c,r);
 	  //set depth and depth-mask if not NaN
-	  if (!isnan(point.z)){
+	  if (!isnan(point.z) && point.z<4.0 && point.z>0.6){
 	    depth_r[c] = (double)point.z;
 	    dmask_r[c] = (unsigned char)255;
 	  }
