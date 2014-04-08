@@ -20,8 +20,9 @@ class BinManagerMotionPlanner(object):
         self.grasp_vel = rospy.get_param("~grasp_vel", 0.03*VEL_MULT)
 
         self.qd_max = [0.2]*6
-        self.q_min = [-4.78, -2.4, 0.3, -3.8, -3.3, -2.*np.pi]
-        self.q_max = [-1.2, -0.4, 2.7, -1.6, 0.3, 2.*np.pi]
+        self.q_min = [-2.*np.pi, -1.9, 0.0, -3.1, -3.3, -2.*np.pi]
+        self.q_max = [2.*np.pi, 0.0, 2.8, -1.6, 0.3, 2.*np.pi]
+        self.q_home = [0.7678, -1.1937,  1.5725, -1.9750, -1.573, 0.0]
 
     def plan_bin_to_bin_traj(self, goal_pose, mid_pts=[]):
         q_init = self.arm.get_q()
@@ -30,6 +31,9 @@ class BinManagerMotionPlanner(object):
         q_knots = [q_init]
         t_knots = [0.]
 
+        q_min = np.array(self.q_min).copy()
+        q_max = np.array(self.q_max).copy()
+
         start_time = rospy.get_time() # time planning
         # move directly upward to clear bins and avoid bin collisions
         upward_pose = x_init.copy()
@@ -37,7 +41,7 @@ class BinManagerMotionPlanner(object):
         t_knots_new, q_knots_new = self.traj_plan.min_jerk_interp_ik(
                 q_init=q_knots[-1], x_goal=upward_pose, dur=self.grasp_dur,
                 vel_i=0., vel_f=self.grasp_vel,
-                qd_max=self.qd_max, q_min=self.q_min, q_max=self.q_max)
+                qd_max=self.qd_max, q_min=q_min, q_max=q_max)
         if q_knots_new is None:
             print 'move upward to pregrasp pose failed'
             print pregrasp_pose
@@ -67,7 +71,7 @@ class BinManagerMotionPlanner(object):
         t_knots_new, q_knots_new = self.traj_plan.min_jerk_interp_ik(
                 q_init=q_knots[-1], x_goal=goal_pose, dur=self.grasp_dur,
                 vel_i=self.grasp_vel, vel_f=0.,
-                qd_max=self.qd_max, q_min=self.q_min, q_max=self.q_max)
+                qd_max=self.qd_max, q_min=q_min, q_max=q_max)
         print 'Planning time:', rospy.get_time() - start_time, len(t_knots_new)
         q_knots.extend(q_knots_new[1:])
         t_knots.extend(t_knots[-1] + t_knots_new[1:])
@@ -87,6 +91,9 @@ class BinManagerMotionPlanner(object):
         q_knots = [q_init]
         t_knots = [0.]
 
+        q_min = np.array(self.q_min).copy()
+        q_max = np.array(self.q_max).copy()
+
         # move to a waypoint above the goal
         above_goal_pose = goal_pose.copy()
         above_goal_pose[2,3] += self.grasp_lift
@@ -105,7 +112,7 @@ class BinManagerMotionPlanner(object):
         t_knots_new, q_knots_new = self.traj_plan.min_jerk_interp_ik(
                 q_init=q_knots[-1], x_goal=goal_pose, dur=self.grasp_dur,
                 vel_i=self.grasp_vel, vel_f=0.,
-                qd_max=self.qd_max, q_min=self.q_min, q_max=self.q_max)
+                qd_max=self.qd_max, q_min=q_min, q_max=q_max)
         print 'Planning time:', rospy.get_time() - start_time, len(t_knots_new)
         q_knots.extend(q_knots_new[1:])
         t_knots.extend(t_knots[-1] + t_knots_new[1:])
@@ -120,12 +127,15 @@ class BinManagerMotionPlanner(object):
         q_midpt_knots = []
         prev_pose = self.kin.forward(prev_q)
 
+        q_min = np.array(self.q_min).copy()
+        q_max = np.array(self.q_max).copy()
+
         # create midpts
         mid_pts = []
 
         for mid_pose in mid_pts + [above_goal_pose]: 
             q_mid_pose = self.kin.inverse(mid_pose, prev_q,
-                                          q_min=self.q_min, q_max=self.q_max)
+                                          q_min=q_min, q_max=q_max)
             if q_mid_pose is None:
                 print 'failed move to replace'
                 print mid_pose
@@ -148,7 +158,7 @@ class BinManagerMotionPlanner(object):
         else:
             is_slow = True
         q_goal_pose = self.kin.inverse(above_goal_pose, prev_q,
-                                       q_min=self.q_min, q_max=self.q_max)
+                                       q_min=q_min, q_max=q_max)
         prev_pose = self.kin.forward(prev_q)
         dist = np.linalg.norm(above_goal_pose[:3,3]-prev_pose[:3,3])
 
@@ -198,8 +208,7 @@ class BinManagerMotionPlanner(object):
             return t_midpt_knots[:-3], q_midpt_knots[:-3]
 
     def plan_home_traj(self):
-        q_home = [-2.75203516454, -1.29936272152, 1.97292018645, 
-                  -2.28456617769, -1.5054511996, -1.1]
+        q_home = self.q_home
         q_init = self.arm.get_q()
         start_time = rospy.get_time()
         t_knots, q_knots = self.traj_plan.min_jerk_interp_q_vel(q_init, q_home, self.pregrasp_vel/5.)
