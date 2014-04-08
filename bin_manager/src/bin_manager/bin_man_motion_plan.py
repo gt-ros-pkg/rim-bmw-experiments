@@ -55,7 +55,10 @@ class BinManagerMotionPlanner(object):
 
         # generate transversing trajectory
         t_midpt_knots, q_midpt_knots = self.create_midpt_traj(
+        # t_midpt_knots, q_midpt_knots = self.create_midpt_traj_new(
                                             prev_t, prev_q, above_goal_pose)
+        # print q_knots, 'YOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO'
+        # print q_midpt_knots, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
         t_knots.extend(t_midpt_knots)
         q_knots.extend(q_midpt_knots)
 
@@ -72,7 +75,47 @@ class BinManagerMotionPlanner(object):
         move_traj = SplineTraj.generate(t_knots, q_knots)
         return move_traj
 
-    def create_midpt_traj(self, prev_t, prev_q, above_goal_pose):
+    def plan_free_to_bin_traj(self, goal_pose, mid_pts=[], midpt_vel=None):
+        if midpt_vel is None:
+            midpt_vel = self.pregrasp_vel
+        start_time = rospy.get_time()
+        q_init = self.arm.get_q()
+        qd_init = self.arm.get_qd()
+        x_init = self.kin.forward(q_init)
+        print '------------------------XXXX--------------', rospy.get_time() - start_time
+
+        q_knots = [q_init]
+        t_knots = [0.]
+
+        # move to a waypoint above the goal
+        above_goal_pose = goal_pose.copy()
+        above_goal_pose[2,3] += self.grasp_lift
+        prev_t = t_knots[-1]
+        prev_q = q_knots[-1]
+
+        # generate transversing trajectory
+        t_midpt_knots, q_midpt_knots = self.create_midpt_traj(
+        # t_midpt_knots, q_midpt_knots = self.create_midpt_traj_new(
+                                            prev_t, prev_q, above_goal_pose, qd_init, midpt_vel)
+        t_knots.extend(t_midpt_knots)
+        q_knots.extend(q_midpt_knots)
+
+        # move downward to goal pose
+        start_time = rospy.get_time() # time planning
+        t_knots_new, q_knots_new = self.traj_plan.min_jerk_interp_ik(
+                q_init=q_knots[-1], x_goal=goal_pose, dur=self.grasp_dur,
+                vel_i=self.grasp_vel, vel_f=0.,
+                qd_max=self.qd_max, q_min=self.q_min, q_max=self.q_max)
+        print 'Planning time:', rospy.get_time() - start_time, len(t_knots_new)
+        q_knots.extend(q_knots_new[1:])
+        t_knots.extend(t_knots[-1] + t_knots_new[1:])
+
+        move_traj = SplineTraj.generate(t_knots, q_knots, qd_i=qd_init)
+        return move_traj
+
+    def create_midpt_traj(self, prev_t, prev_q, above_goal_pose, qd_init=[0.]*6, midpt_vel=None):
+        if midpt_vel is None:
+            midpt_vel = self.pregrasp_vel
         t_midpt_knots = []
         q_midpt_knots = []
         prev_pose = self.kin.forward(prev_q)
@@ -91,12 +134,68 @@ class BinManagerMotionPlanner(object):
             q_midpt_knots.append(q_mid_pose)
             # use a heuristic time based on the velocity to select a knot time
             dist = np.linalg.norm(mid_pose[:3,3]-prev_pose[:3,3])
-            cur_t_delta = max(dist / self.pregrasp_vel, 0.3)
+            cur_t_delta = max(dist / midpt_vel, 0.3)
             t_midpt_knots.append(prev_t + cur_t_delta)
             prev_t += cur_t_delta
             prev_q = q_mid_pose
             prev_pose = mid_pose
         return t_midpt_knots, q_midpt_knots
+
+    def create_midpt_traj_new(self, prev_t, prev_q, above_goal_pose, qd_init=[0.]*6, midpt_vel=None):
+        if midpt_vel is None:
+            midpt_vel = self.pregrasp_vel
+            is_slow = False
+        else:
+            is_slow = True
+        q_goal_pose = self.kin.inverse(above_goal_pose, prev_q,
+                                       q_min=self.q_min, q_max=self.q_max)
+        prev_pose = self.kin.forward(prev_q)
+        dist = np.linalg.norm(above_goal_pose[:3,3]-prev_pose[:3,3])
+
+        if not is_slow:
+
+            # use a heuristic time based on the velocity to select a knot time
+            cur_t_delta = max(dist / midpt_vel, 0.3)
+
+            num_t_knots = round(cur_t_delta / 0.08)
+            t_knots = np.linspace(0., cur_t_delta, num_t_knots)
+            q_knots, qd_knots, qdd_knots = self.traj_plan.min_jerk_interp_q_knots(
+                prev_q, q_goal_pose, t_knots, qd_i=qd_init, qd_f=[0.]*6, qdd_i=[0.]*6, qdd_f=[0.]*6)
+
+            q_midpt_knots = q_knots
+            t_midpt_knots = (t_knots + prev_t).tolist()
+            return t_midpt_knots[1:-3], q_midpt_knots[1:-3]
+        else:
+            # use a heuristic time based on the velocity to select a knot time
+            t_delta = 0.7
+            q_i = np.array(prev_q)
+            qd_i = np.array(qd_init)
+            qd_f = qd_i*0.3
+            q_f = q_i + (qd_f - qd_i) * t_delta
+            num_t_knots = round(t_delta / 0.08)
+            t_knots1 = np.linspace(0., t_delta, num_t_knots)
+
+            q_knots1, qd_knots1, qdd_knots1 = self.traj_plan.min_jerk_interp_q_knots(
+                q_i, q_f, t_knots1, qd_i=qd_i, qd_f=qd_f, qdd_i=[0.]*6, qdd_f=[0.]*6)
+
+            prev_pose = self.kin.forward(q_f)
+            dist = np.linalg.norm(above_goal_pose[:3,3]-prev_pose[:3,3])
+            t_delta = max(dist / midpt_vel, 0.3)
+            q_i = q_f
+            qd_i = qd_f
+            qd_f = [0.]*6
+            q_f = q_goal_pose
+            num_t_knots = round(t_delta / 0.08)
+            t_knots2 = np.linspace(0., t_delta, num_t_knots)
+
+            q_knots2, qd_knots2, qdd_knots2 = self.traj_plan.min_jerk_interp_q_knots(
+                q_i, q_f, t_knots2, qd_i=qd_i, qd_f=qd_f, qdd_i=[0.]*6, qdd_f=[0.]*6)
+
+            q_midpt_knots = q_knots1[1:].tolist() + q_knots2[1:].tolist()
+            t_knots1 += prev_t
+            t_knots2 += t_knots1[-1]
+            t_midpt_knots = t_knots1[1:].tolist() + t_knots2[1:].tolist()
+            return t_midpt_knots[:-3], q_midpt_knots[:-3]
 
     def plan_home_traj(self):
         q_home = [-2.75203516454, -1.29936272152, 1.97292018645, 

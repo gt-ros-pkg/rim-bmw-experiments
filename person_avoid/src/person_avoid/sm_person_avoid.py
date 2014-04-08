@@ -8,6 +8,7 @@ import smach_ros
 import actionlib
 from actionlib_msgs.msg import GoalStatus
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
+from std_msgs.msg import Bool
 
 from robotiq_c_model_control.robotiq_c_ctrl import RobotiqCGripper
 
@@ -75,7 +76,64 @@ class SMJointTrajActionWait(smach.State):
                     return 'preempted'
                 return 'aborted'
             r.sleep()
-        return 'success'
+
+class SMStopMonitor(smach.State):
+    def __init__(self, topic):
+        smach.State.__init__(self,
+            outcomes=['stop', 'preempted', 'shutdown'],
+            input_keys=['bin_move_goal'],
+            output_keys=['bin_move_goal'])
+        self.is_stop_requested = False
+        self.stop_sub = rospy.Subscriber(topic, Bool, self.stop_cb)
+
+    def stop_cb(self, stop_msg):
+        self.is_stop_requested = stop_msg.data or self.is_stop_requested
+
+    def execute(self, ud):
+        self.is_stop_requested = False
+        r = rospy.Rate(10)
+        while True:
+            if rospy.is_shutdown():
+                rospy.loginfo('SMStopMonitor shutdown!')
+                return 'shutdown'
+            if self.preempt_requested():
+                self.service_preempt()
+                rospy.loginfo('SMStopMonitor preempted!')
+                return 'preempted'
+            if self.is_stop_requested:
+                return 'stop'
+            r.sleep()
+
+class SMWaitForAllClear(smach.State):
+    def __init__(self, stop_topic, all_clear_topic):
+        smach.State.__init__(self,
+            outcomes=['all_clear', 'preempted', 'shutdown'],
+            input_keys=['bin_move_goal'],
+            output_keys=['bin_move_goal'])
+        self.stop_sub = rospy.Subscriber(stop_topic, Bool, self.stop_cb)
+        self.all_clear_sub = rospy.Subscriber(all_clear_topic, Bool, self.all_clear_cb)
+
+    def stop_cb(self, stop_msg):
+        self.cur_stop_state = stop_msg.data
+
+    def all_clear_cb(self, all_clear_msg):
+        self.cur_all_clear_state = all_clear_msg.data
+
+    def execute(self, ud):
+        self.cur_stop_state = True
+        self.cur_all_clear_state = False
+        r = rospy.Rate(10)
+        while True:
+            if rospy.is_shutdown():
+                rospy.loginfo('SMWaitForAllClear shutdown!')
+                return 'shutdown'
+            if self.preempt_requested():
+                self.service_preempt()
+                rospy.loginfo('SMWaitForAllClear preempted!')
+                return 'preempted'
+            if not self.cur_stop_state and self.cur_all_clear_state:
+                return 'all_clear'
+            r.sleep()
 
 class SMJointTrajActionStop(smach.State):
     def __init__(self, jnt_traj_act_cli):
@@ -162,13 +220,16 @@ class SMGenerateRandomMoveGoals(smach.State):
         return 'success'
 
 class SMGenerateMotionPlan(smach.State):
-    def __init__(self, bin_man_moplan, is_grasp):
+    # def __init__(self, bin_man_moplan, is_grasp):
+    def __init__(self, bin_man_moplan, is_grasp, is_start_free, is_slow=False):
         smach.State.__init__(self,
             outcomes=['success'],
             input_keys=['bin_move_goal'],
             output_keys=['bin_move_goal', 'joint_traj_goal'])
         self.bin_man_moplan = bin_man_moplan
         self.is_grasp = is_grasp
+        self.is_start_free = is_start_free
+        self.is_slow = is_slow
 
     def execute(self, userdata):
         if self.is_grasp:
@@ -176,11 +237,24 @@ class SMGenerateMotionPlan(smach.State):
         else:
             goal_pose = userdata.bin_move_goal['place_pose']
 
-        q_spline = self.bin_man_moplan.plan_bin_to_bin_traj(goal_pose)
+        NORMAL_VEL = 0.47
+        if self.is_slow:
+            midpt_vel = NORMAL_VEL/3.
+        else:
+            midpt_vel = NORMAL_VEL
+
+        now_time = rospy.Time.now()
+        start_time = rospy.get_time()
+        if self.is_start_free:
+            q_spline = self.bin_man_moplan.plan_free_to_bin_traj(goal_pose, midpt_vel=midpt_vel)
+        else:
+            q_spline = self.bin_man_moplan.plan_bin_to_bin_traj(goal_pose)
+        print rospy.get_time() - start_time
 
         fjt = FollowJointTrajectoryGoal()
         fjt.trajectory = q_spline.to_trajectory_msg()
-        fjt.trajectory.header.stamp = rospy.Time.now() + rospy.Duration(0.05)
+        fjt.trajectory.header.stamp = now_time
+        # fjt.trajectory.header.stamp = rospy.Time.now() + rospy.Duration(0.05)
         fjt.trajectory.joint_names = self.bin_man_moplan.arm.JOINT_NAMES
 
         userdata.joint_traj_goal = fjt
@@ -244,6 +318,15 @@ def main():
     # bin_man_moplan = PersonAvoidBinManMotionPlanner(arm, kin)
     ###############################################################
 
+    stop_topic = '/person_avoid/stop'
+    all_clear_topic = '/person_avoid/all_clear'
+    slow_topic = '/person_avoid/slow'
+
+    # call this on shutdown:
+    def shutdown_hook():
+        jnt_traj_act_cli.cancel_all_goals()
+    rospy.on_shutdown(shutdown_hook)
+
     # start pva joint trajectory controller
     cman.start_joint_controller('pva_trajectory_ctrl')
 
@@ -262,74 +345,146 @@ def main():
 
     def generate_move_sm(is_grasp):
         # generate a sub-state machine which does a grasp or a place
-        if is_grasp:
-            move_type = 'GRASP'
-        else:
-            move_type = 'PLACE'
         sm_move_arm = smach.StateMachine(
                 outcomes=['success', 'aborted', 'shutdown'],
                 input_keys=['bin_move_goal'],
                 output_keys=['bin_move_goal'])
         with sm_move_arm:
             smach.StateMachine.add(
-                'GEN_MOPLAN_%s' % move_type, 
-                SMGenerateMotionPlan(bin_man_moplan, is_grasp=is_grasp),
-                transitions={'success' : 'JOINT_TRAJ_START_%s' % move_type})
+                'GEN_MOPLAN', 
+                SMGenerateMotionPlan(bin_man_moplan, is_grasp=is_grasp, is_start_free=False,
+                                     is_slow=False),
+                transitions={'success' : 'JOINT_TRAJ_START'})
             smach.StateMachine.add(
-                'JOINT_TRAJ_START_%s' % move_type, 
+                'JOINT_TRAJ_START', 
                 SMJointTrajActionStart(jnt_traj_act_cli),
-                transitions={'success' : 'JOINT_TRAJ_WAIT_%s' % move_type,
+                transitions={'success' : 'WAIT_MONITOR',
                              'timeout' : 'aborted',
                              'shutdown' : 'shutdown'})
+
+            # build concurrence container for monitoring trajectory in motion
+            wait_name = 'JOINT_TRAJ_WAIT'
+            stop_mon_name = 'STOP_MONITOR'
+            slow_mon_name = 'SLOW_MONITOR'
+
+            def child_term_cb(outcome_map):
+                if wait_name in outcome_map and outcome_map[wait_name]:
+                    return True
+                if stop_mon_name in outcome_map and outcome_map[stop_mon_name]:
+                    return True
+                if slow_mon_name in outcome_map and outcome_map[slow_mon_name]:
+                    return True
+                return False
+            def out_cb(outcome_map):
+                if outcome_map[stop_mon_name] == 'stop':
+                    return 'stop'
+                if outcome_map[slow_mon_name] == 'stop':
+                    return 'slow'
+                if outcome_map[wait_name] == 'success':
+                    return 'success'
+                return 'shutdown'
+            sm_wait_monitor = smach.Concurrence(
+                outcomes=['success', 'stop', 'slow', 'shutdown'],
+                input_keys=['bin_move_goal'],
+                output_keys=['bin_move_goal'],
+                default_outcome='stop',
+                child_termination_cb=child_term_cb,
+                outcome_cb=out_cb)
+            with sm_wait_monitor:
+                smach.Concurrence.add(
+                    wait_name, 
+                    SMJointTrajActionWait(jnt_traj_act_cli))
+                smach.Concurrence.add(
+                    stop_mon_name, 
+                    SMStopMonitor(stop_topic))
+                smach.Concurrence.add(
+                    slow_mon_name, 
+                    SMStopMonitor(slow_topic))
+            smach.StateMachine.add('WAIT_MONITOR', sm_wait_monitor,
+                transitions={'success' : 'GRIPPER',
+                             'stop' : 'JOINT_TRAJ_STOP',
+                             'slow' : 'GEN_SLOW_REPLAN'})
+            ###################################################################
+            # stop trajectory and wait
             smach.StateMachine.add(
-                'JOINT_TRAJ_WAIT_%s' % move_type, 
-                SMJointTrajActionWait(jnt_traj_act_cli),
-                transitions={'success' : 'GRIPPER_%s' % move_type,
-                             'preempted' : 'aborted',
-                             'aborted' : 'aborted',
-                             'shutdown' : 'shutdown'})
+                'JOINT_TRAJ_STOP',
+                SMJointTrajActionStop(jnt_traj_act_cli),
+                transitions={'success' : 'WAIT_ALL_CLEAR'})
+
             smach.StateMachine.add(
-                'GRIPPER_%s' % move_type, 
+                'WAIT_ALL_CLEAR',
+                SMWaitForAllClear(stop_topic, all_clear_topic),
+                transitions={'all_clear' : 'GEN_STOP_REPLAN',
+                             'preempted' : 'aborted'})
+
+            smach.StateMachine.add(
+                'GEN_STOP_REPLAN', 
+                SMGenerateMotionPlan(bin_man_moplan, is_grasp=is_grasp, is_start_free=True,
+                                     is_slow=True),
+                transitions={'success' : 'JOINT_TRAJ_START'})
+
+            smach.StateMachine.add(
+                'GEN_SLOW_REPLAN', 
+                SMGenerateMotionPlan(bin_man_moplan, is_grasp=is_grasp, is_start_free=True,
+                                     is_slow=True),
+                transitions={'success' : 'JOINT_TRAJ_START'})
+
+            # Grasp or release the current bin
+            smach.StateMachine.add(
+                'GRIPPER', 
                 SMGripperAction(gripper, is_grasp=is_grasp),
                 transitions={'success' : 'success'})
         return sm_move_arm
     
-    # generate full state machine
-    sm = smach.StateMachine(outcomes=['aborted', 'shutdown'])
-    sm.userdata.bin_move_goal = {}
+    sm_safety = smach.StateMachine(outcomes=['exit'])
+    with sm_safety:
 
-    with sm:
+        # generate main state machine
+        sm_main = smach.StateMachine(outcomes=['aborted', 'shutdown'])
+        sm_main.userdata.bin_move_goal = {}
+
+        with sm_main:
+
+            smach.StateMachine.add(
+                'GEN_RAND_MOVE_GOALS', 
+                SMGenerateRandomMoveGoals(bin_goal_planner, grasp_slots, place_slots),
+                transitions={'success' : 'GRASP',
+                             'aborted' : 'aborted'})
+
+            sm_grasp = generate_move_sm(True)
+            smach.StateMachine.add(
+                'GRASP', 
+                sm_grasp,
+                transitions={'success' : 'PLACE',
+                             'aborted' : 'aborted',
+                             'shutdown' : 'shutdown'})
+
+            sm_place = generate_move_sm(False)
+            smach.StateMachine.add(
+                'PLACE', 
+                sm_place,
+                transitions={'success' : 'MOVE_COMPLETE',
+                             'aborted' : 'aborted',
+                             'shutdown' : 'shutdown'})
+
+            smach.StateMachine.add(
+                'MOVE_COMPLETE', 
+                SMBinMoveComplete(bin_goal_planner),
+                transitions={'success' : 'GEN_RAND_MOVE_GOALS'})
 
         smach.StateMachine.add(
-            'GEN_RAND_MOVE_GOALS', 
-            SMGenerateRandomMoveGoals(bin_goal_planner, grasp_slots, place_slots),
-            transitions={'success' : 'GRASP',
-                         'aborted' : 'aborted'})
-
-        sm_grasp = generate_move_sm(True)
+            'MAIN_LOOP',
+            sm_main,
+            transitions={'aborted' : 'JOINT_TRAJ_STOP',
+                         'shutdown' : 'JOINT_TRAJ_STOP'})
         smach.StateMachine.add(
-            'GRASP', 
-            sm_grasp,
-            transitions={'success' : 'PLACE',
-                         'aborted' : 'aborted',
-                         'shutdown' : 'shutdown'})
+            'JOINT_TRAJ_STOP',
+            SMJointTrajActionStop(jnt_traj_act_cli),
+            transitions={'success' : 'exit'})
 
-        sm_place = generate_move_sm(False)
-        smach.StateMachine.add(
-            'PLACE', 
-            sm_place,
-            transitions={'success' : 'MOVE_COMPLETE',
-                         'aborted' : 'aborted',
-                         'shutdown' : 'shutdown'})
-
-        smach.StateMachine.add(
-            'MOVE_COMPLETE', 
-            SMBinMoveComplete(bin_goal_planner),
-            transitions={'success' : 'GEN_RAND_MOVE_GOALS'})
-
-    sis = smach_ros.IntrospectionServer('person_avoid_server', sm, '/SM_ROOT')
+    sis = smach_ros.IntrospectionServer('person_avoid_server', sm_safety, '/SM_ROOT')
     sis.start()
-    sm.execute()
+    sm_safety.execute()
     rospy.spin()
     sis.stop()
 
