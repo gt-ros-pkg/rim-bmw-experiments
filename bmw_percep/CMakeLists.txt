@@ -123,8 +123,21 @@ add_executable(publish_kinect
     src/pub_kinect_msgs.cpp)
 
 add_executable(sample_track
+  src/particleFilter.cpp
+  src/groundPlane.cpp
   src/pcl_cv_utils.cpp
   src/sample_people_track.cpp)
+
+add_executable(sample_track_depth
+  src/particleFilter.cpp
+  src/groundPlane.cpp
+  src/pcl_cv_utils.cpp
+  src/sample_people_track_depth.cpp)
+
+
+add_executable(sample_track_gmg
+  src/pcl_cv_utils.cpp
+  src/sample_people_track_gmg.cpp)
 
 add_executable(sample_ground
   src/groundPlane.cpp
@@ -146,6 +159,8 @@ add_executable(sample_groundReader
 # )
 target_link_libraries(publish_kinect ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_track ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(sample_track_depth ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(sample_track_gmg ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_ground ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_groundReader ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 

@@ -51,10 +51,11 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
   //Various objects
   PointCloudT::Ptr cloud (new PointCloudT);
   int bg_history = 50;
-  double bg_varThresh=.05;
+  double bg_varThresh=0.03;
   bool bg_detectShadow=false;
-  double init_learn=-1; // learning rate for initialization
-  double general_learn=.09; // after initial period
+  double init_learn=-1.0; // learning rate for initialization
+  //TODO: fix learning rates
+  double general_learn= 0.5; // after initial period
   double after_img=0.3;
   cv::BackgroundSubtractorMOG2 cvBg(bg_history, bg_varThresh, bg_detectShadow);
   cvBg.setInt("nmixtures", 2);
@@ -104,6 +105,7 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
       // get image, depth-map, valid mask
       cv_utils::pc_to_img(cloud, rgb_im, depth_im, valid_depth);
 
+      
       //back-ground initialize
       if (!bg_init){
 	cv::imshow("Init", rgb_im);
@@ -155,26 +157,30 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
 	  continue;
 	}
       }
-    
-
+          
       //debug
       // cout << "Foreground masking begins? " << endl;
       
       //get foreground mask without learning from image
       //cvBg.operator()(rgb_im, foreMask, 0);
-      cvBg.operator()(depth_im, foreMask, 0);//general_learn);
+      cvBg.operator()(depth_im, foreMask, general_learn);
     
       //debug
-      //cout << "Foregrounding ..." << endl;
+      //cv::Mat dep_norm;
+      //cv::normalize (depth_im, dep_norm);
+      //cv::imshow("Depth", dep_norm);
       cv::imshow("Fore Image", foreMask);
-      cv::waitKey(10);
-
-      //debug
+      cv::waitKey(0);
       cloud_mutex.unlock();
       continue;
-      
 
-      //ground-subtract
+      //apply depth-mask
+      foreMask.copyTo(foreMask, foreMask);
+      
+      //debug
+      //cout << "Foregrounding ..." << endl;
+
+      //ground-subtract -- not required
       ground_obj.planePtsMask(cloud, ground_mask);
       foreMask.copyTo(foreMask, ground_mask);
       //foreMask = 255 * foreMask;

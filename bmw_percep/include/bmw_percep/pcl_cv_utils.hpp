@@ -29,4 +29,9 @@ bool pc_to_img(const PointCloudT::Ptr& cloud, cv::Mat& d_rgb, cv::Mat& d_depth,
 // returns the area of largest blob
   int find_blobs(const cv::Mat &binary, 
 			   vector < vector<cv::Point2i> > &blobs);
+
+  // Find blobs in a depth image as a vector of a vector of 2D points
+  // returns the area of largest blob
+  int find_blobs_depth(const cv::Mat &binary, const cv::Mat &depth,
+		       vector < vector<cv::Point2i> > &blobs, float depth_delta);
 }

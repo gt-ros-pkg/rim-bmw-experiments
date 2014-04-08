@@ -338,3 +338,60 @@ void GroundPlane::visualizePlane(const PointCloudT::Ptr& cloud,
   cv::destroyWindow("Plane Cutting");
   return;
 }
+
+void GroundPlane::planePtsMask(const PointCloudT::Ptr& cloud, cv::Mat& mask_im, 
+			       double inter_thresh/*=0.02*/)
+{
+  int pc_rows = cloud->height;
+  int pc_cols = cloud->width;
+  double* coeffs_arr = &ground_coeffs[0];
+
+  cv::Mat ground_mat = cv::Mat(1, ground_coeffs.size(), CV_64F, coeffs_arr);
+
+  //incase mask not correctly allocated
+  if (mask_im.size()!=cv::Size(pc_rows, pc_cols) || mask_im.depth()!=CV_8UC1)
+    {mask_im = cv::Mat::ones(pc_rows, pc_cols, CV_8UC1);}
+  else
+    {mask_im = cv::Scalar(1);}
+      
+  for (int r=0; r<pc_rows; r++){
+    unsigned char* res_i = mask_im.ptr<unsigned char>(r);
+    for (int c=0; c<pc_cols; c++){
+      PointT point = cloud->at(c,r);
+      //check if plane intersection
+      cv::Mat pt_mat = (cv::Mat_<double>(4,1) << 
+			point.x, point.y, point.z, 1.0);
+      double dot = (cv::Mat(ground_mat * pt_mat)).at<double>(0,0);
+      //NaNs not considered for plane fit
+      if (dot <= inter_thresh && !isnan(point.z)){
+	res_i[c] = (unsigned char) 0;
+      }
+    }
+  }
+
+  //debug-visualize-mask
+  // cv::Mat disp_im;
+  // mask_im.convertTo(disp_im, CV_32F);
+  // imshow("Plane Mask", disp_im);
+  // cv::waitKey(0);
+  // cv::destroyWindow("Plane Mask");
+  return;
+}
+
+// taken from PCL - tutorial
+void GroundPlane::pcProject(const PointCloudT::Ptr& cloud, PointCloudT::Ptr& cloud_projected)
+{
+  pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
+  coefficients->values.resize (4);
+  coefficients->values[0] = ground_coeffs.at(0);
+  coefficients->values[1] = ground_coeffs.at(1);
+  coefficients->values[2] = ground_coeffs.at(2);
+  coefficients->values[3] = ground_coeffs.at(3);
+
+  // Create the filtering object
+  pcl::ProjectInliers<PointT> proj;
+  proj.setModelType (pcl::SACMODEL_PLANE);
+  proj.setInputCloud (cloud);
+  proj.setModelCoefficients(coefficients);
+  proj.filter (*cloud_projected);
+}

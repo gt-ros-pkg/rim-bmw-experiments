@@ -6,6 +6,9 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <pcl/ModelCoefficients.h>
+#include <pcl/filters/project_inliers.h>
+#include<pcl/common/io.h>
 
 /**
    
@@ -34,6 +37,16 @@ public:
 
   //Write the ground-coefficients to file
   void writeFile(string fileName);
+  
+  // creates a mask of the points in an organized point cloud that 
+  // lie close to the ground-plane
+  void planePtsMask(const PointCloudT::Ptr& cloud, cv::Mat& mask_im, 
+		    double inter_thresh=0.02);
+
+  // project a point-cloud onto the plane and create the image such
+  // mask returns the mask of image locations where a point exists
+  // mask if contains zeros and ones would be used to select points to project
+  void pcProject(const PointCloudT::Ptr& cloud, PointCloudT::Ptr& cloud_projected);
 
 private:
   vector<double> ground_coeffs; // ax+by+cz+d=0
