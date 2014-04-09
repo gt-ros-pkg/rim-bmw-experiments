@@ -4,16 +4,29 @@
 #include<opencv2/opencv.hpp>
 #include<bmw_percep/pcl_cv_utils.hpp>
 #include<bmw_percep/particleFilter.hpp>
-
+#include<visualization_msgs/MarkerArray.h>
+#include<visualization_msgs/Marker.h>
+#include<std_msgs/UInt8.h>
 #include<geometry_msgs/PoseStamped.h>
 //ros-includes
 #include<ros/ros.h>
 /**
    Sample program for implementing the complete chain of events for people tracking
 **/
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <pcl/filters/crop_box.h>
 
 typedef pcl::PointXYZ PointX;
 typedef pcl::PointCloud<PointX> PointCloudX;
+
+typedef pcl::PointXYZ PRGB;
+typedef pcl::PointCloud<PRGB> PCRGB;
+
+// Globals
+visualization_msgs::MarkerArray mark_arr;
+int frame_rate=30;
+double max_filt_vel = 15.0/frame_rate, max_filt_acc = 5.0/frame_rate; // per frame
 
 boost::mutex cloud_mutex;
 enum { COLS=640, ROWS=480};
@@ -30,20 +43,30 @@ void cloud_cb_ (const PointCloudX::ConstPtr &callback_cloud,
   cloud_mutex.unlock ();
 }
 
+void filter_estimate(const cv::Point2f prev_pos, const cv::Point2f prev_vel, 
+		     cv::Point2f &cur_pos, cv::Point2f &cur_vel);
+
+void box_filter(const PointCloudX::Ptr& cloud, cv::Point3f end1, cv::Point3f end2,
+		cv::Mat& mask);
+
+void box_filter_inverse(const PointCloudX::Ptr& cloud, cv::Point3f end1, cv::Point3f end2,
+		cv::Mat& mask);
+
 bool get_blobs(cv::Mat& fore, int min_pixels,
 	      vector < vector<cv::Point2i> > &detect_blobs,
 	       cv::Point3f &mean_blob, const PointCloudX::Ptr& cloud,
 	       int ERODE_SIZE=5, int DILATE_SIZE=5, bool debug_mode=false);
 
 //get blobs from a foreground image
- bool get_blobs_depth(cv::Mat& fore, cv::Mat depth, int min_pixels,
+bool get_blobs_depth(cv::Mat& fore, cv::Mat depth, int min_pixels,
 		      vector < vector<cv::Point2i> > &detect_blobs, 
 		      double depth_delta=0.05,
 		      int ERODE_SIZE=5, int DILATE_SIZE=5, 
 		      bool debug_mode=false);
 
+int publish_human_markers(ros::Publisher viz_pub, geometry_msgs::PoseStamped pos, geometry_msgs::PoseStamped vel, string hum_frame);
 
-  int main(int argc, char** argv)
+int main(int argc, char** argv)
 {
 
   //ros
@@ -51,8 +74,11 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
   ros::NodeHandle nh;
   ros::Publisher pub_pos = nh.advertise<geometry_msgs::PoseStamped> ("/human/position", 1);
   ros::Publisher pub_vel = nh.advertise<geometry_msgs::PoseStamped> ("/human/velocity", 1);
+  ros::Publisher pub_viz = nh.advertise<visualization_msgs::MarkerArray> ("/human/visuals", 1);
+  ros::Publisher pub_robo_state = nh.advertise<std_msgs::UInt8> ("/human/robot", 1);
 
   //messages -- initialize
+  string hum_frame = "base_link";
   geometry_msgs::PoseStamped pos_msg, vel_msg;
   pos_msg.header.frame_id = "base_link";
   vel_msg.header.frame_id = "base_link";
@@ -64,15 +90,16 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
 
   geometry_msgs::PoseStamped noPerson_pos_msg, noPerson_vel_msg;
   noPerson_pos_msg = pos_msg;
-  noPerson_pos_msg.pose.position.x = nan();
-  noPerson_pos_msg.pose.position.y = nan();
-  noPerson_pos_msg = noPerson_vel_msg;
+  noPerson_pos_msg.pose.position.x = numeric_limits<double>::quiet_NaN();
+  noPerson_pos_msg.pose.position.y = numeric_limits<double>::quiet_NaN();
+  noPerson_vel_msg = noPerson_pos_msg;
   
   //Various objects
   PointCloudX::Ptr cloud (new PointCloudX);
   PointCloudX::Ptr cloud2 (new PointCloudX);
+  PointCloudX::Ptr cloud_in (new PointCloudX);
 
-  int bg_history = 50;
+  int bg_history = 5;//0;
   double bg_varThresh=0.03;
   bool bg_detectShadow=false;
   double init_learn=-1.0; // learning rate for initialization
@@ -91,11 +118,21 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
   cv::Mat ground_mask;
 
   //Tracker params
-  int min_human_pixels = 1500; // min. pixels for blob to be human
+  int min_human_pixels = 2000; // min. pixels for blob to be human
 
   char win_key=0;
 
-  cv::Mat depth_im, valid_depth, foreMask, back_im, disp_im;
+  cv::Mat depth_im, valid_depth, foreMask, back_im, disp_im, box_mask, box_mask_inliers;
+
+  //  cv::Point3f box_min = cv::Point3f(0.9, 0.18, 1.9);
+  //  cv::Point3f box_max = cv::Point3f(1.24, 0.44, 3.06);
+
+  cv::Point3f box_min = cv::Point3f(0.0, -0.5, 1.0);//(1.24, 0.55, 3.06);
+  cv::Point3f box_max = cv::Point3f(1.2, 1.0, 3.0);//(0.8, 0.05, 1.9);
+
+  cv::Point3f boxin_min = cv::Point3f(atof(argv[1]), atof(argv[2]), atof(argv[3]));//(1.24, 0.55, 3.06);
+  cv::Point3f boxin_max = cv::Point3f(atof(argv[4]), atof(argv[5]), atof(argv[6]));//(0.8, 0.05, 1.9);
+
   bool bg_init = false; // has background been initialized
   //TODO: initialize these mats
 
@@ -121,15 +158,38 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
       cv::Mat translate = (cv::Mat_<double>(3,1) << -1.1073859, -0.73154575, -2.3490002);
       double z_rot_cos = 0.3764;
       double z_rot_sin = -sqrt(1-pow(z_rot_cos,2));
-      cv::Mat rot_mat = (cv::Mat_<double>(3,3)<<
+      cv::Mat rot_mat1 = (cv::Mat_<double>(3,3)<<
 			 z_rot_cos, -z_rot_sin, 0, 
 			 z_rot_sin, z_rot_cos,  0,
 			 0,         0,          1 );
 
-  
+      double y_rot_cos = 0.05378;
+      double y_rot_sin = sqrt(1-pow(y_rot_cos,2));
+      cv::Mat rot_mat2 = (cv::Mat_<double>(3,3)<<
+			  y_rot_cos,  0,          y_rot_sin,
+			  0,          1,          0,
+			  -y_rot_sin,  0,          y_rot_cos);
+        
   while(ros::ok()){
-
+    
     if (new_cloud_available_flag && cloud_mutex.try_lock()){
+
+      if(n_frames>0){
+	// check frames
+	pos_msg.header.frame_id = hum_frame;
+	vel_msg.header.frame_id = hum_frame;
+	pub_pos.publish(pos_msg);
+	pub_vel.publish(vel_msg);
+	int robo_state = publish_human_markers(pub_viz, pos_msg, vel_msg, hum_frame);
+	
+	//publish to robot
+	std_msgs::UInt8 pub_rob;
+	pub_rob.data = robo_state;
+	pub_robo_state.publish(pub_rob);
+
+	//publish a text-marker
+      }
+
       new_cloud_available_flag = false;
       n_frames++;
 
@@ -145,20 +205,14 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
 	cvBg.operator()(depth_im, foreMask, init_learn);
 	win_key = cv::waitKey(15);
 
-	/* Can't change history condition in OpenCV currently
-	//if more than history frames seen for initialization
-	if (bg_history < n_frames){
-	//set new history limit
-	bg_history = n_frames;
-	//cvBg.setHistory(bg_history);
-	}
-	*/
-
 	//Quit or Not
 	if (win_key!=27){
 	  if (n_frames == bg_history)
 	    cout << "\n Background initialized - press 'Esc' to exit." << endl;
 	  // no further processing required
+	  pos_msg = noPerson_pos_msg;
+	  vel_msg = noPerson_vel_msg;
+
 	  cloud_mutex.unlock();
 	  continue;
 	}
@@ -172,18 +226,10 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
 	  bg_init = true;
 	  cout <<  "Background Initialized!" << endl; 
 	  //to the next frame we go..
-
-	  //debug
-	  //cvBg.getBackgroundImage(back_im);
-	  //cv::imshow("background image", back_im);
-	  //cv::waitKey(0);
-	  
-	  //debug
-	  //cout << "\nTime to destroy .. " << endl;
 	  cv::destroyWindow("Init");
-	  //cv::destroyAllWindows();
-	  //debug
-	  //cout << "\n DESTROYED.. " << endl;
+
+	  pos_msg = noPerson_pos_msg;
+	  vel_msg = noPerson_vel_msg;
 
 	  cloud_mutex.unlock();
 	  continue;
@@ -192,58 +238,32 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
 
       begin = ros::Time::now();
           
-      //debug
-      // cout << "Foreground masking begins? " << endl;
-      
       //get foreground mask without learning from image
-      //cvBg.operator()(rgb_im, foreMask, 0);
       cvBg.operator()(depth_im, foreMask, general_learn);
-    
+      
+      //box_filter(cloud, box2_min, box2_max, box2_mask);
+      
+      box_filter(cloud, box_min, box_max, box_mask);
+      
+      box_filter_inverse(cloud, boxin_min, boxin_max, box_mask_inliers);
+
+      cv::bitwise_and(box_mask, box_mask_inliers, box_mask);
+      
+      //box it
+      foreMask.copyTo(foreMask, box_mask);
       //debug
-      //cv::Mat dep_norm;
-      //cv::normalize (depth_im, dep_norm);
-      //cv::imshow("Depth", dep_norm);
-
-      //apply depth-mask
-      // foreMask.copyTo(foreMask, valid_depth);
-      // cv::imshow("fore", foreMask);
-      // cv::waitKey(15);
-      // cloud_mutex.unlock();
-      // continue;
-
+      imshow("Mask", box_mask);
+      cout << "showy boxy" << endl;
+      cv::Mat dep_show;
+      cv::normalize(depth_im, depth_im, 0.0, 1.0, cv::NORM_MINMAX);
+      //cv::applyColorMap (depth_im, dep_show, cv::COLORMAP_AUTUMN);
+      cv::imshow("Unfiltered", depth_im);
+      depth_im.copyTo(dep_show, box_mask);      
+      cv::imshow("Filtered", dep_show);
+      cv::waitKey(10);
+      //cloud_mutex.unlock();
+      //continue;
       
-      //debug
-      //cout << "Foregrounding ..." << endl;
-
-      //ground-subtract -- not required
-      //ground_obj.planePtsMask(cloud, ground_mask, 0.03);
-      //foreMask.copyTo(foreMask, ground_mask);
-
-      // cv::imshow("Fore Image", foreMask);
-      // cv::waitKey(10);
-      // cloud_mutex.unlock();
-      // continue;
-
-      //foreMask = 255 * foreMask;
-
-      //translate then rotate point cloud
-      // double translate[] = {-1.1073859, -0.73154575, -2.3490002};
-      // double z_rot_cos = 0.3764;
-      // double z_rot_sin = sqrt(1-pow(z_rot_cos,2));
-      // double t1[] = 
-      // t1 << 
-      // 	1, 0, 0, translate[0],
-      // 	0, 1, 0, translate[1],
-      // 	0, 0, 1, translate[2],
-      // 	0, 0, 0, 1;
-      
-      // cout << t1<< endl;
-      // pcl::PointIndices ::Ptr unmasked_indi (new pcl::PointIndices());
-      // unmasked_indi->indices.push_back(1);
-      // //pcl::transformPointCloud(cloud, cloud2, &t1);
-      
-      //transform_cloud(cloud, translate)
-
       //find human component in foreground
       vector< vector <cv::Point2i> > fore_blobs;
       cv::Point3f blob_mean;
@@ -251,15 +271,16 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
 				   fore_blobs, blob_mean, cloud);
     
       // can't simply continue, as tracking requires stuff
-      if (!found_human){
-	//	cvBg.operator()(rgb_im, foreMask, general_learn); // no human, so learn all
+       if (!found_human){
 	//cvBg.operator()(depth_im, foreMask, general_learn);
+	pos_msg = noPerson_pos_msg;
+	vel_msg = noPerson_vel_msg;
 	cloud_mutex.unlock(); 
 	continue;
       } // nothing else to do in this case
       
       //debug - draw contours
-      depth_im.copyTo(disp_im);
+      //depth_im.copyTo(disp_im);
       //cv::imshow("Fore Image", foreMask); 
       // cv::drawContours(disp_im, fore_blobs, -1, cv::Scalar(0, 127, 127));
       // cv::imshow("Human Contours", disp_im);
@@ -268,50 +289,48 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
       //project onto ground plane
       //rotate
       cv::Mat temp_pt = (cv::Mat_<double> (3,1) << blob_mean.x, blob_mean.y, blob_mean.z);
-      cv::Mat new_pt = rot_mat * temp_pt;
+      cv::Mat new_pt1 = rot_mat1 * temp_pt;
+      cv::Mat new_pt = rot_mat2 * new_pt1;
+      //translate
       new_pt = new_pt + translate;
 
       cv::Point2f hum_pt; hum_pt.x=new_pt.at<double>(0,0); hum_pt.y=new_pt.at<double>(0,1);
       
-      //debug
-      // cout << "3d Point:" << blob_mean << endl; 
-      // cout << "Temp point: " << temp_pt << endl;
-      // cout << "Human Point " << hum_pt << endl;
-      // cout << "New pt: " << new_pt << endl;
-      //return 0;
       //particle tracking
 
-      //add in non-human as background
-      //cvBg.operator()(rgb_im, foreMask, general_learn); // no human, so learn all
-      //cvBg.operator()(depth_im, foreMask, general_learn); // no human, so learn all
-
-      //publish points
-      
+      //compute pos, vel
       ros::Time cur_time = ros::Time::now();
       pos_msg.header.seq++;
       vel_msg.header.seq++;
       pos_msg.header.stamp = cur_time;
       vel_msg.header.stamp = cur_time;
+      
+      cv::Point2f prev_pos = cv::Point2f(pos_msg.pose.position.x, pos_msg.pose.position.y);
+      cv::Point2f prev_vel = cv::Point2f(vel_msg.pose.position.x, vel_msg.pose.position.y);
+      cv::Point2f cur_pos = hum_pt;
+      cv::Point2f cur_vel;
 
-      pos_msg.pose.position.x = hum_pt.x; 
-      pos_msg.pose.position.y = hum_pt.y; 
+      filter_estimate(prev_pos, prev_vel, cur_pos, cur_vel);
+      
+      // //velocity computation
+      // if (isnan(pos_msg.pose.position.x)){
+      // 	vel_msg = noPerson_vel_msg;
+      // }
+      // else{
+      // 	//velocity computation
+      // 	vel_msg.pose.position.x = hum_pt.x-pos_msg.pose.position.x;
+      // 	vel_msg.pose.position.y = hum_pt.y-pos_msg.pose.position.y;; 
+      // 	vel_msg.pose.position.z = 0; // 2D points 
+      // }
+      
+      pos_msg.pose.position.x = cur_pos.x; 
+      pos_msg.pose.position.y = cur_pos.y; 
       pos_msg.pose.position.z = 0; // 2D points 
 
-      vel_msg.pose.position.x = hum_pt.x;
-      vel_msg.pose.position.y = hum_pt.y; 
+      vel_msg.pose.position.x = cur_vel.x; 
+      vel_msg.pose.position.y = cur_vel.y; 
       vel_msg.pose.position.z = 0; // 2D points 
-      
-      //velocity computation
-      if (isnan(prev_pos_msg.pose.position.x)){
-	pub_pos.publish(noPerson_pos_msg);
-	pub_vel.publish(noPerson_vel_msg);
-      }
-      else{
-	//velocity computation
 
-	pub_pos.publish(pos_msg);
-	pub_vel.publish(vel_msg);
-      }
       end = ros::Time::now();
       //debug
       //cout << "Iteration time: " << end-begin << endl;
@@ -323,6 +342,88 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
   }
 
   return 0; // successfully exit
+}
+
+// filter out a box from cloud using mask
+// assumes first end-pt has the lower values and second higher
+void box_filter(const PointCloudX::Ptr& cloud, cv::Point3f end1, 
+		cv::Point3f end2, cv::Mat& mask)
+{
+  //check if conversion possible
+  if (cloud->isOrganized()){
+    int pc_rows = cloud->height;
+    int pc_cols = cloud->width;
+
+    //TODO: Check if allocated Mat can be created
+    if (!cloud->empty()){
+      // allocate if neccessary
+      if (mask.size()!=cv::Size(pc_rows, pc_cols) || mask.depth()!= CV_8UC1)
+	mask = 255 * cv::Mat::ones(pc_rows, pc_cols, CV_8UC1);
+      else
+	mask = cv::Scalar(255);
+
+      for (int r=0; r < pc_rows; r++){
+	unsigned char* mask_r = mask.ptr<unsigned char> (r);
+	for (int c=0; c < pc_cols; c++){
+	  PointX point = cloud->at(c,r);
+	  if (point.x>end1.x && point.y>end1.y && point.z>end1.z)
+	    if (point.x<end2.x && point.y<end2.y && point.z<end2.z){
+	      mask_r[c] = (unsigned char) 0;
+	    }
+	}
+      }
+    }
+    else{
+      cout << "\nCloud Empty!" << endl;
+    }
+  }
+  else{
+    cout << endl << "Cloud Unorganized.." << endl;
+  }
+  //debug
+  //cv::imshow("Box", mask);
+  
+}
+
+// filter out a box from cloud using mask
+// assumes first end-pt has the lower values and second higher
+void box_filter_inverse(const PointCloudX::Ptr& cloud, cv::Point3f end1, 
+		cv::Point3f end2, cv::Mat& mask)
+{
+  //check if conversion possible
+  if (cloud->isOrganized()){
+    int pc_rows = cloud->height;
+    int pc_cols = cloud->width;
+
+    //TODO: Check if allocated Mat can be created
+    if (!cloud->empty()){
+      // allocate if neccessary
+      if (mask.size()!=cv::Size(pc_rows, pc_cols) || mask.depth()!= CV_8UC1)
+	mask = 0 * cv::Mat::ones(pc_rows, pc_cols, CV_8UC1);
+      else
+	mask = cv::Scalar(0);
+
+      for (int r=0; r < pc_rows; r++){
+	unsigned char* mask_r = mask.ptr<unsigned char> (r);
+	for (int c=0; c < pc_cols; c++){
+	  PointX point = cloud->at(c,r);
+	  if (point.x>end1.x && point.y>end1.y && point.z>end1.z)
+	    if (point.x<end2.x && point.y<end2.y && point.z<end2.z){
+	      mask_r[c] = (unsigned char) 255;
+	    }
+	}
+      }
+    }
+    else{
+      cout << "\nCloud Empty!" << endl;
+    }
+  }
+  else{
+    cout << endl << "Cloud Unorganized.." << endl;
+  }
+  //debug
+  //cv::imshow("Box", mask);
+  
 }
 
 //get blobs from a foreground image
@@ -466,4 +567,259 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
   
   //if no object big enoungh
   else{return false;}
+}
+
+/**
+   1- all allowed
+   2- backward and front slow
+   3- only backward
+**/
+int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped pos, 
+		      geometry_msgs::PoseStamped vel, string hum_frame)
+{
+  
+  //debug
+  const int all_allowed=1, front_slow=2, backward_only=3, robo_marker_id=4;
+  int pubbed_state = all_allowed;
+
+  visualization_msgs::Marker pos_marker, vel_marker1, vel_marker2, vel_marker3, 
+    robo_marker;
+  //only publish visual markers if velocity present
+  if (isnan(vel.pose.position.x)){
+    //TODO: delete viz-markers
+    for (int i=0; i<mark_arr.markers.size(); i++){
+      if(i!=robo_marker_id)
+	mark_arr.markers[i].action = visualization_msgs::Marker::DELETE;
+    }
+    //viz_pub.publish(mark_arr);
+    pubbed_state =  all_allowed;
+  }
+  
+ 
+  else{
+    double delta_t = .5 * frame_rate; // .5 secs
+  
+    int n_vel_markers=3;
+    // Set the frame ID and timestamp.  See the TF tutorials for information on these.
+    pos_marker.header.frame_id = hum_frame;
+    pos_marker.header.stamp = ros::Time::now();
+
+    // Set the namespace and id for this marker.  This serves to create a unique ID
+    // Any marker sent with the same namespace and id will overwrite the old one
+    pos_marker.ns = "human";
+    pos_marker.id = 0;
+
+    // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
+    uint32_t cylinder = visualization_msgs::Marker::CYLINDER;
+    pos_marker.type = cylinder;
+
+    // Set the pos_marker action.  Options are ADD and DELETE
+    pos_marker.action = visualization_msgs::Marker::ADD;
+
+    // Set the pose of the pos_marker.  This is a full 6DOF pose relative to the frame/time specified in the header
+    pos_marker.pose.position.x = pos.pose.position.x;
+    pos_marker.pose.position.y = pos.pose.position.y;
+    pos_marker.pose.position.z = 0;
+    pos_marker.pose.orientation.x = 0.0;
+    pos_marker.pose.orientation.y = 0.0;
+    pos_marker.pose.orientation.z = 0.0;
+    pos_marker.pose.orientation.w = 1.0;
+  
+    // Set the scale of the pos_marker -- 1x1x1 here means 1m on a side
+    pos_marker.scale.x = 0.3;
+    pos_marker.scale.y = 0.3;
+    pos_marker.scale.z = 2.0;
+  
+    // Set the color -- be sure to set alpha to something non-zero!
+    pos_marker.color.r = 1.0f;
+    pos_marker.color.g = 0.0f;
+    pos_marker.color.b = 0.0f;
+    pos_marker.color.a = 1.0;
+
+    pos_marker.pose.position.z += pos_marker.scale.z/2;
+  
+    pos_marker.lifetime = ros::Duration();
+
+    //velocity markers
+    vel_marker1 = pos_marker;
+    vel_marker1.id = 1;
+    vel_marker1.pose.position.z = 0;
+
+    vel_marker1.pose.position.x = pos.pose.position.x + delta_t * vel.pose.position.x;
+    vel_marker1.pose.position.y = pos.pose.position.y + delta_t * vel.pose.position.y;;
+    vel_marker1.scale.x = 0.6;
+    vel_marker1.scale.y = 0.6;
+    vel_marker1.scale.z = 0.01;
+
+    vel_marker1.color.a = 1.0f;
+    vel_marker1.color.r = 0.0f;
+    vel_marker1.color.g = 1.0f;
+
+    mark_arr.markers.clear();
+
+    mark_arr.markers.push_back(pos_marker);
+  
+    vel_marker2 = vel_marker1;
+    vel_marker3 = vel_marker2;
+    vel_marker2.id = 2;
+    vel_marker3.id = 3;
+  
+    vel_marker2.color.a *= (.5);
+    vel_marker3.color.a *= pow((.5),2);
+
+    vel_marker2.pose.position.x += delta_t * vel.pose.position.x;
+    vel_marker2.pose.position.y += delta_t * vel.pose.position.y;
+
+    vel_marker3.pose.position.x += 2 * delta_t * vel.pose.position.x;
+    vel_marker3.pose.position.y += 2 * delta_t * vel.pose.position.y;
+
+    double vel_mag = sqrt(pow(vel.pose.position.x,2) + pow(vel.pose.position.y,2));
+    double mark_scale = delta_t * vel_mag;
+  
+    vel_marker2.scale.x += mark_scale;
+    vel_marker2.scale.y += mark_scale;
+
+    vel_marker3.scale.x += 2 * mark_scale;
+    vel_marker3.scale.y += 2 * mark_scale;
+
+    mark_arr.markers.push_back(vel_marker1);
+    mark_arr.markers.push_back(vel_marker2);
+    mark_arr.markers.push_back(vel_marker3);
+    
+    // for (int i=0; i<n_vel_markers; i++){
+    //   visualization_msgs::Marker temp_vel_marker;
+    //   vel_marker.id += i;
+    //   temp_vel_marker = vel_marker;
+    //   temp_vel_marker.color.a *= pow(0.5,i);
+    //   temp_vel_marker.pose.position.x += i * delta_t * vel.pose.position.x;
+    //   temp_vel_marker.pose.position.y += i * delta_t * vel.pose.position.y;;
+    //   double vel_mag = sqrt(pow(vel.pose.position.x,2) + pow(vel.pose.position.y,2));
+    //   double mark_scale = delta_t * vel_mag;
+    //   temp_vel_marker.scale.x += i * mark_scale;
+    //   temp_vel_marker.scale.y += i * mark_scale;
+    //   mark_arr.markers.push_back(pos_marker);
+    //   }
+    // //debug
+    // cout << mark_arr.markers.size() << endl;
+  
+    //robot marker
+    robo_marker = pos_marker;
+    robo_marker.id = 10;
+    robo_marker.pose.position.x = 1.0;
+    robo_marker.pose.position.y = -1.0;
+    robo_marker.pose.position.z = 0.0;
+  
+    // Set the scale of the robo_marker -- 1x1x1 here means 1m on a side
+    robo_marker.scale.x = 0.5;
+    robo_marker.scale.y = 0.5;
+    robo_marker.scale.z = 0.01;
+  
+    // Set the color -- be sure to set alpha to something non-zero!
+    mark_arr.markers.push_back(robo_marker);
+
+    double v1_dist = sqrt(pow(vel_marker1.pose.position.x-
+			      robo_marker.pose.position.x,2) 
+			  + pow(vel_marker1.pose.position.y
+				-robo_marker.pose.position.y,2));
+    double v2_dist = sqrt(pow(vel_marker2.pose.position.x-
+			      robo_marker.pose.position.x,2) 
+			  + pow(vel_marker2.pose.position.y
+				-robo_marker.pose.position.y,2));
+    double v3_dist = sqrt(pow(vel_marker3.pose.position.x-
+			      robo_marker.pose.position.x,2) 
+			  + pow(vel_marker3.pose.position.y
+				-robo_marker.pose.position.y,2));
+
+    double v1_allowed = ((vel_marker1.scale.x+robo_marker.scale.x) 
+			 + (vel_marker1.scale.y+robo_marker.scale.y))/2;
+    double v2_allowed = ((vel_marker2.scale.x+robo_marker.scale.x) 
+			 + (vel_marker2.scale.y+robo_marker.scale.y))/2;
+    double v3_allowed = ((vel_marker3.scale.x+robo_marker.scale.x) 
+			 + (vel_marker3.scale.y+robo_marker.scale.y))/2;
+  
+    if(v3_dist<v3_allowed)
+      pubbed_state = front_slow;
+    // if(v2_dist<v2_allowed)
+    //   return ;
+    if(v1_dist<v1_allowed)
+      pubbed_state = backward_only;
+
+
+  }    
+  
+  
+  if(mark_arr.markers.size()>0){
+
+    switch(pubbed_state){
+    case all_allowed:
+      mark_arr.markers[robo_marker_id].color.r = 0.0f;
+      mark_arr.markers[robo_marker_id].color.g = 1.0f;
+      mark_arr.markers[robo_marker_id].color.b = 0.0f;
+      mark_arr.markers[robo_marker_id].color.a = 1.0;
+      break;
+  
+    case front_slow:
+      mark_arr.markers[robo_marker_id].color.r = 1.0f;
+      mark_arr.markers[robo_marker_id].color.g = 1.0f;
+      mark_arr.markers[robo_marker_id].color.b = 0.0f;
+      mark_arr.markers[robo_marker_id].color.a = 1.0;
+      break;
+  
+    case backward_only:
+      mark_arr.markers[robo_marker_id].color.r = 1.0f;
+      mark_arr.markers[robo_marker_id].color.g = 0.0f;
+      mark_arr.markers[robo_marker_id].color.b = 0.0f;
+      mark_arr.markers[robo_marker_id].color.a = 1.0;
+      break;
+    }
+  }
+  
+  // Publish the mark_arr.markers[robo_marker_id]
+  viz_pub.publish(mark_arr);
+  
+  return pubbed_state;
+}
+
+void filter_estimate(const cv::Point2f prev_pos, const cv::Point2f prev_vel, 
+		     cv::Point2f &cur_pos, cv::Point2f &cur_vel)
+{
+  if (!isnan(prev_pos.x) && !isnan(prev_vel.x)){
+    cur_vel = cur_pos - prev_pos;
+
+    cv::Point2f cur_acc = cur_vel-prev_vel;
+    double mag_cur_acc = cv::norm(cur_acc);
+    
+    if (mag_cur_acc>max_filt_acc){
+      cur_acc = (max_filt_acc/cv::norm(cur_acc)) * cur_acc;
+    }
+    cur_vel = prev_vel + cur_acc;
+    double mag_cur_vel = cv::norm(cur_vel);
+    
+    if (mag_cur_vel>max_filt_vel){
+      cur_vel = (max_filt_vel/cv::norm(cur_vel)) * cur_vel;
+    }
+    
+    cur_pos = prev_pos + cur_vel;
+  }
+  
+  else{
+    if (isnan(prev_pos.x)){
+	cur_vel.x = numeric_limits<double>::quiet_NaN();
+	cur_vel.y = numeric_limits<double>::quiet_NaN();
+	return;
+      }
+    else{
+      cur_vel = cur_pos - prev_pos;
+      
+      double mag_cur_vel = cv::norm(cur_vel);
+      
+      if (mag_cur_vel>max_filt_vel){
+	cur_vel = (max_filt_vel/cv::norm(cur_vel)) * cur_vel;
+      }
+    
+      cur_pos = prev_pos + 0.5 * cur_vel; // not very sure of velocity
+					  // the first time around
+
+    }
+  }
 }
