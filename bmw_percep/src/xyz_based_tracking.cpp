@@ -111,6 +111,15 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
   ros::Time begin, end;
   
   cout << "\nInitializing background ..." << endl;
+
+      cv::Mat translate = (cv::Mat_<double>(3,1) << -1.1073859, -0.73154575, -2.3490002);
+      double z_rot_cos = -0.3764;
+      double z_rot_sin = sqrt(1-pow(z_rot_cos,2));
+      cv::Mat rot_mat = (cv::Mat_<double>(3,3)<<
+			 z_rot_cos, -z_rot_sin, 0, 
+			 z_rot_sin, z_rot_cos,  0,
+			 0,         0,          1 );
+
   
   while(ros::ok()){
 
@@ -211,13 +220,6 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
 
       //foreMask = 255 * foreMask;
 
-      cv::Mat translate = (cv::Mat_<double>(3,1) << -1.1073859, -0.73154575, -2.3490002);
-      double z_rot_cos = 0.3764;
-      double z_rot_sin = sqrt(1-pow(z_rot_cos,2));
-      cv::Mat rot_mat = (cv::Mat_<double>(3,3)<<
-			 z_rot_cos, -z_rot_sin, 0, 
-			 z_rot_sin, z_rot_cos,  0,
-			 0,         0,          1 );
       //translate then rotate point cloud
       // double translate[] = {-1.1073859, -0.73154575, -2.3490002};
       // double z_rot_cos = 0.3764;
