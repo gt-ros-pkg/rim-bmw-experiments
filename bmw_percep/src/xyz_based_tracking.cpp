@@ -61,6 +61,12 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
   pos_msg.pose.orientation.x=0; pos_msg.pose.orientation.y=0; 
   pos_msg.pose.orientation.z=0; pos_msg.pose.orientation.z=0;
   vel_msg.pose.orientation = pos_msg.pose.orientation;
+
+  geometry_msgs::PoseStamped noPerson_pos_msg, noPerson_vel_msg;
+  noPerson_pos_msg = pos_msg;
+  noPerson_pos_msg.pose.position.x = nan();
+  noPerson_pos_msg.pose.position.y = nan();
+  noPerson_pos_msg = noPerson_vel_msg;
   
   //Various objects
   PointCloudX::Ptr cloud (new PointCloudX);
@@ -295,14 +301,22 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
       vel_msg.pose.position.y = hum_pt.y; 
       vel_msg.pose.position.z = 0; // 2D points 
       
-      pub_pos.publish(pos_msg);
-      pub_vel.publish(vel_msg);
-     
+      //velocity computation
+      if (isnan(prev_pos_msg.pose.position.x)){
+	pub_pos.publish(noPerson_pos_msg);
+	pub_vel.publish(noPerson_vel_msg);
+      }
+      else{
+	//velocity computation
+
+	pub_pos.publish(pos_msg);
+	pub_vel.publish(vel_msg);
+      }
       end = ros::Time::now();
       //debug
       //cout << "Iteration time: " << end-begin << endl;
       //debug
-      cout << "To be published "<< hum_pt << endl;
+      //cout << "To be published "<< hum_pt << endl;
 
       cloud_mutex.unlock (); // let go of current cloud
     }
