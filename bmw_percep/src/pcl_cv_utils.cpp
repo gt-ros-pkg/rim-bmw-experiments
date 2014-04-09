@@ -217,6 +217,62 @@ int cv_utils::find_blobs(const cv::Mat &binary, vector < vector<cv::Point2i> > &
   return max_area;
 }
 
+
+// Find blobs in a binary image as a vector of a vector of 2D points
+// returns the area of largest blob
+int cv_utils::find_blobs(const cv::Mat &binary, vector < vector<cv::Point2i> > &blobs,
+			 int& max_blob_id)
+{
+  blobs.clear();
+  int max_area =0;
+  int max_label =-1;
+  vector<int> label_areas;
+  label_areas.clear();
+  
+  cv::Mat label_img;
+  binary.convertTo(label_img, CV_32FC1);
+    
+  float label_count = 2; // starts at 2 because 0,1 are used already
+  
+  for(int y=0; y < label_img.rows; y++) {
+    const float* label_row = label_img.ptr<float>(y);
+    for(int x=0; x < label_img.cols; x++) {
+      if(int(label_row[x]) !=1) {continue;}
+      cv::Rect rect;
+      cv::floodFill(label_img, cv::Point(x,y), cv::Scalar(label_count), &rect);
+	
+      vector <cv::Point2i> blob;
+      blob.clear();
+
+      int label_area=0;
+      
+      for(int i=rect.y; i < (rect.y+rect.height); i++) {
+	for(int j=rect.x; j < (rect.x+rect.width); j++) {
+	  if(int(label_img.at<float>(i,j)) != label_count) {continue;}
+	  blob.push_back(cv::Point2i(j,i));
+	  label_area++;
+	}
+      }
+
+      label_areas.push_back(label_area);
+      blobs.push_back(blob);
+	
+      //check for max
+      if (label_area>max_area)
+	{
+	  max_area=label_area; 
+	  max_label=label_count-2;
+	}
+	
+      label_count++;
+    }
+  }
+
+  //return the maximum area found under a blob
+  max_blob_id = max_label;
+  return max_area;
+}
+
 // Find blobs in a depth image as a vector of a vector of 2D points
 // returns the area of largest blob
 int cv_utils::find_blobs_depth(const cv::Mat &binary, const cv::Mat &depth,

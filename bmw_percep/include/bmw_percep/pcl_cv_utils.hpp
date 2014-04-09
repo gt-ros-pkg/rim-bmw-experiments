@@ -34,7 +34,12 @@ bool pc_to_depth(const PointCloudX::Ptr& cloud,
 // Find blobs in a binary image as a vector of a vector of 2D points
 // returns the area of largest blob
   int find_blobs(const cv::Mat &binary, 
-			   vector < vector<cv::Point2i> > &blobs);
+			   vector < vector<cv::Point2i> > &blobs
+		 );
+
+  int find_blobs(const cv::Mat &binary, 
+		 vector < vector<cv::Point2i> > &blobs,
+		 int& max_blob_id);
 
   // Find blobs in a depth image as a vector of a vector of 2D points
   // returns the area of largest blob
