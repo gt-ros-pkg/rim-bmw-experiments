@@ -8,7 +8,9 @@ from collections import deque
 
 from roslaunch.substitution_args import resolve_args
 
+import rospy
 from hrl_geom.pose_converter import PoseConv
+from geometry_msgs.msg import PoseStamped, PoseArray
 
 #         self.ar_man = ARTagManager(bin_slots, available_bins)
 #         ar_grasp_tag_pose, grasp_is_table = self.ar_man.get_bin_pose(ar_grasp_id)
@@ -34,14 +36,35 @@ class ARTagManagerInterface(object):
         # distance from marker to slot which can be considered unified
         self.ar_unification_thresh = 0.12
         # self.ar_unification_thresh = rospy.get_param("~ar_unification_thresh", 0.12)
+        self.table_height = 0.0
+        self.bin_height = 0.101
 
         self.bin_slots = bin_slots
         self.available_bins = available_bins
-        self.slot_tree = create_slot_tree(bin_slots)
+        if len(bin_slots) > 0:
+            self.slot_tree = create_slot_tree(bin_slots)
+        else:
+            self.slot_tree = None
         self.camera_pose = np.mat(np.eye(4))
 
         self.ar_poses = {}
         self.lock = RLock()
+
+        self.slots_pub = rospy.Publisher("/bin_slots", PoseArray, latch=True)
+        self.publish_poses(self.slots_pub, [bin_slots[slot] for slot in bin_slots])
+
+        self.clean_mkrs_pub = rospy.Publisher("/bin_poses_clean", PoseArray, latch=True)
+
+    def publish_poses(self, pub, poses):
+        pose_arr = PoseArray()
+        frame = "/base_link"
+        # print bin_data
+        for pose in poses:
+            pose_msg = PoseConv.to_pose_msg(pose)
+            pose_arr.poses.append(pose_msg)
+        pose_arr.header.frame_id = frame
+        pose_arr.header.stamp = rospy.Time.now()
+        pub.publish(pose_arr)
 
     # forces bin location from a pose in the base_link frame
     def set_bin_location(self, mid, pose, cur_time=0.):
@@ -76,6 +99,7 @@ class ARTagManagerInterface(object):
                 pos_list.append(pos)
                 rot_list.append(rot)
             med_pos, med_rot = np.median(pos_list,0), np.median(rot_list,0)
+            med_pos[2] = self.table_height + self.bin_height
             return (med_pos.tolist(), med_rot.tolist())
 
     def get_all_bin_poses(self):
@@ -116,26 +140,28 @@ class ARTagManagerInterface(object):
         if slots_to_check is None:
             slots_to_check = self.bin_slots.keys()
         slot_states, _ = self.get_bin_slot_states()
+        slot_ids = self.get_slot_ids()
         bins = []
         for ind, slot_state in enumerate(slot_states):
             if slot_state != -1:
-                slot_in_set = ind in slots_to_check
+                slot_in_set = slot_ids[ind] in slots_to_check
                 if np.logical_xor(not slot_in_set, not invert_set):
                     bins.append(slot_state)
         return sorted(bins)
 
     # finds the closest empty slot to the pos position
-    def get_empty_slot(self, slots_to_check=None, invert_set=False, pos=[0.,0.,0.]):
-        if slots_to_check is None:
-            slots_to_check = self.bin_slots.keys()
-        slot_states, _ = self.get_bin_slot_states()
-        dists, inds = self.slot_tree.query(pos, k=len(self.slot_tree.data)) 
-        for ind in inds:
-            if slot_states[ind] == -1:
-                slot_in_set = ind in slots_to_check
-                if np.logical_xor(not slot_in_set, not invert_set):
-                    return self.get_slot_ids()[ind]
-        return -1
+    # def get_empty_slot(self, slots_to_check=None, invert_set=False, pos=[0.,0.,0.]):
+    #     if slots_to_check is None:
+    #         slots_to_check = self.bin_slots.keys()
+    #     slots_to_check.sort()
+    #     slot_states, _ = self.get_bin_slot_states()
+    #     dists, inds = self.slot_tree.query(pos, k=len(self.slot_tree.data)) 
+    #     for ind in inds:
+    #         if slot_states[ind] == -1:
+    #             slot_in_set = ind in slots_to_check
+    #             if np.logical_xor(not slot_in_set, not invert_set):
+    #                 return self.get_slot_ids()[ind]
+    #     return -1
 
     def get_empty_slots(self, slots_to_check=None, invert_set=False):
         if slots_to_check is None:
@@ -145,13 +171,14 @@ class ARTagManagerInterface(object):
         empty_slots = []
         for ind, slot_state in enumerate(slot_states):
             if slot_state == -1:
-                slot_in_set = ind in slots_to_check
+                slot_in_set = slot_ids[ind] in slots_to_check
                 if np.logical_xor(not slot_in_set, not invert_set):
                     empty_slots.append(slot_ids[ind])
         return empty_slots
 
     def get_random_empty_slot(self, slots_to_check=None, invert_set=False):
         empty_slots = self.get_empty_slots(slots_to_check, invert_set)
+        print 'get_random_slot empty_slots', empty_slots
         if len(empty_slots) == 0:
             return None, None
         rand_slot = empty_slots[np.random.randint(len(empty_slots))]
@@ -160,6 +187,7 @@ class ARTagManagerInterface(object):
 
     def get_random_bin(self, slots_to_check=None, invert_set=False):
         bins = self.get_filled_slots(slots_to_check, invert_set)
+        print 'get_random_bin filled_slots', bins
         if len(bins) == 0:
             return None, None
         rand_bin = bins[np.random.randint(len(bins))]
@@ -173,6 +201,12 @@ class ARTagManagerSimulator(ARTagManagerInterface):
         for i in bin_init_locs:
             self.ar_poses[i] = deque()
             self.ar_poses[i].append([0., bin_init_locs[i]])
+
+        self.pub_timer = rospy.Timer(rospy.Duration(0.3), self.pub_poses)
+
+    def pub_poses(self, data):
+        bin_data = self.get_all_bin_poses()
+        self.publish_poses(self.clean_mkrs_pub, [bin_data[binl] for binl in bin_data])
 
 def load_bin_slots(filename):
     f = file(resolve_args(filename), 'r')

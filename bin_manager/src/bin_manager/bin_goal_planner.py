@@ -11,15 +11,27 @@ class BinGoalPlanner(object):
     def __init__(self, ar_tag_man):
         # self.ar_tag_man = ARTagManager(bin_slots, available_bins)
         self.ar_tag_man = ar_tag_man
-        self.place_offset = rospy.get_param("~place_offset", 0.02)
-        self.ar_offset = rospy.get_param("~ar_offset", 0.100)
-        self.grasp_height = rospy.get_param("~grasp_height", 0.10)
-        self.grasp_rot = rospy.get_param("~grasp_rot", 0.0)
+
+        self.place_offset = 0.020
+        self.ar_offset = 0.100
+
+        # calculate grasp height
+        # ar poses give the top edge of the bin
+        self.gripper_tip_end = 0.156 # end of rubber
+        self.gripper_tip_start = 0.121 # beginning of rubber
+        self.gripper_palm = 0.083 # where the metal inside starts
+        # self.grasp_height = self.gripper_tip_start - 0.2 * (self.gripper_tip_start - self.gripper_palm)
+        # self.grasp_height = self.gripper_tip_end + 0.050
+        self.grasp_height = 0.15
+
+        self.grasp_rot = 0.0
 
         self.cur_grasp_bin_id = None
         self.cur_ar_place_tag_pose = None
 
-        self.pose_array_pub = rospy.Publisher('/ar_pose_array', PoseArray)
+        self.pose_array_pub = rospy.Publisher('/ar_pose_array', PoseArray, latch=True)
+        self.grasp_goal_pub = rospy.Publisher('/grasp_goal', PoseStamped, latch=True)
+        self.place_goal_pub = rospy.Publisher('/place_goal', PoseStamped, latch=True)
 
     # given semanic bin/slot IDs, determine the necessary grasp pose
     # and place pose to complete the task
@@ -47,6 +59,9 @@ class BinGoalPlanner(object):
 
         self.cur_grasp_bin_id = grasp_bin_id
         self.cur_ar_place_tag_pose = ar_place_tag_pose
+
+        self.grasp_goal_pub.publish(PoseConv.to_pose_stamped_msg('/base_link', grasp_pose))
+        self.place_goal_pub.publish(PoseConv.to_pose_stamped_msg('/base_link', place_pose))
 
         return grasp_pose, place_pose
 

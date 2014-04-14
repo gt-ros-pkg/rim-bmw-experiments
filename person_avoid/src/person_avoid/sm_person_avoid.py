@@ -104,14 +104,38 @@ class SMStopMonitor(smach.State):
                 return 'stop'
             r.sleep()
 
+class SMSecurityStopMonitor(smach.State):
+    def __init__(self, arm):
+        smach.State.__init__(self,
+            outcomes=['stop', 'preempted', 'shutdown'],
+            input_keys=['bin_move_goal'],
+            output_keys=['bin_move_goal'])
+        self.arm = arm
+
+    def execute(self, ud):
+        self.is_stop_requested = False
+        r = rospy.Rate(10)
+        while True:
+            if rospy.is_shutdown():
+                rospy.loginfo('SMStopMonitor shutdown!')
+                return 'shutdown'
+            if self.preempt_requested():
+                self.service_preempt()
+                rospy.loginfo('SMStopMonitor preempted!')
+                return 'preempted'
+            if self.arm.is_security_stopped():
+                return 'stop'
+            r.sleep()
+
 class SMWaitForAllClear(smach.State):
-    def __init__(self, stop_topic, all_clear_topic):
+    def __init__(self, stop_topic, all_clear_topic, arm):
         smach.State.__init__(self,
             outcomes=['all_clear', 'preempted', 'shutdown'],
             input_keys=['bin_move_goal'],
             output_keys=['bin_move_goal'])
         self.stop_sub = rospy.Subscriber(stop_topic, Bool, self.stop_cb)
         self.all_clear_sub = rospy.Subscriber(all_clear_topic, Bool, self.all_clear_cb)
+        self.arm = arm
 
     def stop_cb(self, stop_msg):
         self.cur_stop_state = stop_msg.data
@@ -132,6 +156,7 @@ class SMWaitForAllClear(smach.State):
                 rospy.loginfo('SMWaitForAllClear preempted!')
                 return 'preempted'
             if not self.cur_stop_state and self.cur_all_clear_state:
+                self.arm.unlock_security_stop()
                 return 'all_clear'
             r.sleep()
 
@@ -175,30 +200,30 @@ class SMGenerateRandomMoveGoals(smach.State):
             cur_grasp_slots = self.grasp_slots
             cur_place_slots = self.place_slots
             prev_place_slot = None
+            last_grasp_in_grasp_slots = False
         else:
             # get location of bin last placed
             prev_place_slot = userdata.bin_move_goal['place_slot_id']
+            last_grasp_in_grasp_slots = userdata.bin_move_goal['last_grasp_in_grasp_slots']
 
-            # only grasp from same side
-            if prev_place_slot in self.grasp_slots:
-                cur_grasp_slots = self.grasp_slots
-                cur_place_slots = self.place_slots
-            elif prev_place_slot in self.place_slots:
+            # # only grasp from same side
+            if last_grasp_in_grasp_slots:
                 cur_grasp_slots = self.place_slots
                 cur_place_slots = self.grasp_slots
             else:
-                rospy.logerr('Bin not in recognized slot, this should not happen')
-                return 'aborted'
+                cur_grasp_slots = self.grasp_slots
+                cur_place_slots = self.place_slots
 
             # only grasp bins not just placed
-            cur_grasp_slots = np.setdiff1d(cur_grasp_slots, [prev_place_slot])
+            # cur_grasp_slots = np.setdiff1d(cur_grasp_slots, [prev_place_slot])
 
-        # print 'OLD', userdata.bin_move_goal
-        # print 'cur_grasp_slots',  cur_grasp_slots
-        # print 'prev_place_slot',  prev_place_slot
-        # print 'cur_place_slots',  cur_place_slots
-        # print 'self.grasp_slots', self.grasp_slots
-        # print 'self.place_slots', self.place_slots
+        print 'OLD', userdata.bin_move_goal
+        print 'cur_grasp_slots',  cur_grasp_slots
+        print 'prev_place_slot',  prev_place_slot
+        print 'cur_place_slots',  cur_place_slots
+        print 'self.grasp_slots', self.grasp_slots
+        print 'self.place_slots', self.place_slots
+        print 'SLOT STATES', self.ar_tag_man.get_bin_slot_states()
         rand_bin, rand_bin_loc = self.ar_tag_man.get_random_bin(cur_grasp_slots)
         if rand_bin is None:
             rospy.logerr('No other bins to move on same side, this should not happen')
@@ -213,6 +238,82 @@ class SMGenerateRandomMoveGoals(smach.State):
             'grasp_bin_id' : rand_bin,
             'place_slot_id' : rand_slot,
             'grasp_pose' : grasp_pose,
+            'place_pose' : place_pose,
+            'last_grasp_in_grasp_slots' : not last_grasp_in_grasp_slots
+        }
+        print 'NEW bin_move_goal --------------------------', bin_move_goal
+        userdata.bin_move_goal = bin_move_goal
+        return 'success'
+
+class SMGenerateRandomMoveGoalsFlip(smach.State):
+    def __init__(self, bin_goal_planner, grasp_slots, place_slots):
+        smach.State.__init__(self,
+            outcomes=['success', 'aborted'],
+            input_keys=['bin_move_goal'],
+            output_keys=['bin_move_goal'])
+        self.bin_goal_planner = bin_goal_planner
+        self.ar_tag_man = bin_goal_planner.ar_tag_man
+        self.grasp_slots = grasp_slots
+        self.place_slots = place_slots
+
+        self.FLIP = False
+
+    def execute(self, userdata):
+        if len(userdata.bin_move_goal) == 0:
+            cur_grasp_slots = self.grasp_slots
+            cur_place_slots = self.place_slots
+            prev_place_slot = None
+        else:
+            # get location of bin last placed
+            prev_place_slot = userdata.bin_move_goal['place_slot_id']
+
+            if self.FLIP:
+                cur_grasp_slots = self.grasp_slots
+                cur_place_slots = self.place_slots
+                self.FLIP = False
+            else:
+                cur_grasp_slots = self.place_slots
+                cur_place_slots = self.grasp_slots
+                self.FLIP = True
+            # # only grasp from same side
+            # if prev_place_slot in self.grasp_slots:
+            #     cur_grasp_slots = self.grasp_slots
+            #     cur_place_slots = self.place_slots
+            # elif prev_place_slot in self.place_slots:
+            #     cur_grasp_slots = self.place_slots
+            #     cur_place_slots = self.grasp_slots
+            # else:
+            #     rospy.logerr('Bin not in recognized slot, this should not happen')
+            #     return 'aborted'
+
+            # only grasp bins not just placed
+            cur_grasp_slots = np.setdiff1d(cur_grasp_slots, [prev_place_slot])
+
+        # print 'OLD', userdata.bin_move_goal
+        # print 'cur_grasp_slots',  cur_grasp_slots
+        # print 'prev_place_slot',  prev_place_slot
+        # print 'cur_place_slots',  cur_place_slots
+        # print 'self.grasp_slots', self.grasp_slots
+        # print 'self.place_slots', self.place_slots
+        print cur_grasp_slots
+        ALL_BINS = [15,13,7,9]
+        ALL_SLOTS = [15,13,7,9,3,10]
+        rand_bin = ALL_BINS[np.random.randint(4)]
+        rand_slot = ALL_SLOTS[np.random.randint(6)]
+        # rand_bin, rand_bin_loc = self.ar_tag_man.get_random_bin(cur_grasp_slots)
+        # if rand_bin is None:
+        #     rospy.logerr('No other bins to move on same side, this should not happen')
+        #     return 'aborted'
+        # rand_slot, rand_slot_loc = self.ar_tag_man.get_random_empty_slot(cur_place_slots)
+        # if rand_slot is None:
+        #     rospy.logerr('No other slots to move to on opposite side, this should not happen')
+        #     return 'aborted'
+        grasp_pose, place_pose = self.bin_goal_planner.generate_bin_location_goals(
+                                                                     rand_bin, rand_slot)
+        bin_move_goal = {
+            'grasp_bin_id' : rand_bin,
+            'place_slot_id' : rand_slot,
+            'grasp_pose' : grasp_pose,
             'place_pose' : place_pose
         }
         # print 'NEW', bin_move_goal
@@ -221,7 +322,7 @@ class SMGenerateRandomMoveGoals(smach.State):
 
 class SMGenerateMotionPlan(smach.State):
     # def __init__(self, bin_man_moplan, is_grasp):
-    def __init__(self, bin_man_moplan, is_grasp, is_start_free, is_slow=False):
+    def __init__(self, bin_man_moplan, is_grasp, is_start_free, front_requested=True, is_slow=False):
         smach.State.__init__(self,
             outcomes=['success'],
             input_keys=['bin_move_goal'],
@@ -229,7 +330,12 @@ class SMGenerateMotionPlan(smach.State):
         self.bin_man_moplan = bin_man_moplan
         self.is_grasp = is_grasp
         self.is_start_free = is_start_free
+        self.front_requested = front_requested
         self.is_slow = is_slow
+        self.front_request_sub = rospy.Subscriber('/person_avoid/move_front', Bool, self.front_cb)
+
+    def front_cb(self, msg):
+        self.front_requested = msg.data
 
     def execute(self, userdata):
         if self.is_grasp:
@@ -237,7 +343,7 @@ class SMGenerateMotionPlan(smach.State):
         else:
             goal_pose = userdata.bin_move_goal['place_pose']
 
-        NORMAL_VEL = 0.47
+        NORMAL_VEL = 0.25
         if self.is_slow:
             midpt_vel = NORMAL_VEL/3.
         else:
@@ -246,15 +352,18 @@ class SMGenerateMotionPlan(smach.State):
         now_time = rospy.Time.now()
         start_time = rospy.get_time()
         if self.is_start_free:
-            q_spline = self.bin_man_moplan.plan_free_to_bin_traj(goal_pose, midpt_vel=midpt_vel)
+            q_spline = self.bin_man_moplan.plan_free_to_bin_traj(
+                    goal_pose, self.front_requested, self.is_grasp, midpt_vel=midpt_vel)
         else:
-            q_spline = self.bin_man_moplan.plan_bin_to_bin_traj(goal_pose)
+            q_spline = self.bin_man_moplan.plan_bin_to_bin_traj(
+                    goal_pose, self.front_requested, self.is_grasp, self.is_grasp, 
+                    midpt_vel=midpt_vel)
         print rospy.get_time() - start_time
 
         fjt = FollowJointTrajectoryGoal()
         fjt.trajectory = q_spline.to_trajectory_msg()
-        fjt.trajectory.header.stamp = now_time
-        # fjt.trajectory.header.stamp = rospy.Time.now() + rospy.Duration(0.05)
+        # fjt.trajectory.header.stamp = now_time
+        fjt.trajectory.header.stamp = rospy.Time.now() + rospy.Duration(0.05)
         fjt.trajectory.joint_names = self.bin_man_moplan.arm.JOINT_NAMES
 
         userdata.joint_traj_goal = fjt
@@ -299,10 +408,27 @@ def main():
         # return
         gripper = SimGripper()
     else:
+        # full setup
+        from bin_manager.ar_tag_manager import load_bin_slots
+        grasp_slots = [52, 53, 54, 55, 56]
+        place_slots = [57, 58, 59]
+        bin_slots = load_bin_slots('$(find bin_manager)/src/bin_manager/bin_slots_both1.yaml')
+        if False:
+            # real AR simulator
+            from bin_manager.ar_tag_manager import ARTagManager
+            ar_tag_man = ARTagManager(bin_slots)
+        else:
+            from bin_manager.ar_tag_manager_iface import ARTagManagerSimulator
+            bin_locs = load_bin_slots('$(find bin_manager)/src/bin_manager/test_bin_locs_both1.yaml')
+            ar_tag_man = ARTagManagerSimulator(bin_slots, bin_locs)
+
+        # start gripper
         gripper = RobotiqCGripper()
-        print 'Waiting for gripper...', 
+        print 'Waiting for gripper...'
         gripper.wait_for_connection()
-        print 'found.'
+        print 'Gripper found.'
+        gripper.goto(0.042, 0., 0., block=False)
+        print 'Opening gripper'
 
     ################ setup utility classes #######################
     cman = URControllerManager()
@@ -329,6 +455,11 @@ def main():
         jnt_traj_act_cli.cancel_all_goals()
     rospy.on_shutdown(shutdown_hook)
 
+    arm.set_tcp_payload(1.0)
+    rospy.sleep(1.)
+    arm.unlock_security_stop()
+    rospy.sleep(1.)
+
     # start pva joint trajectory controller
     cman.start_joint_controller('pva_trajectory_ctrl')
 
@@ -344,6 +475,7 @@ def main():
     jnt_traj_act_cli.wait_for_result()
     rospy.loginfo("Trajectory complete")
     ###############################################################
+    rospy.sleep(2.)
 
     def generate_move_sm(is_grasp):
         # generate a sub-state machine which does a grasp or a place
@@ -355,7 +487,7 @@ def main():
             smach.StateMachine.add(
                 'GEN_MOPLAN', 
                 SMGenerateMotionPlan(bin_man_moplan, is_grasp=is_grasp, is_start_free=False,
-                                     is_slow=False),
+                                     is_slow=False, front_requested=False),
                 transitions={'success' : 'JOINT_TRAJ_START'})
             smach.StateMachine.add(
                 'JOINT_TRAJ_START', 
@@ -367,6 +499,7 @@ def main():
             # build concurrence container for monitoring trajectory in motion
             wait_name = 'JOINT_TRAJ_WAIT'
             stop_mon_name = 'STOP_MONITOR'
+            sec_stop_mon_name = 'SEC_STOP_MONITOR'
             slow_mon_name = 'SLOW_MONITOR'
 
             def child_term_cb(outcome_map):
@@ -374,11 +507,15 @@ def main():
                     return True
                 if stop_mon_name in outcome_map and outcome_map[stop_mon_name]:
                     return True
+                if sec_stop_mon_name in outcome_map and outcome_map[sec_stop_mon_name]:
+                    return True
                 if slow_mon_name in outcome_map and outcome_map[slow_mon_name]:
                     return True
                 return False
             def out_cb(outcome_map):
                 if outcome_map[stop_mon_name] == 'stop':
+                    return 'stop'
+                if outcome_map[sec_stop_mon_name] == 'stop':
                     return 'stop'
                 if outcome_map[slow_mon_name] == 'stop':
                     return 'slow'
@@ -402,6 +539,9 @@ def main():
                 smach.Concurrence.add(
                     slow_mon_name, 
                     SMStopMonitor(slow_topic))
+                smach.Concurrence.add(
+                    sec_stop_mon_name, 
+                    SMSecurityStopMonitor(arm))
             smach.StateMachine.add('WAIT_MONITOR', sm_wait_monitor,
                 transitions={'success' : 'GRIPPER',
                              'stop' : 'JOINT_TRAJ_STOP',
@@ -415,7 +555,7 @@ def main():
 
             smach.StateMachine.add(
                 'WAIT_ALL_CLEAR',
-                SMWaitForAllClear(stop_topic, all_clear_topic),
+                SMWaitForAllClear(stop_topic, all_clear_topic, arm),
                 transitions={'all_clear' : 'GEN_STOP_REPLAN',
                              'preempted' : 'aborted'})
 

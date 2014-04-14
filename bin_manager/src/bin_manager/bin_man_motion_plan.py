@@ -20,12 +20,13 @@ class BinManagerMotionPlanner(object):
         self.grasp_vel = rospy.get_param("~grasp_vel", 0.03*VEL_MULT)
 
         self.qd_max = [0.2]*6
-        self.q_min = [-2.*np.pi, -1.9, 0.0, -3.1, -3.3, -2.*np.pi]
-        self.q_max = [2.*np.pi, 0.0, 2.8, -1.6, 0.3, 2.*np.pi]
+        self.q_min = [-2.*np.pi, -2.4, 0.0, -3.1, -3.3, -2.*np.pi]
+        self.q_max = [2.*np.pi, 0.0, 2.8, -1.0, 0.3, 2.*np.pi]
         self.q_home = [0.7678, -1.1937,  1.5725, -1.9750, -1.573, 0.0]
 
-    def plan_bin_to_bin_traj(self, goal_pose, mid_pts=[]):
+    def plan_bin_to_bin_traj(self, goal_pose, front_requested, is_grasp, mid_pts=[], midpt_vel=None):
         q_init = self.arm.get_q()
+        qd_init = self.arm.get_qd()
         x_init = self.kin.forward(q_init)
 
         q_knots = [q_init]
@@ -58,9 +59,10 @@ class BinManagerMotionPlanner(object):
         prev_q = q_knots[-1]
 
         # generate transversing trajectory
-        t_midpt_knots, q_midpt_knots = self.create_midpt_traj(
         # t_midpt_knots, q_midpt_knots = self.create_midpt_traj_new(
-                                            prev_t, prev_q, above_goal_pose)
+        t_midpt_knots, q_midpt_knots = self.create_midpt_traj(
+                                            prev_t, prev_q, above_goal_pose, 
+                                            is_grasp, front_requested, qd_init, midpt_vel)
         # print q_knots, 'YOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO'
         # print q_midpt_knots, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
         t_knots.extend(t_midpt_knots)
@@ -79,7 +81,7 @@ class BinManagerMotionPlanner(object):
         move_traj = SplineTraj.generate(t_knots, q_knots)
         return move_traj
 
-    def plan_free_to_bin_traj(self, goal_pose, mid_pts=[], midpt_vel=None):
+    def plan_free_to_bin_traj(self, goal_pose, front_requested, is_grasp, mid_pts=[], midpt_vel=None):
         if midpt_vel is None:
             midpt_vel = self.pregrasp_vel
         start_time = rospy.get_time()
@@ -101,9 +103,10 @@ class BinManagerMotionPlanner(object):
         prev_q = q_knots[-1]
 
         # generate transversing trajectory
-        t_midpt_knots, q_midpt_knots = self.create_midpt_traj(
         # t_midpt_knots, q_midpt_knots = self.create_midpt_traj_new(
-                                            prev_t, prev_q, above_goal_pose, qd_init, midpt_vel)
+        t_midpt_knots, q_midpt_knots = self.create_midpt_traj(
+                                            prev_t, prev_q, above_goal_pose, 
+                                            is_grasp, front_requested, qd_init, midpt_vel)
         t_knots.extend(t_midpt_knots)
         q_knots.extend(q_midpt_knots)
 
@@ -120,26 +123,122 @@ class BinManagerMotionPlanner(object):
         move_traj = SplineTraj.generate(t_knots, q_knots, qd_i=qd_init)
         return move_traj
 
-    def create_midpt_traj(self, prev_t, prev_q, above_goal_pose, qd_init=[0.]*6, midpt_vel=None):
+    def get_q1_goal(self, prev_q, new_pose, front_requested):
+
+        new_pose_ang = np.arctan2(new_pose[1,3], new_pose[0,3])
+        goal_left = new_pose_ang > 0.
+        print 'goal_left', goal_left, new_pose_ang, new_pose[:2,3]
+
+        q1 = prev_q[0]
+        print 'q1', q1
+        left_min = np.pi/2
+        left_max = np.pi
+        right_min = 3*np.pi/2
+        right_max = 2*np.pi
+        if goal_left:
+            if q1 <= -np.pi/2:
+                return left_min-2*np.pi, left_max-2*np.pi
+            elif q1 >= 0.:
+                return left_min, left_max
+            elif front_requested:
+                return left_min, left_max
+            else:
+                return left_min-2*np.pi, left_max-2*np.pi
+        else:
+            if q1 <= np.pi/2:
+                return right_min-2*np.pi, right_max-2*np.pi
+            elif q1 >= np.pi:
+                return right_min, right_max
+            elif front_requested:
+                return right_min-2*np.pi, right_max-2*np.pi
+            else:
+                return right_min, right_max
+
+
+        # left_min = np.pi/2
+        # left_max = np.pi
+        # right_min = -np.pi/2
+        # right_max = 0.
+        # q1 = prev_q[0]
+        # if q1 < 0.:
+        #     start_neg = True
+        # else:
+        #     start_neg = False
+        # if new_pose_ang > left_min and new_pose_ang < left_max:
+        #     end_left = True
+        # elif new_pose_ang > right_min and new_pose_ang < right_max:
+        #     end_left = False
+        # else:
+        #     rospy.logerr('end pose not in range..')
+        #     return None, None
+
+        # is_backwards = not front_requested
+        # if start_neg and not end_left:
+        #     # gotta go backwards
+        #     is_backwards = True
+        # if not start_neg and end_left:
+        #     # gotta go backwards
+        #     is_backwards = True
+
+        # if is_backwards:
+        #     if start_neg:
+        #         add_ang = 2*np.pi
+        #     else:
+        #         add_ang = 0
+        #     if end_left:
+        #         return right_min - np.pi + add_ang, right_max - np.pi + add_ang
+        #     else:
+        #         return left_min - np.pi + add_ang, left_max - np.pi + add_ang
+        # else:
+        #     # is front traj
+        #     if end_left:
+        #         return right_min + np.pi, right_max + np.pi
+        #     else:
+        #         return left_min - np.pi, left_max - np.pi
+
+    def get_q_bounds(self, prev_q, new_pose, front_requested):
+        q1_min, q1_max = self.get_q1_goal(prev_q, new_pose, front_requested)
+        q_min = np.array(self.q_min).copy()
+        q_max = np.array(self.q_max).copy()
+        q_min[0] = q1_min
+        q_max[0] = q1_max
+        return q_min, q_max
+
+    def create_midpt_traj(self, prev_t, prev_q, above_goal_pose, 
+                          is_grasp, front_requested, qd_init=[0.]*6, midpt_vel=None):
         if midpt_vel is None:
             midpt_vel = self.pregrasp_vel
         t_midpt_knots = []
         q_midpt_knots = []
         prev_pose = self.kin.forward(prev_q)
 
-        q_min = np.array(self.q_min).copy()
-        q_max = np.array(self.q_max).copy()
-
         # create midpts
         mid_pts = []
 
         for mid_pose in mid_pts + [above_goal_pose]: 
+
+            if is_grasp:
+                print 'IS GRASP'
+                q_min = np.array(self.q_min).copy()
+                q_max = np.array(self.q_max).copy()
+            else:
+                print 'IS PLACE'
+                q_min, q_max = self.get_q_bounds(prev_q, above_goal_pose, front_requested)
             q_mid_pose = self.kin.inverse(mid_pose, prev_q,
                                           q_min=q_min, q_max=q_max)
+            print 'prev_pose', prev_pose
+            print 'mid_pose', mid_pose
+            print 'prev_q', prev_q
+            print 'q_min', q_min
+            print 'q_mid_pose', q_mid_pose
+            print 'q_max', q_max
             if q_mid_pose is None:
-                print 'failed move to replace'
-                print mid_pose
-                print q_knots
+                rospy.logerr('Failed to find midpoint IK')
+                print 'mid_pose', mid_pose
+                print 'prev_q', prev_q
+                print 'q_min', q_min
+                print 'ALL SOLUTIONS'
+                print self.kin.inverse_all(mid_pose, prev_q)
                 return None
             q_midpt_knots.append(q_mid_pose)
             # use a heuristic time based on the velocity to select a knot time
@@ -211,7 +310,7 @@ class BinManagerMotionPlanner(object):
         q_home = self.q_home
         q_init = self.arm.get_q()
         start_time = rospy.get_time()
-        t_knots, q_knots = self.traj_plan.min_jerk_interp_q_vel(q_init, q_home, self.pregrasp_vel/5.)
+        t_knots, q_knots = self.traj_plan.min_jerk_interp_q_vel(q_init, q_home, self.pregrasp_vel/3.)
         print t_knots, q_knots
         print 'Planning time:', rospy.get_time() - start_time
         home_traj = SplineTraj.generate(t_knots, q_knots)
