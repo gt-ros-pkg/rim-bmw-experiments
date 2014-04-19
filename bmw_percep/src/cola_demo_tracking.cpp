@@ -4,25 +4,21 @@
 #include<opencv2/opencv.hpp>
 #include<bmw_percep/pcl_cv_utils.hpp>
 #include<bmw_percep/particleFilter.hpp>
+
+//ros-includes
+#include<ros/ros.h>
 #include<visualization_msgs/MarkerArray.h>
 #include<visualization_msgs/Marker.h>
 #include<std_msgs/UInt8.h>
 #include<std_msgs/Bool.h>
 #include<geometry_msgs/PoseStamped.h>
-//ros-includes
-#include<ros/ros.h>
+
 /**
    Sample program for implementing the complete chain of events for people tracking
 **/
-#include <Eigen/Core>
-#include <Eigen/Geometry>
-#include <pcl/filters/crop_box.h>
 
 typedef pcl::PointXYZ PointX;
 typedef pcl::PointCloud<PointX> PointCloudX;
-
-typedef pcl::PointXYZ PRGB;
-typedef pcl::PointCloud<PRGB> PCRGB;
 
 // Globals
 visualization_msgs::MarkerArray mark_arr;
@@ -136,11 +132,22 @@ int main(int argc, char** argv)
   cv::Point3f box_min = cv::Point3f(0.0, -0.5, 1.0);//(1.24, 0.55, 3.06);
   cv::Point3f box_max = cv::Point3f(1.2, 1.0, 3.0);//(0.8, 0.05, 1.9);
 
-  cv::Point3f boxin_min = cv::Point3f(atof(argv[1]), atof(argv[2]), atof(argv[3]));//(1.24, 0.55, 3.06);
-  cv::Point3f boxin_max = cv::Point3f(atof(argv[4]), atof(argv[5]), atof(argv[6]));//(0.8, 0.05, 1.9);
+  cv::Point3f boxin_min, boxin_max;
 
+  // If params for inlier box specified - use them
+  if (argc == 7){
+    boxin_min = 
+      cv::Point3f(atof(argv[1]), atof(argv[2]), atof(argv[3]));
+    boxin_max = 
+      cv::Point3f(atof(argv[4]), atof(argv[5]), atof(argv[6]));
+  }
+  // else previously stored params
+  else {
+    boxin_min = cv::Point3f(-1.0, -2.0, -10.0);
+    boxin_max = cv::Point3f(2.0, 0.5, 10.0);
+  }
+  
   bool bg_init = false; // has background been initialized
-  //TODO: initialize these mats
 
   // Read Kinect live stream:
   bool new_cloud_available_flag = false;
@@ -153,33 +160,38 @@ int main(int argc, char** argv)
   // Wait for the first frame:
   while(!new_cloud_available_flag) 
     boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-  //new_cloud_available_flag = true;
 
   int n_frames=0;
   
+
+  //vars to help profile
   ros::Time begin, end;
   
   cout << "\nInitializing background ..." << endl;
 
-      cv::Mat translate = (cv::Mat_<double>(3,1) << -1.1073859, -0.73154575, -2.3490002);
-      double z_rot_cos = 0.3764;
-      double z_rot_sin = -sqrt(1-pow(z_rot_cos,2));
-      cv::Mat rot_mat1 = (cv::Mat_<double>(3,3)<<
-			 z_rot_cos, -z_rot_sin, 0, 
-			 z_rot_sin, z_rot_cos,  0,
-			 0,         0,          1 );
+  //Transform into the ground plane frame of reference
+  cv::Mat translate = (cv::Mat_<double>(3,1) << -1.1073859, -0.73154575, -2.3490002);
+  cv::Mat rotate_mat;
+  double z_rot_cos = 0.3764;
+  double z_rot_sin = -sqrt(1-pow(z_rot_cos,2));
+  cv::Mat rot_mat1 = (cv::Mat_<double>(3,3)<<
+		      z_rot_cos, -z_rot_sin, 0, 
+		      z_rot_sin, z_rot_cos,  0,
+		      0,         0,          1 );
 
-      double y_rot_cos = 0.05378;
-      double y_rot_sin = sqrt(1-pow(y_rot_cos,2));
-      cv::Mat rot_mat2 = (cv::Mat_<double>(3,3)<<
-			  y_rot_cos,  0,          y_rot_sin,
-			  0,          1,          0,
-			  -y_rot_sin,  0,          y_rot_cos);
-        
+  double y_rot_cos = 0.05378;
+  double y_rot_sin = sqrt(1-pow(y_rot_cos,2));
+  cv::Mat rot_mat2 = (cv::Mat_<double>(3,3)<<
+		      y_rot_cos,  0,          y_rot_sin,
+		      0,          1,          0,
+		      -y_rot_sin,  0,          y_rot_cos);
+  rotate_mat = rot_mat2 * rot_mat1;
+
   while(ros::ok()){
     
     if (new_cloud_available_flag && cloud_mutex.try_lock()){
 
+      //from second frame onwards
       if(n_frames>0){
 	// check frames
 	pos_msg.header.frame_id = hum_frame;
@@ -216,80 +228,63 @@ int main(int argc, char** argv)
 	pub_rob.data = robo_state;
 	pub_robo_state.publish(pub_rob);
 
-	//publish a text-marker
-      }
+    }
 
       new_cloud_available_flag = false;
       n_frames++;
 
-      // chain of events start
+      // Start Image processing pipeline
    
-      // get image, depth-map, valid mask
+      // get image, depth-map, valid mask from extracted point cloud
       cv_utils::pc_to_depth(cloud, depth_im, valid_depth);
       
-      //back-ground initialize
+      //back-ground initialize -- for the first specified number of frames
+      //TODO: from recorded data
       if (!bg_init){
-	cv::imshow("Init", depth_im);
-	//cvBg.operator()(rgb_im, foreMask, init_learn);
+
 	cvBg.operator()(depth_im, foreMask, init_learn);
-	win_key = cv::waitKey(15);
 
-	//Quit or Not
-	if (win_key!=27){
-	  if (n_frames == bg_history)
-	    cout << "\n Background initialized - press 'Esc' to exit." << endl;
-	  // no further processing required
-	  pos_msg = noPerson_pos_msg;
-	  vel_msg = noPerson_vel_msg;
+	if (n_frames >= bg_history){
+	  cout << 
+	    "\n ***** Background initialized - Start actual processing" 
+	       << endl;
+	  // no further processing required for this frame
+	bg_init = true;
+	 
+	pos_msg = noPerson_pos_msg;
+	vel_msg = noPerson_vel_msg;
 
-	  cloud_mutex.unlock();
-	  continue;
-	}
-	else{
-	  if (n_frames < bg_history){
-	    cout << "\nHistory frames not reached... Continue recording background." 
-		 << endl;
-	    cloud_mutex.unlock();
-	    continue;
-	  }
-	  bg_init = true;
-	  cout <<  "Background Initialized!" << endl; 
-	  //to the next frame we go..
-	  cv::destroyWindow("Init");
-
-	  pos_msg = noPerson_pos_msg;
-	  vel_msg = noPerson_vel_msg;
-
-	  cloud_mutex.unlock();
-	  continue;
-	}
+	cloud_mutex.unlock();
+	continue;
+	} 
       }
 
       begin = ros::Time::now();
-          
-      //get foreground mask without learning from image
-      cvBg.operator()(depth_im, foreMask, general_learn);
       
-      //box_filter(cloud, box2_min, box2_max, box2_mask);
-      
-      box_filter(cloud, box_min, box_max, box_mask);
-      
-      box_filter_inverse(cloud, boxin_min, boxin_max, box_mask_inliers);
+      // TODO: learn newer backgrounds as new images are coming in
 
+      // Get foreground mask without learning from image
+      cvBg.operator()(depth_im, foreMask, general_learn);
+      // filter out the 'robot box'
+      box_filter(cloud, box_min, box_max, box_mask);
+      // filter out points not in the inlier box
+      box_filter_inverse(cloud, boxin_min, boxin_max, box_mask_inliers);
+      // logical and of the two masks from the two boxes
       cv::bitwise_and(box_mask, box_mask_inliers, box_mask);
       
-      //box it
+      // Apply the box mask to the foreground mask 
       foreMask.copyTo(foreMask, box_mask);
+
       //debug
-      imshow("Mask", box_mask);
-      cout << "showy boxy" << endl;
-      cv::Mat dep_show;
-      cv::normalize(depth_im, depth_im, 0.0, 1.0, cv::NORM_MINMAX);
-      //cv::applyColorMap (depth_im, dep_show, cv::COLORMAP_AUTUMN);
-      cv::imshow("Unfiltered", depth_im);
-      depth_im.copyTo(dep_show, box_mask);      
-      cv::imshow("Filtered", dep_show);
-      cv::waitKey(10);
+      // imshow("Mask", box_mask);
+      // cout << "showy boxy" << endl;
+      // cv::Mat dep_show;
+      // cv::normalize(depth_im, depth_im, 0.0, 1.0, cv::NORM_MINMAX);
+      // //cv::applyColorMap (depth_im, dep_show, cv::COLORMAP_AUTUMN);
+      // cv::imshow("Unfiltered", depth_im);
+      // depth_im.copyTo(dep_show, box_mask);      
+      // cv::imshow("Filtered", dep_show);
+      // cv::waitKey(10);
       //cloud_mutex.unlock();
       //continue;
       
@@ -315,13 +310,13 @@ int main(int argc, char** argv)
       // cv::imshow("Human Contours", disp_im);
       // cv::waitKey(15);
 
-      //project onto ground plane
-      //rotate
-      cv::Mat temp_pt = (cv::Mat_<double> (3,1) << blob_mean.x, blob_mean.y, blob_mean.z);
-      cv::Mat new_pt1 = rot_mat1 * temp_pt;
-      cv::Mat new_pt = rot_mat2 * new_pt1;
-      //translate
-      new_pt = new_pt + translate;
+      // Transform to the 2D ground plane
+      // TODO: check if the transformation is correct
+       cv::Mat temp_pt = (cv::Mat_<double> (3,1) 
+			  << blob_mean.x, blob_mean.y, blob_mean.z);
+       cv::Mat new_pt = rotate_mat * temp_pt;
+       //translate
+       new_pt = new_pt + translate;
 
       cv::Point2f hum_pt; hum_pt.x=new_pt.at<double>(0,0); hum_pt.y=new_pt.at<double>(0,1);
       
@@ -340,17 +335,6 @@ int main(int argc, char** argv)
       cv::Point2f cur_vel;
 
       filter_estimate(prev_pos, prev_vel, cur_pos, cur_vel);
-      
-      // //velocity computation
-      // if (isnan(pos_msg.pose.position.x)){
-      // 	vel_msg = noPerson_vel_msg;
-      // }
-      // else{
-      // 	//velocity computation
-      // 	vel_msg.pose.position.x = hum_pt.x-pos_msg.pose.position.x;
-      // 	vel_msg.pose.position.y = hum_pt.y-pos_msg.pose.position.y;; 
-      // 	vel_msg.pose.position.z = 0; // 2D points 
-      // }
       
       pos_msg.pose.position.x = cur_pos.x; 
       pos_msg.pose.position.y = cur_pos.y; 
