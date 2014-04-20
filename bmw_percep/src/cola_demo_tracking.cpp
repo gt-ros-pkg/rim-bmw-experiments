@@ -66,6 +66,22 @@ int publish_human_markers(ros::Publisher viz_pub, geometry_msgs::PoseStamped pos
 int main(int argc, char** argv)
 {
 
+  int N = 5;
+  cv::Mat mean = cv::Mat::zeros(1,1,CV_64FC1);
+  cv::Mat sigma= cv::Mat::ones(1,1,CV_64FC1);
+  cv::Mat matrix2xN(2,N,CV_64FC1);
+  cv::Mat pertur(1,N,CV_64FC1);
+  cv::randn(pertur,  mean, sigma);
+  pertur.copyTo(matrix2xN.row(0));;
+  cv::randn(pertur,  mean, 5.0 * sigma);
+  pertur.copyTo(matrix2xN.row(1));;
+  //  cout << endl << matrix2xN << endl;
+  cv::Mat theOne = cv::Mat::ones(3,3,CV_32F);
+  cv::Mat theTwo = 2*cv::Mat::ones(3,3,CV_32F);
+  theOne.col(0).copyTo(theTwo.col(1));
+  cout << theTwo << endl;
+  return 0;
+
   //ros
   ros::init(argc, argv, "sample_tracker");
   ros::NodeHandle nh;
@@ -756,7 +772,7 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
 			      robo_marker.pose.position.x,2) 
 			  + pow(pos_marker.pose.position.y
 				-robo_marker.pose.position.y,2));
-    printf("dist %f vel %f\n", hum_rob_dist, vel_mag2);
+    //printf("dist %f vel %f\n", hum_rob_dist, vel_mag2);
     //if (vel_mag2 > 0.032)
     if (hum_rob_dist < 1.7)
        pubbed_state = front_slow;

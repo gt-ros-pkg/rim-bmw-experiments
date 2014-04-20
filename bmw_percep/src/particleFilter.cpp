@@ -6,9 +6,171 @@
 
 using namespace std;
 
+#define PI 22./7.
 
+double gaussian_at_point(double mean, double sigma, double point);
 
-particleFilter2D::particleFilter2D(){}
+particleFilter2D::particleFilter2D(cv::Point2f obs_1, cv::Point2f obs_2, 
+				   double delta_t,
+				   int no_part /*=1000*/, double std_pos/*=1.5*/,
+				   double std_vel/*=2.0*/, 
+				   double eff_part_ratio/*=.2*/)
+{
+  delta = delta_t;
+  cv::Mat part_mat = cv::Mat::ones(no_part, 5, CV_64F); // each row - [x, y, vx, vy, w]
+
+  part_mat.col(0) *= obs_2.x; part_mat.col(1) *= obs_2.y;
+  cv::Point2f init_vel = obs_2 - obs_1;
+  part_mat.col(2) *= init_vel.x; part_mat.col(3) *= init_vel.y;
+  double init_w = 1.0/static_cast<double>(no_part);
+
+  // Randomly perturb particles
+  cv::Mat pertur_mat = cv::Mat::zeros(part_mat.size(), part_mat.depth());
+  //perturb positions
+  cv::randn(pertur_mat.col(0), cv::Mat::zeros(1,1,CV_64FC1), 
+	    std_pos * cv::Mat::ones(1,1,CV_64FC1));
+  cv::randn(pertur_mat.col(1), cv::Mat::zeros(1,1,CV_64FC1), 
+	    std_pos * cv::Mat::ones(1,1,CV_64FC1));
+  //perturb velocities
+  cv::randn(pertur_mat.col(2), cv::Mat::zeros(1,1,CV_64FC1), 
+	    std_vel * cv::Mat::ones(1,1,CV_64FC1));
+  cv::randn(pertur_mat.col(3), cv::Mat::zeros(1,1,CV_64FC1), 
+	    std_vel * cv::Mat::ones(1,1,CV_64FC1));
   
-void particleFilter2D::estimate(){}
+  part_mat += pertur_mat;
 
+  cur_state = part_mat;
+}
+
+particleFilter2D::particleFilter2D()
+{
+  cout << "\nDeprecated constructor, use others.." << endl;
+}
+  
+void particleFilter2D::estimate(cv::Point2f obs)
+{
+  // get effective number of particles
+  cv::Mat prev_weights; cur_state.col(cur_state.cols-1).copyTo(prev_weights);
+  cv::Mat temp = 1.0/(prev_weights.t() * prev_weights);
+  double N_eff = temp.at<double>(0,0);
+  
+  if ((N_eff/static_cast<double>(n_particles)) < effective_part_thresh)
+    resample_particles();
+
+  // propogate them particles
+  //positions
+  cv::Mat pertur_mat = cv::Mat::zeros(cur_state.size(), cur_state.depth());
+  // positions process noise
+  cv::randn(pertur_mat.col(0), cv::Mat::zeros(1,1,CV_64FC1), 
+	    acc_std * cv::Mat::ones(1,1,CV_64FC1));
+  cv::randn(pertur_mat.col(1), cv::Mat::zeros(1,1,CV_64FC1), 
+	    acc_std * cv::Mat::ones(1,1,CV_64FC1));
+  // velocity process noise
+  cv::randn(pertur_mat.col(2), cv::Mat::zeros(1,1,CV_64FC1), 
+	    acc_std * cv::Mat::ones(1,1,CV_64FC1));
+  cv::randn(pertur_mat.col(3), cv::Mat::zeros(1,1,CV_64FC1), 
+	    acc_std * cv::Mat::ones(1,1,CV_64FC1));
+  // pos = pos + vel*t + acc.* t^2
+  cur_state.col(0) += cur_state.col(2) * delta + pertur_mat.col(0) * pow(delta,2.0);
+  cur_state.col(1) += cur_state.col(3) * delta + pertur_mat.col(1) * pow(delta,2.0);
+  // velocity = velocity + acc.* t^2 
+  cur_state.col(2) += pertur_mat.col(2) * delta;
+  cur_state.col(3) += pertur_mat.col(3) * delta;
+
+  // weigh them according to observation
+  reweigh(obs);
+
+  // get point estimate
+  cv::Mat particle_estimate;
+  weighted_mean(particle_estimate);
+}
+
+void particleFilter2D::weighted_mean(cv::Mat& p_est)
+{
+  cv::Mat temp_p = cv::Mat::zeros(1, cur_state.cols-2, cur_state.depth());
+  for (int i=0; i<n_particles; i++){
+    temp_p += cur_state.at<double>(i, cur_state.cols-1) * cur_state.row(i);
+  }
+  
+  p_est = cv::Mat(temp_p.rows, temp_p.cols-1, temp_p.depth());
+  for(int i=0; i<p_est.cols; i++){
+    p_est.at<double>(1,i) = temp_p.at<double>(1,i);
+  }
+}
+
+void particleFilter2D::reweigh(cv::Point2f obs, double sigma/*=0.5*/)
+{
+  double epsilon = 1.e-15; // because couldn't get the one from numerical limits
+  cv::Mat new_weights(cur_state.rows, 1, cur_state.depth());
+  double sum_wts = 0.0, max_wt=0.0;
+
+  for(int i=0; i<n_particles; i++)
+    {
+      double* state_vec = cur_state.ptr<double> (i);
+      double dist = sqrt(pow(state_vec[0]-obs.x,2.0) +pow(state_vec[1]-obs.y,2.0));
+      double similarity = gaussian_at_point(0.0, sigma, dist);
+      //in case too far away, I still want to keep the particle
+      if (similarity < 10.0* epsilon)
+	similarity = 10.0* epsilon;
+
+      //set weight
+      state_vec[cur_state.cols-1] = similarity;
+      sum_wts += similarity;
+      if(similarity>max_wt)
+	max_wt=similarity;
+    }
+  
+  //check for numerical stability
+  if (sum_wts>1){
+    for(int i=0; i<n_particles; i++){
+      double* state_vec = cur_state.ptr<double> (i);
+      double similarity = state_vec[cur_state.cols-1];
+      if (similarity < 10*sum_wts* epsilon)
+	similarity = 10*sum_wts* epsilon;
+    }
+  }
+
+  //normalize weights
+  cur_state.col(cur_state.cols-1) *= (1.0/sum_wts);
+}
+
+double gaussian_at_point(double mean, double sigma, double point)
+{
+  return (1.0/sqrt(2*(PI)*sigma*sigma)) * exp(-pow((point-mean),2)/(2.*sigma*sigma));
+}
+
+//sampling a discrete distribution - copied from :
+//http://www.boost.org/doc/libs/1_46_1/doc/html/boost_random/tutorial.html#boost_random.tutorial.generating_integers_with_different_probabilities
+int particleFilter2D::roll_weighted_die(vector<double> disc_dist) 
+{
+  std::vector<double> cumulative;
+  std::partial_sum(disc_dist.begin(), disc_dist.end(),
+		   std::back_inserter(cumulative));
+  boost::uniform_real<> dist(0, cumulative.back());
+  boost::variate_generator<boost::mt19937&, boost::uniform_real<> > die(gen, dist);
+  return (std::lower_bound(cumulative.begin(), cumulative.end(), die()) 
+	  - cumulative.begin()) ;
+}
+
+void particleFilter2D::resample_particles()
+{
+  vector<double> prev_weights;
+  cv::Mat temp_state(cur_state.size(), cur_state.depth());
+  
+  prev_weights.clear();
+  for (int i=0; i<n_particles; i++){
+    prev_weights.push_back(cur_state.at<double>(i, cur_state.cols-1));
+  }
+    
+  for (int i=0; i<n_particles; i++){
+    int chosen_one = roll_weighted_die(prev_weights);
+    cur_state.row(chosen_one).copyTo(temp_state.row(i));
+  }
+
+  //make all the weights equal
+  temp_state.col(temp_state.cols-1) = (1.0/static_cast<double>(n_particles)) *
+    cv::Mat::ones(n_particles, 1, temp_state.depth());
+  
+  //copy over to the class variable
+  cur_state = temp_state;
+}
