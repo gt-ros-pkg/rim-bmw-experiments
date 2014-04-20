@@ -23,7 +23,8 @@ typedef pcl::PointCloud<PointX> PointCloudX;
 // Globals
 visualization_msgs::MarkerArray mark_arr;
 int frame_rate=30;
-double max_filt_vel = 15.0/frame_rate, max_filt_acc = 5.0/frame_rate; // per frame
+double max_filt_vel = 15.0/static_cast<double>(frame_rate), 
+  max_filt_acc = 5.0/static_cast<double>(frame_rate); // per frame
 
 boost::mutex cloud_mutex;
 enum { COLS=640, ROWS=480};
@@ -115,7 +116,8 @@ int main(int argc, char** argv)
   cvBg.setInt("nmixtures", 2);
 
   particleFilter2D filter_human;
-  
+  bool currently_filtering=false; // to check whether reinitialization reqd
+
   //ground-plane
   //read ground plane parameters from file
   string fileName = "data/ground_coeffs.txt";
@@ -341,8 +343,40 @@ int main(int argc, char** argv)
       cv::Point2f cur_vel;
 
       //filter_estimate(prev_pos, prev_vel, cur_pos, cur_vel);
-      filter_estimate_avg(prev_pos, prev_vel, cur_pos, cur_vel);
-      
+      //filter_estimate_avg(prev_pos, prev_vel, cur_pos, cur_vel);
+      if (!isnan(cur_pos.x)){      
+	if (!isnan(prev_pos.x)){
+	  if (currently_filtering){
+	    filter_human.prop_part();
+	    filter_human.estimate(hum_pt, cur_pos, cur_vel);
+	    cout << "Observation "<< hum_pt << "-- Filtered: " << cur_pos << endl; 
+	    cout << "Observed velocity"<< hum_pt-prev_pos << endl; 
+	    //return 0;
+
+	  }
+	  else{
+	    filter_human.reinitialize(prev_pos, hum_pt, 
+				      (1.0/static_cast<double> (frame_rate)), 500,
+				      5.0);
+	    filter_human.estimate(hum_pt, cur_pos, cur_vel);
+	    // cout << "Observation "<< hum_pt << "-- Filtered: " << cur_pos << endl; 
+	    // cout << "Observed velocity"<< hum_pt-prev_pos << endl; 
+	    // return 0;
+	    currently_filtering = true;
+	  }
+	}
+	else{
+	  currently_filtering = false;
+	  cur_vel.x = numeric_limits<double>::quiet_NaN();
+	  cur_vel.y = numeric_limits<double>::quiet_NaN();
+	}
+      }
+      else{
+	currently_filtering = false;
+	cur_vel.x = numeric_limits<double>::quiet_NaN();
+	cur_vel.y = numeric_limits<double>::quiet_NaN();
+      }
+
       pos_msg.pose.position.x = cur_pos.x; 
       pos_msg.pose.position.y = cur_pos.y; 
       pos_msg.pose.position.z = 0; // 2D points 
@@ -597,7 +631,7 @@ bool get_blobs(cv::Mat& fore, int min_pixels,
 int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped pos, 
 		      geometry_msgs::PoseStamped vel, string hum_frame)
 {
-  
+
   //debug
   const int all_allowed=1, front_slow=2, backward_only=3, robo_marker_id=4;
   int pubbed_state = all_allowed;
