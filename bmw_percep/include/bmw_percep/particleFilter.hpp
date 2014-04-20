@@ -27,14 +27,20 @@ public:
   // initialize with two observed locations, this enables particles to
   // be initialized using both position and velocity measures
   particleFilter2D(cv::Point2f obs_1, cv::Point2f obs_2, double delta_t=(1.0/30.0), 
+		   int no_part =1000, double std_acc=1.0,
+		   double std_pos=1.5, double std_vel=2.0, double eff_part_ratio=0.2);
+  
+  //initialize particles all over again
+  void reinitialize(cv::Point2f obs_1, cv::Point2f obs_2, double delta_t=(1.0/30.0), 
 		   int no_part =1000, 
 		   double std_pos=1.5, double std_vel=2.0, double eff_part_ratio=0.2);
+
   
   //point-estimate of the state given an observation of position
   void estimate(cv::Point2f obs);
 
 private:
-  void reweigh(cv::Point2f obs, double sigma=0.5); //reweigh particles
+  void reweigh(cv::Point2f obs, double sigma=1.0); //reweigh particles
 						   //according to
 						   //obsevation
   void resample_particles(); //resample particles from weight

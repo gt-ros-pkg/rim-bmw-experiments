@@ -40,8 +40,12 @@ void cloud_cb_ (const PointCloudX::ConstPtr &callback_cloud,
   cloud_mutex.unlock ();
 }
 
+void filter_estimate_avg(const cv::Point2f prev_pos, const cv::Point2f prev_vel, 
+		     cv::Point2f &cur_pos, cv::Point2f &cur_vel);
+
 void filter_estimate(const cv::Point2f prev_pos, const cv::Point2f prev_vel, 
 		     cv::Point2f &cur_pos, cv::Point2f &cur_vel);
+
 
 void box_filter(const PointCloudX::Ptr& cloud, cv::Point3f end1, cv::Point3f end2,
 		cv::Mat& mask);
@@ -65,23 +69,6 @@ int publish_human_markers(ros::Publisher viz_pub, geometry_msgs::PoseStamped pos
 
 int main(int argc, char** argv)
 {
-
-  int N = 5;
-  cv::Mat mean = cv::Mat::zeros(1,1,CV_64FC1);
-  cv::Mat sigma= cv::Mat::ones(1,1,CV_64FC1);
-  cv::Mat matrix2xN(2,N,CV_64FC1);
-  cv::Mat pertur(1,N,CV_64FC1);
-  cv::randn(pertur,  mean, sigma);
-  pertur.copyTo(matrix2xN.row(0));;
-  cv::randn(pertur,  mean, 5.0 * sigma);
-  pertur.copyTo(matrix2xN.row(1));;
-  //  cout << endl << matrix2xN << endl;
-  cv::Mat theOne = cv::Mat::ones(3,3,CV_32F);
-  cv::Mat theTwo = 2*cv::Mat::ones(3,3,CV_32F);
-  theOne.col(0).copyTo(theTwo.col(1));
-  cout << theTwo << endl;
-  return 0;
-
   //ros
   ros::init(argc, argv, "sample_tracker");
   ros::NodeHandle nh;
@@ -214,7 +201,8 @@ int main(int argc, char** argv)
 	vel_msg.header.frame_id = hum_frame;
 	pub_pos.publish(pos_msg);
 	pub_vel.publish(vel_msg);
-	int robo_state = publish_human_markers(pub_viz, pos_msg, vel_msg, hum_frame);
+	int robo_state = publish_human_markers(pub_viz, pos_msg, 
+					       vel_msg, hum_frame);
 	
         std_msgs::Bool true_msg;
         std_msgs::Bool false_msg;
@@ -311,7 +299,7 @@ int main(int argc, char** argv)
 				   fore_blobs, blob_mean, cloud);
     
       // can't simply continue, as tracking requires stuff
-       if (!found_human){
+      if (!found_human){
 	//cvBg.operator()(depth_im, foreMask, general_learn);
 	pos_msg = noPerson_pos_msg;
 	vel_msg = noPerson_vel_msg;
@@ -328,13 +316,15 @@ int main(int argc, char** argv)
 
       // Transform to the 2D ground plane
       // TODO: check if the transformation is correct
-       cv::Mat temp_pt = (cv::Mat_<double> (3,1) 
-			  << blob_mean.x, blob_mean.y, blob_mean.z);
-       cv::Mat new_pt = rotate_mat * temp_pt;
-       //translate
-       new_pt = new_pt + translate;
+      cv::Mat temp_pt = (cv::Mat_<double> (3,1) 
+			 << blob_mean.x, blob_mean.y, blob_mean.z);
+      cv::Mat new_pt = rotate_mat * temp_pt;
 
-      cv::Point2f hum_pt; hum_pt.x=new_pt.at<double>(0,0); hum_pt.y=new_pt.at<double>(0,1);
+      //translate
+      new_pt = new_pt + translate;
+      
+      cv::Point2f hum_pt; hum_pt.x=new_pt.at<double>(0,0); hum_pt.y = 
+							     new_pt.at<double>(0,1);
       
       //particle tracking
 
@@ -350,7 +340,8 @@ int main(int argc, char** argv)
       cv::Point2f cur_pos = hum_pt;
       cv::Point2f cur_vel;
 
-      filter_estimate(prev_pos, prev_vel, cur_pos, cur_vel);
+      //filter_estimate(prev_pos, prev_vel, cur_pos, cur_vel);
+      filter_estimate_avg(prev_pos, prev_vel, cur_pos, cur_vel);
       
       pos_msg.pose.position.x = cur_pos.x; 
       pos_msg.pose.position.y = cur_pos.y; 
@@ -613,9 +604,9 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
 
   visualization_msgs::Marker pos_marker, vel_marker1, vel_marker2, vel_marker3, 
     robo_marker;
+  
   //only publish visual markers if velocity present
   if (isnan(vel.pose.position.x)){
-    //TODO: delete viz-markers
     for (int i=0; i<mark_arr.markers.size(); i++){
       if(i!=robo_marker_id)
 	mark_arr.markers[i].action = visualization_msgs::Marker::DELETE;
@@ -628,7 +619,8 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
   else{
     double delta_t = .5 * frame_rate; // .5 secs
   
-    int n_vel_markers=3;
+    int n_vel_markers = 3;
+
     // Set the frame ID and timestamp.  See the TF tutorials for information on these.
     pos_marker.header.frame_id = hum_frame;
     pos_marker.header.stamp = ros::Time::now();
@@ -675,11 +667,12 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
     vel_marker1.pose.position.z = 0;
 
     vel_marker1.pose.position.x = pos.pose.position.x + delta_t * vel.pose.position.x;
-    vel_marker1.pose.position.y = pos.pose.position.y + delta_t * vel.pose.position.y;;
+    vel_marker1.pose.position.y = pos.pose.position.y + delta_t * vel.pose.position.y;
+
     vel_marker1.scale.x = 0.6;
     vel_marker1.scale.y = 0.6;
     vel_marker1.scale.z = 0.01;
-
+    
     vel_marker1.color.a = 1.0f;
     vel_marker1.color.r = 0.0f;
     vel_marker1.color.g = 1.0f;
@@ -687,7 +680,7 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
     mark_arr.markers.clear();
 
     mark_arr.markers.push_back(pos_marker);
-  
+    
     vel_marker2 = vel_marker1;
     vel_marker3 = vel_marker2;
     vel_marker2.id = 2;
@@ -704,7 +697,7 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
 
     double vel_mag = sqrt(pow(vel.pose.position.x,2) + pow(vel.pose.position.y,2));
     double mark_scale = delta_t * vel_mag;
-  
+
     vel_marker2.scale.x += mark_scale;
     vel_marker2.scale.y += mark_scale;
 
@@ -715,22 +708,6 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
     mark_arr.markers.push_back(vel_marker2);
     mark_arr.markers.push_back(vel_marker3);
     
-    // for (int i=0; i<n_vel_markers; i++){
-    //   visualization_msgs::Marker temp_vel_marker;
-    //   vel_marker.id += i;
-    //   temp_vel_marker = vel_marker;
-    //   temp_vel_marker.color.a *= pow(0.5,i);
-    //   temp_vel_marker.pose.position.x += i * delta_t * vel.pose.position.x;
-    //   temp_vel_marker.pose.position.y += i * delta_t * vel.pose.position.y;;
-    //   double vel_mag = sqrt(pow(vel.pose.position.x,2) + pow(vel.pose.position.y,2));
-    //   double mark_scale = delta_t * vel_mag;
-    //   temp_vel_marker.scale.x += i * mark_scale;
-    //   temp_vel_marker.scale.y += i * mark_scale;
-    //   mark_arr.markers.push_back(pos_marker);
-    //   }
-    // //debug
-    // cout << mark_arr.markers.size() << endl;
-  
     //robot marker
     robo_marker = pos_marker;
     robo_marker.id = 10;
@@ -743,7 +720,6 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
     robo_marker.scale.y = 0.5;
     robo_marker.scale.z = 0.01;
   
-    // Set the color -- be sure to set alpha to something non-zero!
     mark_arr.markers.push_back(robo_marker);
 
     double v1_dist = sqrt(pow(vel_marker1.pose.position.x-
@@ -758,38 +734,37 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
 			      robo_marker.pose.position.x,2) 
 			  + pow(vel_marker3.pose.position.y
 				-robo_marker.pose.position.y,2));
-
+    
     double v1_allowed = ((vel_marker1.scale.x+robo_marker.scale.x) 
-			 + (vel_marker1.scale.y+robo_marker.scale.y))/2;
+			 + (vel_marker1.scale.y+robo_marker.scale.y))/(2*2);//diameter
     double v2_allowed = ((vel_marker2.scale.x+robo_marker.scale.x) 
-			 + (vel_marker2.scale.y+robo_marker.scale.y))/2;
+			 + (vel_marker2.scale.y+robo_marker.scale.y))/(2*2);//diameter
     double v3_allowed = ((vel_marker3.scale.x+robo_marker.scale.x) 
-			 + (vel_marker3.scale.y+robo_marker.scale.y))/2;
-  
+			 + (vel_marker3.scale.y+robo_marker.scale.y))/(2*2);//diameter
+    
     double vel_mag2 = sqrt(pow(vel.pose.position.x,2) 
-			  + pow(vel.pose.position.y,2));
+			   + pow(vel.pose.position.y,2));
     double hum_rob_dist = sqrt(pow(pos_marker.pose.position.x-
-			      robo_marker.pose.position.x,2) 
-			  + pow(pos_marker.pose.position.y
+				   robo_marker.pose.position.x,2) 
+			       + pow(pos_marker.pose.position.y
 				-robo_marker.pose.position.y,2));
     //printf("dist %f vel %f\n", hum_rob_dist, vel_mag2);
     //if (vel_mag2 > 0.032)
-    if (hum_rob_dist < 1.7)
-       pubbed_state = front_slow;
-    if (hum_rob_dist < 1.0)
-       pubbed_state = backward_only;
-    if (vel_mag2 > 0.040)
-       pubbed_state = backward_only;
-    // // if(v2_dist<v2_allowed)
-    // //   return ;
-    // if(v1_dist<v1_allowed)
-    //   pubbed_state = backward_only;
-
-    
-
+    // if (hum_rob_dist < 1.7)
+    //    pubbed_state = front_slow;
+    // if (hum_rob_dist < 1.0)
+    //    pubbed_state = backward_only;
+    // if (vel_mag2 > 0.040)
+    //    pubbed_state = backward_only;
+  
+    if(v3_dist < v3_allowed)
+      pubbed_state = front_slow;
+    if(v2_dist < v2_allowed)
+      pubbed_state = backward_only;
   }    
   
   
+  //Color Robot according to the state
   if(mark_arr.markers.size()>0){
 
     switch(pubbed_state){
@@ -826,7 +801,7 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
 cv::Point2f hist[HISTLEN];
 int cur_hist_ind = 0;
 
-void filter_estimate(const cv::Point2f prev_pos, const cv::Point2f prev_vel, 
+void filter_estimate_avg(const cv::Point2f prev_pos, const cv::Point2f prev_vel, 
 		     cv::Point2f &cur_pos, cv::Point2f &cur_vel)
 {
     hist[cur_hist_ind%HISTLEN] = cur_pos;
@@ -839,43 +814,48 @@ void filter_estimate(const cv::Point2f prev_pos, const cv::Point2f prev_vel,
         cur_pos.y /= HISTLEN;
     }
     cur_vel = cur_pos - prev_pos;
-  //if (!isnan(prev_pos.x) && !isnan(prev_vel.x)){
-  //  cur_vel = cur_pos - prev_pos;
+}
 
-  //  cv::Point2f cur_acc = cur_vel-prev_vel;
-  //  double mag_cur_acc = cv::norm(cur_acc);
-  //  
-  //  if (mag_cur_acc>max_filt_acc){
-  //    cur_acc = (max_filt_acc/cv::norm(cur_acc)) * cur_acc;
-  //  }
-  //  //cur_vel = prev_vel + cur_acc;
-  //  double mag_cur_vel = cv::norm(cur_vel);
-  //  
-  //  if (mag_cur_vel>max_filt_vel){
-  //    //cur_vel = (max_filt_vel/cv::norm(cur_vel)) * cur_vel;
-  //  }
-  //  
-  //  //cur_pos = prev_pos + cur_vel;
-  //}
+void filter_estimate(const cv::Point2f prev_pos, const cv::Point2f prev_vel, 
+		     cv::Point2f &cur_pos, cv::Point2f &cur_vel)
+{
   
-  //else{
-  //  if (isnan(prev_pos.x)){
-  //  //cur_vel.x = numeric_limits<double>::quiet_NaN();
-  //  //cur_vel.y = numeric_limits<double>::quiet_NaN();
-  //  return;
-  //    }
-  //  else{
-  //    //cur_vel = cur_pos - prev_pos;
-  //    
-  //    double mag_cur_vel = cv::norm(cur_vel);
-  //    
-  //    if (mag_cur_vel>max_filt_vel){
-  //  //cur_vel = (max_filt_vel/cv::norm(cur_vel)) * cur_vel;
-  //    }
-  //  
-  //    //cur_pos = prev_pos + 0.5 * cur_vel; // not very sure of velocity
-  //  				  // the first time around
-
-  //  }
-  //}
+  if (!isnan(prev_pos.x) && !isnan(prev_vel.x)){
+    cur_vel = cur_pos - prev_pos;
+    
+    cv::Point2f cur_acc = cur_vel-prev_vel;
+    double mag_cur_acc = cv::norm(cur_acc);
+    
+    if (mag_cur_acc>max_filt_acc){
+      cur_acc = (max_filt_acc/cv::norm(cur_acc)) * cur_acc;
+    }
+    cur_vel = prev_vel + cur_acc;
+   double mag_cur_vel = cv::norm(cur_vel);
+   
+   if (mag_cur_vel>max_filt_vel){
+     cur_vel = (max_filt_vel/cv::norm(cur_vel)) * cur_vel;
+   }
+   
+   cur_pos = prev_pos + cur_vel;
+  }
+  
+  else{
+    if (isnan(prev_pos.x)){
+      cur_vel.x = numeric_limits<double>::quiet_NaN();
+      cur_vel.y = numeric_limits<double>::quiet_NaN();
+      return;
+    }
+    else{
+      cur_vel = cur_pos - prev_pos;
+     
+      double mag_cur_vel = cv::norm(cur_vel);
+     
+      if (mag_cur_vel>max_filt_vel){
+	cur_vel = (max_filt_vel/cv::norm(cur_vel)) * cur_vel;
+      }
+      
+      cur_pos = prev_pos + 0.5 * cur_vel; // not very sure of velocity
+      // the first time around
+    }
+  }
 }

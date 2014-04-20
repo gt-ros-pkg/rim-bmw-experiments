@@ -12,6 +12,40 @@ double gaussian_at_point(double mean, double sigma, double point);
 
 particleFilter2D::particleFilter2D(cv::Point2f obs_1, cv::Point2f obs_2, 
 				   double delta_t,
+				   int no_part /*=1000*/, double std_acc/*=1.*/,
+				   double std_pos/*=1.5*/,
+				   double std_vel/*=2.0*/, 
+				   double eff_part_ratio/*=.2*/)
+{
+  acc_std = std_acc;
+  delta = delta_t;
+  cv::Mat part_mat = cv::Mat::ones(no_part, 5, CV_64F); // each row - [x, y, vx, vy, w]
+
+  part_mat.col(0) *= obs_2.x; part_mat.col(1) *= obs_2.y;
+  cv::Point2f init_vel = obs_2 - obs_1;
+  part_mat.col(2) *= init_vel.x; part_mat.col(3) *= init_vel.y;
+  double init_w = 1.0/static_cast<double>(no_part);
+
+  // Randomly perturb particles
+  cv::Mat pertur_mat = cv::Mat::zeros(part_mat.size(), part_mat.depth());
+  //perturb positions
+  cv::randn(pertur_mat.col(0), cv::Mat::zeros(1,1,CV_64FC1), 
+	    std_pos * cv::Mat::ones(1,1,CV_64FC1));
+  cv::randn(pertur_mat.col(1), cv::Mat::zeros(1,1,CV_64FC1), 
+	    std_pos * cv::Mat::ones(1,1,CV_64FC1));
+  //perturb velocities
+  cv::randn(pertur_mat.col(2), cv::Mat::zeros(1,1,CV_64FC1), 
+	    std_vel * cv::Mat::ones(1,1,CV_64FC1));
+  cv::randn(pertur_mat.col(3), cv::Mat::zeros(1,1,CV_64FC1), 
+	    std_vel * cv::Mat::ones(1,1,CV_64FC1));
+  
+  part_mat += pertur_mat;
+
+  cur_state = part_mat;
+}
+
+void particleFilter2D::reinitialize(cv::Point2f obs_1, cv::Point2f obs_2, 
+				   double delta_t,
 				   int no_part /*=1000*/, double std_pos/*=1.5*/,
 				   double std_vel/*=2.0*/, 
 				   double eff_part_ratio/*=.2*/)
@@ -40,7 +74,11 @@ particleFilter2D::particleFilter2D(cv::Point2f obs_1, cv::Point2f obs_2,
   part_mat += pertur_mat;
 
   cur_state = part_mat;
+
+  //debug
+  cout << "\nRe-initialize " << endl;
 }
+
 
 particleFilter2D::particleFilter2D()
 {
