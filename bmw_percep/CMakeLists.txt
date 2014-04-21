@@ -124,40 +124,47 @@ add_executable(publish_kinect
     src/pcl_cv_utils.cpp
     src/pub_kinect_msgs.cpp)
 
-add_executable(sample_track
+#add_executable(sample_track
+#  src/particleFilter.cpp
+#  src/groundPlane.cpp
+#  src/pcl_cv_utils.cpp
+#  src/sample_people_track.cpp)
+
+#add_executable(sample_track_depth
+#  src/particleFilter.cpp
+#  src/groundPlane.cpp
+#  src/pcl_cv_utils.cpp
+#  src/sample_people_track_depth.cpp)
+
+#add_executable(xyz_based_tracking
+#  src/particleFilter.cpp
+#  src/groundPlane.cpp
+#  src/pcl_cv_utils.cpp
+#  src/xyz_based_tracking.cpp)
+
+#add_executable(cola_demo_tracking
+#  src/particleFilter.cpp
+#  src/groundPlane.cpp
+#  src/pcl_cv_utils.cpp
+#  src/cola_demo_tracking.cpp)
+
+#Add_executable(cola_demo_tracking1
+#  src/particleFilter.cpp
+#  src/groundPlane.cpp
+#  src/pcl_cv_utils.cpp
+#  src/cola_demo_tracking1.cpp)
+
+
+#add_executable(sample_track_gmg
+#  src/pcl_cv_utils.cpp
+#  src/sample_people_track_gmg.cpp)
+
+
+add_executable(tracker_3D
   src/particleFilter.cpp
   src/groundPlane.cpp
   src/pcl_cv_utils.cpp
-  src/sample_people_track.cpp)
-
-add_executable(sample_track_depth
-  src/particleFilter.cpp
-  src/groundPlane.cpp
-  src/pcl_cv_utils.cpp
-  src/sample_people_track_depth.cpp)
-
-add_executable(xyz_based_tracking
-  src/particleFilter.cpp
-  src/groundPlane.cpp
-  src/pcl_cv_utils.cpp
-  src/xyz_based_tracking.cpp)
-
-add_executable(cola_demo_tracking
-  src/particleFilter.cpp
-  src/groundPlane.cpp
-  src/pcl_cv_utils.cpp
-  src/cola_demo_tracking.cpp)
-
-add_executable(cola_demo_tracking1
-  src/particleFilter.cpp
-  src/groundPlane.cpp
-  src/pcl_cv_utils.cpp
-  src/cola_demo_tracking1.cpp)
-
-
-add_executable(sample_track_gmg
-  src/pcl_cv_utils.cpp
-  src/sample_people_track_gmg.cpp)
+  src/tracker_3D.cpp)
 
 add_executable(sample_ground
   src/groundPlane.cpp
@@ -177,15 +184,16 @@ add_executable(sample_groundReader
 # target_link_libraries(bmw_percep_node
 #   ${catkin_LIBRARIES}
 # )
-target_link_libraries(publish_kinect ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
-target_link_libraries(sample_track ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
-target_link_libraries(sample_track_depth ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
-target_link_libraries(xyz_based_tracking ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
-target_link_libraries(cola_demo_tracking ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
-target_link_libraries(cola_demo_tracking1 ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
-target_link_libraries(sample_track_gmg ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+#target_link_libraries(sample_track ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+#target_link_libraries(sample_track_depth ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+#target_link_libraries(xyz_based_tracking ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+#target_link_libraries(cola_demo_tracking ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+#target_link_libraries(cola_demo_tracking1 ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+#target_link_libraries(sample_track_gmg ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(tracker_3D ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_ground ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_groundReader ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(publish_kinect ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
 ## Install ##

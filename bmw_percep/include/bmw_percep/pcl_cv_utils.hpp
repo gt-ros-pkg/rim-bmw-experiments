@@ -2,6 +2,12 @@
 #include<pcl/point_types.h>
 #include <pcl/conversions.h>
 #include <pcl/point_cloud.h>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/kdtree/kdtree.h>
+#include <pcl/search/kdtree.h>
+#include <pcl/segmentation/extract_clusters.h>
+#include <pcl/common/common_headers.h>
+
 /**
    Utility functions for OpenCV and PCL
 **/
@@ -52,7 +58,16 @@ namespace cv_utils{
   // mask over the image of the cloud
   // returns the clusters as 3D points
   // Used pcl tutorial on euclidean clustering as reference
-  void find_euclid_blobs(PointCloudX::Ptr cloud, const cv::Mat &mask, 
+  void find_euclid_blobs(PointCloudX::ConstPtr cloud, 
+			 pcl::PointCloud<pcl::PointXYZRGB>::Ptr viz_cloud, 
+			 const cv::Mat &mask, 
 			 vector<cv::Point3f> clusters, int& max_blob_id,
 			 float leaf_size=0.01);
+
+  void find_euclid_blobs(PointCloudX::ConstPtr cloud, 
+			 pcl::PointCloud<pcl::PointXYZ>::Ptr viz_cloud, 
+			 const cv::Mat &mask, 
+			 vector<cv::Point3f> clusters, int& max_blob_id,
+			 float leaf_size=0.01);
+
 }
