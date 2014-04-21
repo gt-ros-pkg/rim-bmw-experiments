@@ -311,13 +311,25 @@ void particleFilter2D::reweigh(cv::Point2f obs,
   for(int i=0; i<n_particles; i++)
     {
       double* state_vec = cur_state.ptr<double> (i);
-      double dist = sqrt(pow(state_vec[0]-obs.x,2.0) +pow(state_vec[1]-obs.y,2.0));
-      double similarity = gaussian_at_point(0.0, sigma, dist);
+      double distp = sqrt(pow(state_vec[0]-obs.x,2.0) + 
+			  pow(state_vec[1]-obs.y,2.0));
+      double distv = sqrt(pow(state_vec[2]-obs_v.x,2.0) + 
+			  pow(state_vec[3]-obs_v.y,2.0));
+      double similarityp = gaussian_at_point(0.0, sigma, distp);
+      double similarityv = gaussian_at_point(0.0, sigma_v, distv);
       
       // //in case too far away, I still want to keep the particle
       // if (similarity < 10.0* epsilon)
       // 	similarity = 10.0* epsilon;
       
+      double similarity;
+      //in case too far away, I want to get rid of the particle
+      if (similarityp>10*epsilon && similarityv>10*epsilon)
+	similarity = similarityp * similarityv;
+      else{
+	similarity=0.0;
+      }
+
       //in case too far away, I want to get rid of the particle
       if (similarity < 10*epsilon)
 	similarity = 0.0;

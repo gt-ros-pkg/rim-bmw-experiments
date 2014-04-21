@@ -244,6 +244,11 @@ int main(int argc, char** argv)
       // get image, depth-map, valid mask from extracted point cloud
       cv_utils::pc_to_depth(cloud, depth_im, valid_depth);
       
+      //demo
+      cv::Mat dep_show;
+      cv::normalize(depth_im, dep_show, 0.0, 1.0, cv::NORM_MINMAX);
+      cv::imshow("Depth", dep_show);
+      cv::waitKey(5);
       //back-ground initialize -- for the first specified number of frames
       //TODO: from recorded data
       if (!bg_init){
@@ -348,7 +353,8 @@ int main(int argc, char** argv)
 	if (!isnan(prev_pos.x)){
 	  if (currently_filtering){
 	    filter_human.prop_part();
-	    filter_human.estimate(hum_pt, cur_pos, cur_vel);
+	    //filter_human.estimate(hum_pt, cur_pos, cur_vel);
+	    filter_human.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
 	    cout << "Observation "<< hum_pt << "-- Filtered: " << cur_pos << endl; 
 	    cout << "Observed velocity"<< hum_pt-prev_pos << endl; 
 	    //return 0;
@@ -356,9 +362,11 @@ int main(int argc, char** argv)
 	  }
 	  else{
 	    filter_human.reinitialize(prev_pos, hum_pt, 
-				      (1.0/static_cast<double> (frame_rate)), 500,
+				      (1.0/static_cast<double> (frame_rate)), 1000,
 				      5.0);
-	    filter_human.estimate(hum_pt, cur_pos, cur_vel);
+	    //filter_human.estimate(hum_pt, cur_pos, cur_vel);
+	    filter_human.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
+
 	    // cout << "Observation "<< hum_pt << "-- Filtered: " << cur_pos << endl; 
 	    // cout << "Observed velocity"<< hum_pt-prev_pos << endl; 
 	    // return 0;
@@ -638,6 +646,8 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
 
   visualization_msgs::Marker pos_marker, vel_marker1, vel_marker2, vel_marker3, 
     robo_marker;
+
+  double vel_scale = 0.6, robot_scale=.5*1.0;
   
   //only publish visual markers if velocity present
   if (isnan(vel.pose.position.x)){
@@ -651,7 +661,7 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
   
  
   else{
-    double delta_t = .5 * frame_rate; // .5 secs
+    double delta_t = 1 * frame_rate; // 1 secs
   
     int n_vel_markers = 3;
 
@@ -695,6 +705,9 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
   
     pos_marker.lifetime = ros::Duration();
 
+    double vel_mag = sqrt(pow(vel.pose.position.x,2) + pow(vel.pose.position.y,2));
+    double mark_scale = delta_t * vel_mag;
+
     //velocity markers
     vel_marker1 = pos_marker;
     vel_marker1.id = 1;
@@ -703,12 +716,12 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
     vel_marker1.pose.position.x = pos.pose.position.x + delta_t * vel.pose.position.x;
     vel_marker1.pose.position.y = pos.pose.position.y + delta_t * vel.pose.position.y;
 
-    vel_marker1.scale.x = 0.6;
-    vel_marker1.scale.y = 0.6;
+    vel_marker1.scale.x = pos_marker.scale.x + mark_scale;
+    vel_marker1.scale.y = pos_marker.scale.y + mark_scale;
     vel_marker1.scale.z = 0.01;
     
-    vel_marker1.color.a = 1.0f;
-    vel_marker1.color.r = 0.0f;
+    vel_marker1.color.a = 0.5f;
+    vel_marker1.color.r = 0.75f;
     vel_marker1.color.g = 1.0f;
 
     mark_arr.markers.clear();
@@ -729,9 +742,6 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
     vel_marker3.pose.position.x += 2 * delta_t * vel.pose.position.x;
     vel_marker3.pose.position.y += 2 * delta_t * vel.pose.position.y;
 
-    double vel_mag = sqrt(pow(vel.pose.position.x,2) + pow(vel.pose.position.y,2));
-    double mark_scale = delta_t * vel_mag;
-
     vel_marker2.scale.x += mark_scale;
     vel_marker2.scale.y += mark_scale;
 
@@ -750,8 +760,8 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
     robo_marker.pose.position.z = 0.0;
   
     // Set the scale of the robo_marker -- 1x1x1 here means 1m on a side
-    robo_marker.scale.x = 0.5;
-    robo_marker.scale.y = 0.5;
+    robo_marker.scale.x = robot_scale;
+    robo_marker.scale.y = robot_scale;
     robo_marker.scale.z = 0.01;
   
     mark_arr.markers.push_back(robo_marker);
@@ -791,9 +801,9 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
     // if (vel_mag2 > 0.040)
     //    pubbed_state = backward_only;
   
-    if(v3_dist < v3_allowed)
-      pubbed_state = front_slow;
     if(v2_dist < v2_allowed)
+      pubbed_state = front_slow;
+    if(v1_dist < v1_allowed)
       pubbed_state = backward_only;
   }    
   
