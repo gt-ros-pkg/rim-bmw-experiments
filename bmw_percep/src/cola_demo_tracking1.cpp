@@ -380,7 +380,7 @@ int main(int argc, char** argv)
 	  else{
 	    filter_human.reinitialize(prev_pos, hum_pt, 
 				      (1.0/static_cast<double> (frame_rate)), 1000,
-				      5.0);
+				      10.0);
 	    //filter_human.estimate(hum_pt, cur_pos, cur_vel);
 	    filter_human.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
 
@@ -733,8 +733,8 @@ int publish_human_markers( ros::Publisher viz_pub, geometry_msgs::PoseStamped po
     vel_marker1.pose.position.x = pos.pose.position.x + delta_t * vel.pose.position.x;
     vel_marker1.pose.position.y = pos.pose.position.y + delta_t * vel.pose.position.y;
 
-    vel_marker1.scale.x = 0.5* vel_scale + mark_scale;
-    vel_marker1.scale.y = .5*vel_scale + mark_scale;
+    vel_marker1.scale.x = .5* vel_scale + delta_t * vel_mag + mark_scale;
+    vel_marker1.scale.y = .5*vel_scale + delta_t * vel_mag + mark_scale;
     vel_marker1.scale.z = 0.01;
     
     vel_marker1.color.a = 0.5f;

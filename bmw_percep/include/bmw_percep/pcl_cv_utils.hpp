@@ -15,28 +15,30 @@ using namespace std;
 
 namespace cv_utils{
 
-// Changes the color in an image at the specified 8-connected diameter
-// to color passed as argument
-void paint_at_point(cv::Mat& img, const cv::Point loc, cv::Scalar col, int diam);
+  // Changes the color in an image at the specified 8-connected diameter
+  // to color passed as argument
+  void paint_at_point(cv::Mat& img, const cv::Point loc, cv::Scalar col, 
+		      int diam);
 
-// Changes the color in an image at the specified 8-connected diameter 
-// to colors in the passed 'orig' image
-void paint_at_point(cv::Mat& img, const cv::Point loc, const cv::Mat& orig, int diam);
+  // Changes the color in an image at the specified 8-connected diameter 
+  // to colors in the passed 'orig' image
+  void paint_at_point(cv::Mat& img, const cv::Point loc, 
+		      const cv::Mat& orig, int diam);
 
-//Extract only RGB, Depth, and Valid-depth maps from point cloud
-bool pc_to_img(const PointCloudT::Ptr& cloud, cv::Mat& d_rgb, cv::Mat& d_depth, 
-		 cv::Mat& d_dmask);
-
-bool pc_to_depth(const PointCloudX::Ptr& cloud, 
+  //Extract only RGB, Depth, and Valid-depth maps from point cloud
+  bool pc_to_img(const PointCloudT::Ptr& cloud, cv::Mat& d_rgb, 
 		 cv::Mat& d_depth, cv::Mat& d_dmask);
 
+  bool pc_to_depth(const PointCloudX::Ptr& cloud, 
+		   cv::Mat& d_depth, cv::Mat& d_dmask);
 
-// Find blobs in a binary image as a vector of a vector of 2D points
-// returns the area of largest blob
+  // Find blobs in a binary image, returns a vector of a vector of 2D
+  // points
   int find_blobs(const cv::Mat &binary, 
-			   vector < vector<cv::Point2i> > &blobs
-		 );
+		 vector < vector<cv::Point2i> > &blobs);
 
+  // Find blobs in a binary image as a vector of a vector of 2D points
+  // returns the ID of largest blob
   int find_blobs(const cv::Mat &binary, 
 		 vector < vector<cv::Point2i> > &blobs,
 		 int& max_blob_id);
@@ -45,4 +47,12 @@ bool pc_to_depth(const PointCloudX::Ptr& cloud,
   // returns the area of largest blob
   int find_blobs_depth(const cv::Mat &binary, const cv::Mat &depth,
 		       vector < vector<cv::Point2i> > &blobs, float depth_delta);
+
+  // Finds blobs from an organized 3D point cloud and a binary
+  // mask over the image of the cloud
+  // returns the clusters as 3D points
+  // Used pcl tutorial on euclidean clustering as reference
+  void find_euclid_blobs(PointCloudX::Ptr cloud, const cv::Mat &mask, 
+			 vector<cv::Point3f> clusters, int& max_blob_id,
+			 float leaf_size=0.01);
 }

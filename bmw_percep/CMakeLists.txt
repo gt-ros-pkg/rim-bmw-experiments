@@ -148,6 +148,12 @@ add_executable(cola_demo_tracking
   src/pcl_cv_utils.cpp
   src/cola_demo_tracking.cpp)
 
+add_executable(cola_demo_tracking1
+  src/particleFilter.cpp
+  src/groundPlane.cpp
+  src/pcl_cv_utils.cpp
+  src/cola_demo_tracking1.cpp)
+
 
 add_executable(sample_track_gmg
   src/pcl_cv_utils.cpp
@@ -176,6 +182,7 @@ target_link_libraries(sample_track ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_track_depth ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(xyz_based_tracking ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(cola_demo_tracking ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(cola_demo_tracking1 ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_track_gmg ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_ground ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_groundReader ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
