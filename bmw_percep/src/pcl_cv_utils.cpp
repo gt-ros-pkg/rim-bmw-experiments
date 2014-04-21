@@ -332,71 +332,71 @@ void cv_utils::find_euclid_blobs(PointCloudX::Ptr cloud, const cv::Mat &mask,
 				     vector<cv::Point3f> clusters, int& max_blob_id,
 				     float leaf_size/*=0.01*/)
 {
- //  //Remove masked points
- //  PointCloudX::Ptr cloud_unmasked(new PointCloudX);
- //  //copy over unmasked points
- //  int pc_rows=cloud->height;
- //  int pc_cols=cloud->width;
+  //Remove masked points
+  PointCloudX::Ptr cloud_unmasked(new PointCloudX);
+  //copy over unmasked points
+  int pc_rows=cloud->height;
+  int pc_cols=cloud->width;
   
- //  cloud_unmasked->height = cloud->height;
- //  cloud_unmasked->width = cloud->width;
- //  cloud_unmasked->is_dense = cloud->is_dense;
- //  //cloud_unmasked->sensor_origin = cloud->sensor_origin;
- //  //cloud_unmasked->sensor_orientation = cloud->sensor_orientation;
+  cloud_unmasked->height = cloud->height;
+  cloud_unmasked->width = cloud->width;
+  cloud_unmasked->is_dense = cloud->is_dense;
+  //cloud_unmasked->sensor_origin = cloud->sensor_origin;
+  //cloud_unmasked->sensor_orientation = cloud->sensor_orientation;
 
- //  //start adding them points
- //  for (int r=0; r<pc_rows; r++){
- //    const double* mask_r = mask.ptr<double> (r);
- //    for (int c=0; c<pc_cols; c++){
- //      if (mask_r[c]>0){
- // 	PointX point = cloud->at(c,r);
- // 	cloud_unmasked->points.push_back(point);
- //      }
- //    }
- //  }
+  //start adding them points
+  for (int r=0; r<pc_rows; r++){
+    const double* mask_r = mask.ptr<double> (r);
+    for (int c=0; c<pc_cols; c++){
+      if (mask_r[c]>0){
+ 	PointX point = cloud->at(c,r);
+ 	cloud_unmasked->points.push_back(point);
+      }
+    }
+  }
 
 
- //  // Create the filtering object: downsample the dataset using a leaf size of 1cm
- //  pcl::VoxelGrid<pcl::PointXYZ> vg;
- //  pcl::PointCloudX::Ptr cloud_filtered 
- //    (new pcl::PointCloudX>);
- //  vg.setInputCloud (cloud_unmasked);
- //  vg.setLeafSize (0.01f, 0.01f, 0.01f);
- //  vg.filter (*cloud_filtered);
- //  std::cout << "PointCloud after filtering has: " << cloud_filtered->points.size ()  << " data points." << std::endl; 
+  // Create the filtering object: downsample the dataset using a leaf size of 1cm
+  pcl::VoxelGrid<pcl::PointXYZ> vg;
+  pcl::PointCloudX::Ptr cloud_filtered 
+    (new pcl::PointCloudX>);
+  vg.setInputCloud (cloud_unmasked);
+  vg.setLeafSize (0.01f, 0.01f, 0.01f);
+  vg.filter (*cloud_filtered);
+  std::cout << "PointCloud after filtering has: " << cloud_filtered->points.size ()  << " data points." << std::endl; 
 
- // // Creating the KdTree object for the search method of the extraction
- //  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
- //  tree->setInputCloud (cloud_filtered);
+ // Creating the KdTree object for the search method of the extraction
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
+  tree->setInputCloud (cloud_filtered);
 
- //  std::vector<pcl::PointIndices> cluster_indices;
- //  pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
- //  ec.setClusterTolerance (0.02); // 2cm
- //  ec.setMinClusterSize (100);
- //  ec.setMaxClusterSize (25000);
- //  ec.setSearchMethod (tree);
- //  ec.setInputCloud (cloud_filtered);
- //  ec.extract (cluster_indices);
+  std::vector<pcl::PointIndices> cluster_indices;
+  pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+  ec.setClusterTolerance (0.02); // 2cm
+  ec.setMinClusterSize (100);
+  ec.setMaxClusterSize (25000);
+  ec.setSearchMethod (tree);
+  ec.setInputCloud (cloud_filtered);
+  ec.extract (cluster_indices);
 
- //  int j = 0;
- //  for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); 
- //       it != cluster_indices.end (); ++it){
- //    PointCloudX::Ptr cloud_cluster 
- //      (new pcl::PointCloud<pcl::PointXYZ>);
- //    for (std::vector<int>::const_iterator pit = it->indices.begin (); 
- // 	 pit != it->indices.end (); pit++){
- //      cloud_cluster->points.push_back (cloud_filtered->points[*pit]); //*
- //    }
- //    cloud_cluster->width = cloud_cluster->points.size ();
- //    cloud_cluster->height = 1;
- //    cloud_cluster->is_dense = true;
+  int j = 0;
+  for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); 
+       it != cluster_indices.end (); ++it){
+    PointCloudX::Ptr cloud_cluster 
+      (new pcl::PointCloud<pcl::PointXYZ>);
+    for (std::vector<int>::const_iterator pit = it->indices.begin (); 
+ 	 pit != it->indices.end (); pit++){
+      cloud_cluster->points.push_back (cloud_filtered->points[*pit]); //*
+    }
+    cloud_cluster->width = cloud_cluster->points.size ();
+    cloud_cluster->height = 1;
+    cloud_cluster->is_dense = true;
 
- //    std::cout << "PointCloud representing the Cluster: " << cloud_cluster->points.size () << " data points." << std::endl;
- //    std::stringstream ss;
- //    ss << "cloud_cluster_" << j << ".pcd";
- //    writer.write<pcl::PointXYZ> (ss.str (), *cloud_cluster, false); //*
- //    j++;
+    std::cout << "PointCloud representing the Cluster: " << cloud_cluster->points.size () << " data points." << std::endl;
+    std::stringstream ss;
+    ss << "cloud_cluster_" << j << ".pcd";
+    writer.write<pcl::PointXYZ> (ss.str (), *cloud_cluster, false); //*
+    j++;
 
- //  }
+  }
 
 }
