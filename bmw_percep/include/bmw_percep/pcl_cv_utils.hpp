@@ -1,5 +1,5 @@
-#include<opencv2/opencv.hpp>
-#include<pcl/point_types.h>
+#include <opencv2/opencv.hpp>
+#include <pcl/point_types.h>
 #include <pcl/conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/filters/voxel_grid.h>
@@ -7,6 +7,8 @@
 #include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/common/common_headers.h>
+#include <pcl/sample_consensus/sac_model_plane.h>
+#include <pcl/filters/extract_indices.h>
 
 /**
    Utility functions for OpenCV and PCL
@@ -68,6 +70,12 @@ namespace cv_utils{
 			 pcl::PointCloud<pcl::PointXYZ>::Ptr viz_cloud, 
 			 const cv::Mat &mask, 
 			 vector<cv::Point3f> clusters, int& max_blob_id,
+			 float leaf_size=0.01);
+  
+  void find_euclid_blobs(PointCloudT::ConstPtr cloud, 
+			 PointCloudT::Ptr viz_cloud, 
+			 vector<cv::Point3f> clusters, int& max_blob_id,
+			 const Eigen::VectorXf ground_coeffs,
 			 float leaf_size=0.01);
 
 }

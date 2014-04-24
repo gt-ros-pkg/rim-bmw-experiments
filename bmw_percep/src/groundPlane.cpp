@@ -117,6 +117,19 @@ cv::Mat pc_to_img(const PointCloudT::Ptr& cloud, bool mask_nans=true)
   return result;
 }
 
+void GroundPlane::get_ground_coeffs(Eigen::VectorXf& eig_coeffs)
+{
+  if (ground_coeffs.size()==4){
+    eig_coeffs.resize(4);
+    eig_coeffs[0] = ground_coeffs.at(0);
+    eig_coeffs[1] = ground_coeffs.at(1);
+    eig_coeffs[2] = ground_coeffs.at(2);
+    eig_coeffs[3] = ground_coeffs.at(3);
+  }
+  else
+    cout << "\nGround Coefficients not set." << endl;
+}
+
 GroundPlane::GroundPlane(const PointCloudT::Ptr& cloud)
 {
   //resize plane parameters

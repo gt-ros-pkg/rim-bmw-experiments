@@ -31,7 +31,9 @@ public:
   
   //Get plane from saved file
   GroundPlane (string fileName);
-
+  
+  
+  
   //Visualize the plane by coloring all the pixels intersecting with ground *pink*
   void visualizePlane(const PointCloudT::Ptr& cloud, double inter_thresh=0.01);
 
@@ -47,6 +49,8 @@ public:
   // mask returns the mask of image locations where a point exists
   // mask if contains zeros and ones would be used to select points to project
   void pcProject(const PointCloudT::Ptr& cloud, PointCloudT::Ptr& cloud_projected);
+  
+  void get_ground_coeffs(Eigen::VectorXf& eig_coeffs);
 
 private:
   vector<double> ground_coeffs; // ax+by+cz+d=0

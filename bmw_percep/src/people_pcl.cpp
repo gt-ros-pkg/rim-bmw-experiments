@@ -4,6 +4,10 @@
 #include <pcl/io/openni_grabber.h>
 #include <pcl/sample_consensus/sac_model_plane.h>
 #include <pcl/people/ground_based_people_detection_app.h>
+#include<pcl/sample_consensus/sac_model_plane.h>
+#include <pcl/filters/extract_indices.h>
+#include <pcl/sample_consensus/ransac.h>
+#include <pcl/filters/extract_indices.h>
 
 typedef pcl::PointXYZRGBA PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
@@ -119,10 +123,7 @@ int main (int argc, char** argv)
   // Ground plane estimation:
   Eigen::VectorXf ground_coeffs;
   ground_coeffs.resize(4);
-  std::vector<int> clicked_points_indices;
-  for (unsigned int i = 0; i < clicked_points_3d->points.size(); i++)
-    clicked_points_indices.push_back(i);
-  pcl::SampleConsensusModelPlane<PointT> model_plane(clicked_points_3d);
+  pcl::SampleConsensusModelPlane<PointT> model_plane(ground_coeffs);
   model_plane.computeModelCoefficients(clicked_points_indices,ground_coeffs);
   std::cout << "Ground plane: " << ground_coeffs(0) << " " << ground_coeffs(1) << " " << ground_coeffs(2) << " " << ground_coeffs(3) << std::endl;
 

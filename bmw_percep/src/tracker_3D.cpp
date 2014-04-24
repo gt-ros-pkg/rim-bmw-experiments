@@ -6,6 +6,7 @@
 #include<pcl/conversions.h>
 #include<opencv2/opencv.hpp>
 #include<bmw_percep/pcl_cv_utils.hpp>
+#include<bmw_percep/groundPlane.hpp>
 
 //ros-includes
 #include<ros/ros.h>
@@ -49,17 +50,26 @@ int main(int argc, char** argv)
   string hum_frame = "base_link";
 
   PointCloudT::Ptr cloud (new PointCloudT);
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr 
+    tcloud (new pcl::PointCloud<pcl::PointXYZRGB>);
   pcl::PCLPointCloud2 pub_pc;
       
-  cv::Mat depth_im, valid_depth, foreMask, back_im, disp_im, box_mask, box_mask2, box_mask_inliers;
+  cv::Mat rgb_im, depth_im, valid_depth, foreMask, back_im, disp_im, box_mask, box_mask2, box_mask_inliers;
 
   // Read Kinect live stream:
   bool new_cloud_available_flag = false;
-  pcl::Grabber* interface = new pcl::OpenNIGrabber();
+  pcl::Grabber* interface = new pcl::OpenNIGrabber("#1");
   boost::function<void (const PointCloudT::ConstPtr&)> f =
     boost::bind (&cloud_cb_, _1, cloud, &new_cloud_available_flag);
   interface->registerCallback (f);
   interface->start ();
+
+  //ground-plane
+  Eigen::VectorXf ground_coeffs;
+  //read ground plane parameters from file
+  string fileName = "data/ground_coeffs.txt";
+  GroundPlane ground_obj(fileName);
+  ground_obj.get_ground_coeffs(ground_coeffs);
 
   // Wait for the first frame:
   while(!new_cloud_available_flag) 
@@ -73,19 +83,26 @@ int main(int argc, char** argv)
       new_cloud_available_flag = false;
       n_frames++;
 
+      cout << "No fault?" << endl;
       PointCloudT::Ptr 
 	viz_cloud (new PointCloudT);
 
       vector<cv::Point3f> clusters; int max_blob_id;
-      //cv_utils::find_euclid_blobs(cloud, viz_cloud, foreMask, 
-				  // clusters, max_blob_id);
-      pcl::toPCLPointCloud2(*viz_cloud, pub_pc);
-      // pcl::toPCLPointCloud2(*cloud, pub_pc);
+      // cv_utils::find_euclid_blobs(cloud, viz_cloud,  
+      //  				  clusters, max_blob_id,
+      // 				  ground_coeffs);
+
+      pcl::copyPointCloud(*cloud, *tcloud);
+      pcl::toPCLPointCloud2(*tcloud, pub_pc);
       pub_pc.header.frame_id = hum_frame;
       db_pc.publish(pub_pc);
 
-
-
+      int useless;
+      //cin >> useless;
+      // cv_utils::pc_to_img(cloud, rgb_im, depth_im, valid_depth);
+      // cv::imshow("rgb", rgb_im);
+      // cv::waitKey(10);
+      cloud_mutex.unlock();
     }
 
   }
