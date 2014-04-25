@@ -9,6 +9,7 @@
 #include <pcl/common/common_headers.h>
 #include <pcl/sample_consensus/sac_model_plane.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/people/person_cluster.h>
 
 /**
    Utility functions for OpenCV and PCL
@@ -77,5 +78,29 @@ namespace cv_utils{
 			 vector<cv::Point3f> clusters, int& max_blob_id,
 			 const Eigen::VectorXf ground_coeffs,
 			 float leaf_size=0.01);
+  
+void find_ppl_clusters(const PointCloudT::Ptr cloud, 
+		  vector<pcl::PointIndices>& init_indices, 
+		  std::vector<pcl::people::PersonCluster<PointT> >& clusters,
+		  const Eigen::VectorXf ground_coeffs);
 
+void mergeClustersCloseInFloorCoordinates 
+(const PointCloudT::Ptr cloud, 
+ std::vector<pcl::people::PersonCluster<PointT> >& input_clusters,
+ std::vector<pcl::people::PersonCluster<PointT> >& output_clusters, 
+ const Eigen::VectorXf ground_coeffs_, double sqrt_ground_coeffs_);
+ 
+  bool get_min_ground_dist(const PointCloudT::Ptr cloud, 
+			   pcl::people::PersonCluster<PointT> person_c, 
+			   const Eigen::VectorXf ground_coeffs, 
+			   double sqrt_ground_coeffs, double min_dist);
+
+  void depth_bgSub(PointCloudT::ConstPtr cloud, PointCloudT::Ptr bgCloud, 
+		   const cv::Mat& bg);
+
+  void find_euclid_blobs(PointCloudT::ConstPtr cloud, 
+			 PointCloudT::Ptr viz_cloud, 
+			 vector<cv::Point3f> clusters, int& max_blob_id,
+			 const Eigen::VectorXf ground_coeffs, cv::Mat bg,
+			 float leaf_size=0.01);
 }

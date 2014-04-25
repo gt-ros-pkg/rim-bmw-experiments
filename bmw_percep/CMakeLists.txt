@@ -166,6 +166,12 @@ add_executable(tracker_3D
   src/pcl_cv_utils.cpp
   src/tracker_3D.cpp)
 
+add_executable(tracker_from_file
+  src/particleFilter.cpp
+  src/groundPlane.cpp
+  src/pcl_cv_utils.cpp
+  src/tracker_from_file.cpp)
+
 add_executable(sample_ground
   src/groundPlane.cpp
   src/sample_groundPlane.cpp)
@@ -191,6 +197,7 @@ add_executable(sample_groundReader
 #target_link_libraries(cola_demo_tracking1 ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 #target_link_libraries(sample_track_gmg ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(tracker_3D ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(tracker_from_file ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_ground ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_groundReader ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(publish_kinect ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})

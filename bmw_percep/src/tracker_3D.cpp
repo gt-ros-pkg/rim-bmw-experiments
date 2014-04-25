@@ -83,16 +83,15 @@ int main(int argc, char** argv)
       new_cloud_available_flag = false;
       n_frames++;
 
-      cout << "No fault?" << endl;
       PointCloudT::Ptr 
 	viz_cloud (new PointCloudT);
 
       vector<cv::Point3f> clusters; int max_blob_id;
-      // cv_utils::find_euclid_blobs(cloud, viz_cloud,  
-      //  				  clusters, max_blob_id,
-      // 				  ground_coeffs);
+      cv_utils::find_euclid_blobs(cloud, viz_cloud,  
+				  clusters, max_blob_id,
+       				  ground_coeffs);
 
-      pcl::copyPointCloud(*cloud, *tcloud);
+      pcl::copyPointCloud(*viz_cloud, *tcloud);
       pcl::toPCLPointCloud2(*tcloud, pub_pc);
       pub_pc.header.frame_id = hum_frame;
       db_pc.publish(pub_pc);

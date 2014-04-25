@@ -67,13 +67,15 @@ int main(int argc, char** argv)
   cloud_mutex.lock ();    // for not overwriting the point cloud
 
   //visualize plane on rgb-imagery
-  ground_obj.visualizePlane(cloud, 0.05);
+  ground_obj.visualizePlane(cloud, 0.1);
 
 
   cloud_mutex.unlock();
 
   while(ros::ok()){
    if (new_cloud_available_flag && cloud_mutex.try_lock()){
+     new_cloud_available_flag = false;
+
      //project plane
      ground_obj.pcProject(cloud, cloud_projected);
      
