@@ -166,6 +166,14 @@ add_executable(tracker_3D
   src/pcl_cv_utils.cpp
   src/tracker_3D.cpp)
 
+add_executable(record_kin_pcd
+  src/pcl_cv_utils.cpp
+  src/record_kin_pcd.cpp)
+
+add_executable(learn_col_hist
+  src/pcl_cv_utils.cpp
+  src/learn_col_hist.cpp)
+
 add_executable(tracker_from_file
   src/particleFilter.cpp
   src/groundPlane.cpp
@@ -201,6 +209,8 @@ target_link_libraries(tracker_from_file ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_ground ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_groundReader ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(publish_kinect ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(record_kin_pcd ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(learn_col_hist ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
 ## Install ##

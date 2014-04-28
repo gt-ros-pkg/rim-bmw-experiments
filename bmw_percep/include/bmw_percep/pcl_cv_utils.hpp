@@ -38,6 +38,11 @@ namespace cv_utils{
   bool pc_to_img(const PointCloudT::Ptr& cloud, cv::Mat& d_rgb, 
 		 cv::Mat& d_depth, cv::Mat& d_dmask);
 
+  //Extract only RGB, Depth, and Valid-depth maps from point cloud
+  bool pc_to_img(PointCloudT::ConstPtr& cloud, cv::Mat& d_rgb, 
+		 cv::Mat& d_depth, cv::Mat& d_dmask);
+
+
   bool pc_to_depth(const PointCloudX::Ptr& cloud, 
 		   cv::Mat& d_depth, cv::Mat& d_dmask);
 
@@ -98,9 +103,24 @@ void mergeClustersCloseInFloorCoordinates
   void depth_bgSub(PointCloudT::ConstPtr cloud, PointCloudT::Ptr bgCloud, 
 		   const cv::Mat& bg);
 
+  void depth_bgSub( PointCloudT::ConstPtr cloud, PointCloudT::Ptr bgCloud, 
+		   cv::BackgroundSubtractorMOG2 cvBg);
+
   void find_euclid_blobs(PointCloudT::ConstPtr cloud, 
 			 PointCloudT::Ptr viz_cloud, 
 			 vector<cv::Point3f> clusters, int& max_blob_id,
 			 const Eigen::VectorXf ground_coeffs, cv::Mat bg,
 			 float leaf_size=0.01);
+
+  void find_euclid_blobs(PointCloudT::ConstPtr cloud, 
+			 PointCloudT::Ptr viz_cloud, 
+			 vector<cv::Point3f> clusters, int& max_blob_id,
+			 const Eigen::VectorXf ground_coeffs, 
+			 cv::BackgroundSubtractorMOG2 cvBg,
+			 float leaf_size=0.01);
+
+  bool pc_to_img_no_filter( const PointCloudT::Ptr& cloud, cv::Mat& d_rgb, 
+			    cv::Mat& d_depth, cv::Mat& d_dmask);
+  bool pc_to_img_no_filter( PointCloudT::ConstPtr& cloud, cv::Mat& d_rgb, 
+			    cv::Mat& d_depth, cv::Mat& d_dmask);
 }

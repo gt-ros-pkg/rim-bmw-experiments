@@ -113,6 +113,189 @@ bool cv_utils::pc_to_img(const PointCloudT::Ptr& cloud, cv::Mat& d_rgb,
   return true;
 }
 
+//Extract RGB, Depth, and Valid-depth maps from point cloud
+bool cv_utils::pc_to_img( PointCloudT::ConstPtr& cloud, cv::Mat& d_rgb, 
+			 cv::Mat& d_depth, cv::Mat& d_dmask)
+{
+  int pc_rows=cloud->height;
+  int pc_cols=cloud->width;
+  
+  //check if conversion possible
+  if (cloud->isOrganized()){
+
+    //TODO: Check if allocated Mat can be created
+    if (!cloud->empty()){
+      // allocate if neccessary
+      if (d_rgb.size()!=cv::Size(pc_rows, pc_cols) || d_rgb.depth()!= CV_8UC3)
+	d_rgb.create(pc_rows, pc_cols, CV_8UC3);
+
+      if (d_depth.size()!=cv::Size(pc_rows, pc_cols) || d_depth.depth()!= CV_64F)
+	d_depth = cv::Mat::zeros(pc_rows, pc_cols, CV_64F);
+      else
+	d_depth = cv::Scalar(10.0);
+
+      if (d_dmask.size()!=cv::Size(pc_rows, pc_cols) || d_dmask.depth()!= CV_8U)
+	d_dmask = cv::Mat::zeros(pc_rows, pc_cols, CV_8U);
+      else
+	d_dmask = cv::Scalar(0);
+
+      for (int r=0; r<pc_rows; r++){
+
+	cv::Vec3b* rgb_r = d_rgb.ptr<cv::Vec3b> (r);
+	double* depth_r = d_depth.ptr<double> (r);
+	unsigned char* dmask_r = d_dmask.ptr<unsigned char> (r);
+
+	for (int c=0; c<pc_cols; c++){
+	  PointT point = cloud->at(c,r);
+	  //set depth and depth-mask if not NaN
+	  if (!isnan(point.z) && point.z<4.0 && point.z>0.6){
+	    depth_r[c] = (double)point.z;
+	    dmask_r[c] = (unsigned char)255;
+	  }
+	  
+	  //set colors
+	  Eigen::Vector3i rgb = point.getRGBVector3i();
+	  rgb_r[c][0] = rgb[2];
+	  rgb_r[c][1] = rgb[1];
+	  rgb_r[c][2] = rgb[0];
+	}
+      }
+    }
+    else{
+      cout << "\n Cloud Empty!" << endl;
+      return false;
+    }
+  }
+  else{
+    cout << endl << "Cloud Unorganized.." << endl;
+    return false;
+  }
+
+  return true;
+}
+
+//Extract RGB, Depth, and Valid-depth maps from point cloud
+bool cv_utils::pc_to_img_no_filter( const PointCloudT::Ptr& cloud, cv::Mat& d_rgb, 
+				    cv::Mat& d_depth, cv::Mat& d_dmask)
+{
+  int pc_rows=cloud->height;
+  int pc_cols=cloud->width;
+  
+  //check if conversion possible
+  if (cloud->isOrganized()){
+
+    //TODO: Check if allocated Mat can be created
+    if (!cloud->empty()){
+      // allocate if neccessary
+      if (d_rgb.size()!=cv::Size(pc_rows, pc_cols) || d_rgb.depth()!= CV_8UC3)
+	d_rgb.create(pc_rows, pc_cols, CV_8UC3);
+
+      if (d_depth.size()!=cv::Size(pc_rows, pc_cols) || d_depth.depth()!= CV_64F)
+	d_depth = cv::Mat::zeros(pc_rows, pc_cols, CV_64F);
+      else
+	d_depth = cv::Scalar(0.0);
+
+      if (d_dmask.size()!=cv::Size(pc_rows, pc_cols) || d_dmask.depth()!= CV_8U)
+	d_dmask = cv::Mat::zeros(pc_rows, pc_cols, CV_8U);
+      else
+	d_dmask = cv::Scalar(0);
+
+      for (int r=0; r<pc_rows; r++){
+
+	cv::Vec3b* rgb_r = d_rgb.ptr<cv::Vec3b> (r);
+	double* depth_r = d_depth.ptr<double> (r);
+	unsigned char* dmask_r = d_dmask.ptr<unsigned char> (r);
+
+	for (int c=0; c<pc_cols; c++){
+	  PointT point = cloud->at(c,r);
+	  //set depth and depth-mask if not NaN
+	  if (!isnan(point.z)){
+	    depth_r[c] = static_cast<double>(point.z);
+	    dmask_r[c] = static_cast<unsigned char>(255);
+	  }
+	  
+	  //set colors
+	  Eigen::Vector3i rgb = point.getRGBVector3i();
+	  rgb_r[c][0] = rgb[2];
+	  rgb_r[c][1] = rgb[1];
+	  rgb_r[c][2] = rgb[0];
+	}
+      }
+    }
+    else{
+      cout << "\n Cloud Empty!" << endl;
+      return false;
+    }
+  }
+  else{
+    cout << endl << "Cloud Unorganized.." << endl;
+    return false;
+  }
+
+  return true;
+}
+
+bool cv_utils::pc_to_img_no_filter( PointCloudT::ConstPtr& cloud, cv::Mat& d_rgb, 
+				    cv::Mat& d_depth, cv::Mat& d_dmask)
+{
+  int pc_rows=cloud->height;
+  int pc_cols=cloud->width;
+  
+  //check if conversion possible
+  if (cloud->isOrganized()){
+
+    //TODO: Check if allocated Mat can be created
+    if (!cloud->empty()){
+      // allocate if neccessary
+      if (d_rgb.size()!=cv::Size(pc_rows, pc_cols) || d_rgb.depth()!= CV_8UC3)
+	d_rgb.create(pc_rows, pc_cols, CV_8UC3);
+
+      if (d_depth.size()!=cv::Size(pc_rows, pc_cols) || d_depth.depth()!= CV_64F)
+	d_depth = cv::Mat::zeros(pc_rows, pc_cols, CV_64F);
+      else
+	d_depth = cv::Scalar(0.0);
+
+      if (d_dmask.size()!=cv::Size(pc_rows, pc_cols) || d_dmask.depth()!= CV_8U)
+	d_dmask = cv::Mat::zeros(pc_rows, pc_cols, CV_8U);
+      else
+	d_dmask = cv::Scalar(0);
+
+      for (int r=0; r<pc_rows; r++){
+
+	cv::Vec3b* rgb_r = d_rgb.ptr<cv::Vec3b> (r);
+	double* depth_r = d_depth.ptr<double> (r);
+	unsigned char* dmask_r = d_dmask.ptr<unsigned char> (r);
+
+	for (int c=0; c<pc_cols; c++){
+	  PointT point = cloud->at(c,r);
+	  //set depth and depth-mask if not NaN
+	  if (!isnan(point.z)){
+	    depth_r[c] = static_cast<double>(point.z);
+	    dmask_r[c] = static_cast<unsigned char>(255);
+	  }
+	  
+	  //set colors
+	  Eigen::Vector3i rgb = point.getRGBVector3i();
+	  rgb_r[c][0] = rgb[2];
+	  rgb_r[c][1] = rgb[1];
+	  rgb_r[c][2] = rgb[0];
+	}
+      }
+    }
+    else{
+      cout << "\n Cloud Empty!" << endl;
+      return false;
+    }
+  }
+  else{
+    cout << endl << "Cloud Unorganized.." << endl;
+    return false;
+  }
+
+  return true;
+}
+
+
 bool cv_utils::pc_to_depth(const PointCloudX::Ptr& cloud, 
 			 cv::Mat& d_depth, cv::Mat& d_dmask)
 {
@@ -519,7 +702,7 @@ void cv_utils::find_euclid_blobs(PointCloudT::ConstPtr cloud,
   // Ground removal and update:
   pcl::IndicesPtr inliers(new std::vector<int>);
   boost::shared_ptr<pcl::SampleConsensusModelPlane<PointT> > ground_model(new pcl::SampleConsensusModelPlane<PointT>(cloud_filtered));
-  ground_model->selectWithinDistance(ground_coeffs, 1.5*voxel_size, *inliers);
+  ground_model->selectWithinDistance(ground_coeffs, 3*voxel_size, *inliers);
   PointCloudT::Ptr no_ground_cloud(new PointCloudT);
   pcl::ExtractIndices<PointT> extract;
   extract.setInputCloud(cloud_filtered);
@@ -615,6 +798,7 @@ void cv_utils::find_ppl_clusters(const PointCloudT::Ptr cloud,
   // cout << "Started this finding.." << endl;
 
   float max_height_= 2.3; float min_height_= 1.3;
+  int min_a_merge = 200; float max_dist_gr=0.4;
   bool camera_vertical=false, compute_head=false;
 
   float sqrt_ground_coeffs_ = (ground_coeffs - Eigen::Vector4f
@@ -648,10 +832,12 @@ void cv_utils::find_ppl_clusters(const PointCloudT::Ptr cloud,
   new_clusters.clear();
   for(unsigned int i = 0; i < clusters.size(); i++) // for every cluster
     {
-      if (clusters[i].getHeight() >= min_height_){
-  	if (get_min_ground_dist(cloud, clusters[i], ground_coeffs, 
-  				sqrt_ground_coeffs_, 1.0))
+      if (clusters[i].getNumberPoints() > min_a_merge){
+	if (clusters[i].getHeight() >= min_height_){
+	  if (get_min_ground_dist(cloud, clusters[i], ground_coeffs, 
+				  sqrt_ground_coeffs_, max_dist_gr))
   	    new_clusters.push_back(clusters[i]);
+	}
       }
     }
 
@@ -770,10 +956,10 @@ std::vector<pcl::people::PersonCluster<PointT> >& input_clusters,
   }
 }
 
-bool cv_utils::get_min_ground_dist(const PointCloudT::Ptr cloud, 
-				     pcl::people::PersonCluster<PointT> person_c, 
-				     const Eigen::VectorXf ground_coeffs, 
-				     double sqrt_ground_coeffs, double min_dist)
+bool cv_utils::get_min_ground_dist (const PointCloudT::Ptr cloud, 
+				    pcl::people::PersonCluster<PointT> person_c, 
+				    const Eigen::VectorXf ground_coeffs, 
+				    double sqrt_ground_coeffs, double min_dist)
 {
   pcl::PointIndices p_ind = person_c.getIndices();
   double min_disto=1000.0;
@@ -822,8 +1008,123 @@ void cv_utils::find_euclid_blobs(PointCloudT::ConstPtr cloud,
   std::cout << "PointCloud after filtering has: " << cloud_filtered->points.size ()  << " data points." << std::endl; 
 
   // TODO: Check background subtraction
-  pcl::copyPointCloud(*bgCloud, *viz_cloud);
-  return;
+  // pcl::copyPointCloud(*bgCloud, *viz_cloud);
+  // return;
+
+  // Ground removal and update:
+  pcl::IndicesPtr inliers(new std::vector<int>);
+  boost::shared_ptr<pcl::SampleConsensusModelPlane<PointT> > ground_model(new pcl::SampleConsensusModelPlane<PointT>(cloud_filtered));
+  ground_model->selectWithinDistance(ground_coeffs, voxel_size, *inliers);
+  PointCloudT::Ptr no_ground_cloud(new PointCloudT);
+  pcl::ExtractIndices<PointT> extract;
+  extract.setInputCloud(cloud_filtered);
+  extract.setIndices(inliers);
+  extract.setNegative(true);
+  extract.filter(*no_ground_cloud);
+
+  // Creating the KdTree object for the search method of the extraction
+  pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
+  tree->setInputCloud (no_ground_cloud);
+
+  std::vector<pcl::PointIndices> cluster_indices;
+  pcl::EuclideanClusterExtraction<PointT> ec;
+  ec.setClusterTolerance (2* 0.06); // 2cm
+  ec.setMinClusterSize (30);
+  ec.setMaxClusterSize (5000);
+  ec.setSearchMethod (tree);
+  ec.setInputCloud (no_ground_cloud);
+  ec.extract (cluster_indices);
+
+  std::vector<pcl::people::PersonCluster<PointT> > ppl_clusters; 
+
+  find_ppl_clusters(no_ground_cloud,
+  		    cluster_indices,
+  		    ppl_clusters,
+  		    ground_coeffs);
+
+  //debug
+  cout << "No. of clusters: " << cluster_indices.size() << endl;
+
+  int j = 0;
+  
+  //replace cluster indices with people clusters
+  int n_ppl=0;
+  cluster_indices.clear();
+  for(std::vector<pcl::people::PersonCluster<PointT> >::iterator 
+  	it = ppl_clusters.begin(); it != ppl_clusters.end(); ++it)
+      {
+  	cluster_indices.push_back(it->getIndices());
+  	n_ppl++;
+      }
+  
+  cout << "No. of people: " << n_ppl << endl; 
+  // string whatupp;
+  // if (n_ppl > 100)
+  //   cin >> whatupp;
+
+  // visualize by painting each PC another color
+  pcl::copyPointCloud(*no_ground_cloud, *cloud_filtered);
+  
+  viz_cloud->points.clear();
+  for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); 
+       it != cluster_indices.end (); ++it){
+    uint8_t r(rand()%255), g(rand()%255), b(rand()%255);
+
+    for (std::vector<int>::const_iterator pit = it->indices.begin (); 
+ 	 pit != it->indices.end (); pit++){
+      // create RGB point to push in
+      PointT new_pt;
+      new_pt.x = cloud_filtered->points[*pit].x;
+      new_pt.y = cloud_filtered->points[*pit].y;
+      new_pt.z = cloud_filtered->points[*pit].z;
+
+      new_pt.r = cloud_filtered->points[*pit].r;
+      new_pt.g = cloud_filtered->points[*pit].g;
+      new_pt.b = cloud_filtered->points[*pit].b;
+
+      // new_pt.r = r; new_pt.g = g; new_pt.b = b;
+      new_pt.a = 1.0;
+      viz_cloud->points.push_back (new_pt); //*
+    }
+    viz_cloud->width = viz_cloud->points.size ();
+    viz_cloud->height = 1;
+    viz_cloud->is_dense = true;
+
+    //std::cout << "PointCloud representing the Cluster: " << viz_cloud->points.size () << " data points." << std::endl;
+    //writer.write<pcl::PointXYZ> (ss.str (), *cloud_cluster, false); //*
+    //j++;
+
+  }
+  
+}
+
+void cv_utils::find_euclid_blobs(PointCloudT::ConstPtr cloud, 
+				 PointCloudT::Ptr viz_cloud, 
+				 vector<cv::Point3f> clusters, int& max_blob_id,
+				 const Eigen::VectorXf ground_coeffs, 
+				 cv::BackgroundSubtractorMOG2 cvBg,
+				 float leaf_size/*=0.01*/)
+{
+
+  // background subtract the point cloud
+  PointCloudT::Ptr bgCloud(new PointCloudT);
+  depth_bgSub(cloud, bgCloud, cvBg);
+  
+  // pcl::copyPointCloud(*bgCloud, *viz_cloud);
+  // return;
+  
+  float voxel_size=0.06;
+  // Create the filtering object: downsample the dataset using a leaf size of 1cm
+  pcl::VoxelGrid<PointT> vg;
+  PointCloudT::Ptr cloud_filtered(new PointCloudT);
+  vg.setInputCloud (bgCloud);
+  vg.setLeafSize (0.06f, 0.06f, 0.06f);
+  vg.filter (*cloud_filtered);
+  std::cout << "PointCloud after filtering has: " << cloud_filtered->points.size ()  << " data points." << std::endl; 
+
+  // TODO: Check background subtraction
+  // pcl::copyPointCloud(*bgCloud, *viz_cloud);
+  // return;
 
   // Ground removal and update:
   pcl::IndicesPtr inliers(new std::vector<int>);
@@ -915,12 +1216,10 @@ void cv_utils::find_euclid_blobs(PointCloudT::ConstPtr cloud,
 void cv_utils::depth_bgSub( PointCloudT::ConstPtr cloud, PointCloudT::Ptr bgCloud, 
 		 const cv::Mat& bg)
 {
-  //debug
-  cout << "Get here man?" << endl;
-  
-  double max_diff = 0.05;
+  double max_diff = 0.1;
   int pc_rows=cloud->height;
   int pc_cols=cloud->width;
+  cv::Mat rgb_im, depth_im, depth_mask, depth_show;
 
   // //debug
   // cv::Mat bg_;
@@ -936,21 +1235,90 @@ void cv_utils::depth_bgSub( PointCloudT::ConstPtr cloud, PointCloudT::Ptr bgClou
   
 
   bgCloud->points.clear();
+
+  pc_to_img_no_filter(cloud, rgb_im, depth_im, depth_mask);
+
+  // //check if conversion possible
+  // if (cloud->isOrganized()){
+  //   //TODO: Check if allocated Mat can be created
+  //   if (!cloud->empty()){
+  //     for (int r=0; r<pc_rows; r++){
+  // 	const double* bg_r = bg.ptr<double> (r);
+  // 	for (int c=0; c<pc_cols; c++){
+  // 	  PointT point = cloud->at(c,r);
+  // 	  if (!isnan(point.z) && point.z<6.0 && point.z>0.5){
+  // 	    //set depth and depth-mask if not NaN
+  // 	    double bg_diff = fabs(point.z-bg_r[c]);
+  // 	    if (bg_diff > max_diff)
+  // 	      bgCloud->points.push_back(point);
+  // 	  }
+  // 	}
+  //     }
+  //   }
+  //   else{
+  //     cout << "\n Cloud Empty!" << endl;
+  //     return ;
+  //   }
+  // }
+  // else{
+  //   cout << endl << "Cloud Unorganized.." << endl;
+  //   return;
+  // }
+
+  for(int r=0; r<depth_im.rows; r++){
+      const double* depth_r = depth_im.ptr<double> (r);
+      const double* bg_r = bg.ptr<double> (r);
+      const uchar* dmask_r = depth_mask.ptr<uchar> (r);
+
+      for(int c=0; c<depth_im.cols; c++){
+	if (dmask_r[c]>0){
+	  if (!isnan(depth_r[c]) && depth_r[c]>0.5 && depth_r[c]<5.0){
+	    if (fabs(depth_r[c]-bg_r[c]) > 0.1){
+	      PointT pointy = cloud->at(c,r);
+	      bgCloud->points.push_back(pointy);
+	    }
+	  }
+	}
+      }
+    }  
+
+  bgCloud->width = bgCloud->points.size();
+  bgCloud->height = 1;
+  bgCloud->is_dense = true;
+  
+  return;
+}
+
+
+void cv_utils::depth_bgSub( PointCloudT::ConstPtr cloud, PointCloudT::Ptr bgCloud, 
+			    cv::BackgroundSubtractorMOG2 cvBg)
+{
+  double general_learn=0.0;
+  int pc_rows=cloud->height;
+  int pc_cols=cloud->width;
+
+  cv::Mat rgb_im, depth_im, depth_mask, foreMask, depth_filt;
+
+  cv_utils::pc_to_img(cloud, rgb_im, depth_im, depth_mask);
+  
+  //subtract-bg
+  cvBg.operator()(depth_im, foreMask, general_learn);
+
+  bgCloud->points.clear();
   
   //check if conversion possible
   if (cloud->isOrganized()){
 
-    //TODO: Check if allocated Mat can be created
     if (!cloud->empty()){
       for (int r=0; r<pc_rows; r++){
-	const double* bg_r = bg.ptr<double> (r);
+	const double* depth_r = depth_im.ptr<double> (r);
+	const double* fore_r = foreMask.ptr<double> (r);
 	for (int c=0; c<pc_cols; c++){
-	  PointT point = cloud->at(c,r);
-	  if (!isnan(point.z) && point.z<6.0 && point.z>0.5){
-	    //set depth and depth-mask if not NaN
-	    double bg_diff = fabs(point.z-bg_r[c]);
-	    if (bg_diff > max_diff)
+	  if (fore_r > 0){
+	    if (!isnan(depth_r[c]) && depth_r[c]<6.0 && depth_r[c]>0.5){
+	      PointT point = cloud->at(c,r);
 	      bgCloud->points.push_back(point);
+	    }
 	  }
 	}
       }

@@ -27,6 +27,8 @@ int frame_rate=30;
 enum { COLS=640, ROWS=480};
 
 cv::Mat learn_background(const string backg_folder);
+void learn_background(const string backg_folder, cv::BackgroundSubtractorMOG2& bg, double init_learn);
+void learn_bg(string backg_dir, cv::Mat& cvBg);
 
 // MAIN
 int main(int argc, char** argv)
@@ -45,12 +47,28 @@ int main(int argc, char** argv)
 
   //background
   string backg_folder = "/home/menchi/dev/shray-hydro-ws/src/ppl_navigate/data/pcd/sequences1/background/";
-  read_dir = backg_folder;
-  cv::Mat backg_img = learn_background(backg_folder);
+  // //debug
+  // read_dir = backg_folder;
 
-  cv::namedWindow("BackG",2);
-  cv::imshow("BackG", backg_img);
-  cv::waitKey(0);
+  //cv::Mat backg_img = learn_background(backg_folder);
+  int bg_history = 20;//0;
+  double bg_varThresh=0.03;
+  bool bg_detectShadow=false;
+  double init_learn=-1.0; // learning rate for initialization
+  //TODO: fix learning rates
+  double general_learn= 0.0;//0.001; // after initial period
+  double after_img=0.3;
+  // cv::BackgroundSubtractorMOG2 cvBg(bg_history, bg_varThresh, bg_detectShadow);
+  // cvBg.setInt("nmixtures", 2);
+  // learn_background(backg_folder, cvBg, init_learn);
+  
+  cv::Mat cvBg;
+  learn_bg(backg_folder, cvBg);
+
+
+  // cv::namedWindow("BackG",2);
+  // cv::imshow("BackG", backg_img);
+  // cv::waitKey(0);
   
   PointCloudT::Ptr cloud (new PointCloudT);
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr 
@@ -73,6 +91,9 @@ int main(int argc, char** argv)
   PointCloudT::Ptr 
     viz_cloud (new PointCloudT);
 
+  //debug
+  //read_dir = backg_folder;
+
 
   while(ros::ok()){
     n_frames++;
@@ -91,15 +112,24 @@ int main(int argc, char** argv)
     }
 
     vector<cv::Point3f> clusters; int max_blob_id;
-    cv_utils::find_euclid_blobs(cloud, viz_cloud,  
-				  clusters, max_blob_id,
-				ground_coeffs, backg_img);
+    // cv_utils::find_euclid_blobs(cloud, viz_cloud,  
+    // 				  clusters, max_blob_id,
+    // 				ground_coeffs, backg_img);
 
+    // cv_utils::find_euclid_blobs(cloud, viz_cloud,  
+    // 				  clusters, max_blob_id,
+    // 				ground_coeffs, cvBg);
+
+    cv_utils::find_euclid_blobs(cloud, viz_cloud,  
+				clusters, max_blob_id,
+				ground_coeffs, cvBg);
+
+    if (viz_cloud->points.size()>0){
       pcl::copyPointCloud(*viz_cloud, *tcloud);
       pcl::toPCLPointCloud2(*tcloud, pub_pc);
       pub_pc.header.frame_id = hum_frame;
       db_pc.publish(pub_pc);
-
+    }
       int useless;
       //cin >> useless;
       // cv_utils::pc_to_img(cloud, rgb_im, depth_im, valid_depth);
@@ -175,4 +205,103 @@ cv::Mat learn_background(const string backg_folder)
 
   bg_im = mean_img;
   return bg_im;
+}
+
+
+void learn_background(const string backg_folder, cv::BackgroundSubtractorMOG2& bg, double init_learn)
+{
+  int frame_no=0;
+  cv::Mat rgb_im, depth_im, depth_mask, foreMask;
+  PointCloudT::Ptr cloud (new PointCloudT);
+
+  while(ros::ok())
+    {
+
+      frame_no++;
+      ostringstream read_fr_str;
+      read_fr_str << frame_no;
+      string read_file = backg_folder + read_fr_str.str() + ".pcd";
+    
+      if (pcl::io::loadPCDFile<PointT> (read_file, *cloud) == -1){
+      	cout << "\nRead " << frame_no-1 << " background frames .." << endl;
+	break;
+      }
+      
+      else{
+      	//file read learn it!
+	cv_utils::pc_to_img(cloud, rgb_im, depth_im, depth_mask);
+	//cv::imshow("Background learning", depth_im);
+	//cv::waitKey(5);
+	bg.operator()(depth_im, foreMask, init_learn);
+      }
+    }
+  
+  return;
+}
+
+void learn_bg(string backg_dir, cv::Mat& cvBg)
+{
+  //read and learn background..
+  bool done_backg = false;
+  int backg_frame = 0;
+  string pcd_ext = ".pcd";
+
+  PointCloudT::Ptr cloud (new PointCloudT);
+  cv::Mat rgb_im, depth_im, depth_mask, depth_show, 
+    frame_cunt;
+
+  while(!done_backg){
+    backg_frame++;
+    ostringstream read_fr_str;
+    read_fr_str << backg_frame;
+    string read_file = backg_dir + read_fr_str.str() + pcd_ext;
+    
+    if (pcl::io::loadPCDFile<PointT> (read_file, *cloud) == -1 ){
+      //done reading
+      cout << "\n All files read. I guess." << endl;
+      done_backg = true;
+      break;
+    }
+
+    cv_utils::pc_to_img_no_filter(cloud, rgb_im, depth_im, depth_mask);
+    
+    if(backg_frame==1){
+      cvBg = cv::Mat::zeros(depth_im.size(), depth_im.depth());
+      frame_cunt = cv::Mat::zeros(depth_im.size(), depth_im.depth());
+    }
+    // //debug
+    // cv::normalize(depth_im, depth_show, 0.0, 1.0, cv::NORM_MINMAX);
+    // cv::imshow("RGB", rgb_im);
+        
+    // cv::imshow("Depth", depth_show);
+    // cv::waitKey(100);
+    
+    // //debug
+    // cout << "Read frame: " << backg_frame << endl;
+
+    for(int r=0; r < depth_im.rows; r++){
+      double* depth_r = depth_im.ptr<double> (r);
+      double* cvBg_r = cvBg.ptr<double> (r);
+      uchar* dmask_r = depth_mask.ptr<uchar> (r);
+      double* fr_c_r = frame_cunt.ptr<double> (r);
+      for(int c=0; c<depth_im.cols; c++){
+	if (dmask_r[c]>0){
+	  if (!isnan(depth_r[c]) && depth_r[c]>0.5){
+	    cvBg_r[c] += static_cast<double>(depth_r[c]);
+	    fr_c_r[c]++;
+	  }
+	}
+      }
+    }
+  }
+
+  //normalize
+  for(int r=0; r<cvBg.rows; r++){
+      double* cvBg_r = cvBg.ptr<double> (r);
+      double* fr_c_r = frame_cunt.ptr<double> (r);
+      for(int c=0; c<cvBg.cols; c++){
+	if(fr_c_r[c]>0)
+	  cvBg_r[c] /= fr_c_r[c];
+      }
+  }
 }
