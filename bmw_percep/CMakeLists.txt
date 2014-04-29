@@ -172,6 +172,7 @@ add_executable(record_kin_pcd
 
 add_executable(learn_col_hist
   src/pcl_cv_utils.cpp
+  src/colorHistogram.cpp
   src/learn_col_hist.cpp)
 
 add_executable(tracker_from_file
