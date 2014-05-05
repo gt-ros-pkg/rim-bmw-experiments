@@ -175,6 +175,10 @@ add_executable(learn_col_hist
   src/colorHistogram.cpp
   src/learn_col_hist.cpp)
 
+add_executable(pc_to_vid
+  src/pcl_cv_utils.cpp
+  src/pc_to_vid.cpp)
+
 add_executable(tracker_from_file
   src/particleFilter.cpp
   src/groundPlane.cpp
@@ -212,6 +216,7 @@ target_link_libraries(sample_groundReader ${OpenCV_LIBRARIES} ${catkin_LIBRARIES
 target_link_libraries(publish_kinect ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(record_kin_pcd ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(learn_col_hist ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(pc_to_vid ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
 ## Install ##

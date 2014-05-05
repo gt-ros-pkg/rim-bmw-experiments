@@ -24,11 +24,11 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
 
 
-  ColorHistogram robo_hist(181);
+  ColorHistogram robo_hist(256);
   
   string read_dir = "data/PCDs/robot2/", pcd_ext=".pcd";
   PointCloudT::Ptr cloud (new PointCloudT);
-  cv::Mat rgb_im, depth_im, depth_mask, fore;
+  cv::Mat rgb_im, depth_im, depth_mask, fore, fore_hist;
   string read_file;
   int n_frames=0;
   bool done_reading_files=false;
@@ -110,7 +110,7 @@ int main(int argc, char** argv)
   // test histogram
   bool done_test=false;
   int test_frame=0;
-  fore.create(640, 480, CV_8UC1);
+  fore_hist.create(rgb_im.size(), CV_8UC1);
   while(!done_test){
     test_frame++;
     ostringstream read_fr_str;
@@ -125,8 +125,11 @@ int main(int argc, char** argv)
     }
 
     cv_utils::pc_to_img_no_filter(cloud, rgb_im, depth_im, depth_mask);
-    robo_hist.testImg(rgb_im, fore);
-    
+    robo_hist.testImg(rgb_im, fore_hist);
+    //debug
+    c = cv::waitKey(5);
+    if (c==27)
+      break;
   }
 
 

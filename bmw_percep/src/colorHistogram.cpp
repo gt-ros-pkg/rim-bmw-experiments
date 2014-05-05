@@ -16,7 +16,7 @@ ColorHistogram::ColorHistogram(int bins, int a_count/*=1*/)
 
   _thresh = THRESH;
 
-  float h_range=181.0;
+  float h_range=256.0;//181.0;
   float s_range=256.0;
 
   object_histogram = static_cast<double> (a_count) * 
@@ -131,7 +131,7 @@ void ColorHistogram::readFromFile(string path)
 ColorHistogram::ColorHistogram(int bins, string path, int a_count/*=1*/)
 {
   _thresh = THRESH;
-  float h_range=181.0;
+  float h_range=256.0;//181.0;
   float s_range=256.0;
 
   object_histogram = static_cast<double> (a_count) * 
@@ -155,7 +155,8 @@ void ColorHistogram::testImg(const cv::Mat &im, cv::Mat &fore)
   cv::cvtColor(im, converted, CV_BGR2HSV);
   cv::Point cur_ind;
 
-  fore = cv::Scalar(0);
+  fore = cv::Mat::zeros(im.size(), CV_8UC1);
+  // fore = cv::Scalar(0);
 
   for (int r=0; r<converted.rows; r++){
     cv::Vec3b* conv_r = converted.ptr<cv::Vec3b> (r);
@@ -174,6 +175,8 @@ void ColorHistogram::testImg(const cv::Mat &im, cv::Mat &fore)
   //debug
   cv::Mat visuals;
   im.copyTo(visuals, fore);
+  cv::imshow("Fore", fore);
   cv::imshow("The Filtered", visuals);
+  cout << "Displayed a frame.." << endl;
   cv::waitKey(10);
 }

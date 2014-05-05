@@ -46,7 +46,7 @@ int main(int argc, char** argv)
   string pcd_ext = ".pcd";
 
   //background
-  string backg_folder = "/home/menchi/dev/shray-hydro-ws/src/ppl_navigate/data/pcd/sequences1/background/";
+ string backg_folder = "/home/menchi/dev/shray-hydro-ws/src/ppl_navigate/data/pcd/sequences1/background/";
   // //debug
   // read_dir = backg_folder;
 
