@@ -10,6 +10,8 @@
 
 using namespace std;
 
+//TODO: Get rid of the Mat as a way of storing histograms
+
 class ColorHistogram{
 
 public:
@@ -32,9 +34,10 @@ public:
 private:
   void augmentHist(cv::Mat& hist, const cv::Mat& bgr_frame);
   cv::Point getIndex(uchar h, uchar s);
-  int _bins; // bins in each of the H and S dimensions
+  int _bins_h, _bins_s; // bins in each of the H and S dimensions
   float _h_size, _s_size;
   cv::Mat object_histogram; // hist for object colors
   cv::Mat background_histogram; // hist for back. colors
   double _thresh;
+  
 };

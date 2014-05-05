@@ -16,18 +16,30 @@ ColorHistogram::ColorHistogram(int bins, int a_count/*=1*/)
 
   _thresh = THRESH;
 
-  float h_range=256.0;//181.0;
-  float s_range=256.0;
+  float h_range = 181.0;
+  float s_range = 256.0;
+
+
+  _bins_s = bins;
+  _bins_h = 181;
 
   object_histogram = static_cast<double> (a_count) * 
-    cv::Mat::ones(bins, bins, CV_64FC1);
+    cv::Mat::ones(_bins_h, _bins_s, CV_64FC1);
 
   background_histogram = static_cast<double> (a_count) * 
-    cv::Mat::ones(bins, bins, CV_64FC1);
-
-  _bins = bins;
-  _h_size = static_cast<float>(h_range/_bins);
-  _s_size = static_cast<float>(s_range/_bins);
+    cv::Mat::ones(_bins_h, _bins_s, CV_64FC1);
+  
+  _h_size = static_cast<float>(h_range/_bins_h);
+  _s_size = static_cast<float>(s_range/_bins_s);
+  
+  //debug
+  cout << "Bins = " << _bins_h << "\t" << _bins_s << endl;
+  cout << "H size = " << _h_size << "\t S size = " << _s_size << endl;
+  cout << "Threshold = " << _thresh << endl;
+  cout << "(0,0) Index: " << getIndex((uchar)0,(uchar)0) << endl;
+  cout << "(20,50) Index: " << getIndex((uchar)20,(uchar)50) << endl;
+  cout << "(180,255) Index: " << getIndex((uchar)180,(uchar)255) << endl;
+  return;
 }
 
 void ColorHistogram::addToObj(const cv::Mat& frame)
@@ -89,62 +101,67 @@ void ColorHistogram::displayHists()
 
 void ColorHistogram::writeToFile(string path)
 {
-  //file names
-  string w_fn = "world.csv";
-  string o_fn = "object.csv";
+  // //file names
+  // string w_fn = "world.csv";
+  // string o_fn = "object.csv";
   
-  //open files
-  ofstream object_f((path+o_fn).c_str());
-  ofstream world_f((path+w_fn).c_str());
+  // //open files
+  // ofstream object_f((path+o_fn).c_str());
+  // ofstream world_f((path+w_fn).c_str());
   
-  // write the contents
-  object_f << format(object_histogram, "csv") << endl;
-  world_f << format(background_histogram, "csv") << endl;
+  // // write the contents
+  // object_f << format(object_histogram, "csv") << endl;
+  // world_f << format(background_histogram, "csv") << endl;
   
-  //close
-  object_f.close();
-  world_f.close();
+  // //close
+  // object_f.close();
+  // world_f.close();
+
+  cv::FileStorage fs(path+"robot_hist.yml", cv::FileStorage::WRITE);
+  fs << "object" << object_histogram;
+  fs << "world" << background_histogram;
 }
 
 void ColorHistogram::readFromFile(string path)
 {
-  //file names
-  string w_fn = "world.txt";
-  string o_fn = "object.txt";
-
-  //read from files
-  CvMLData o_dat, w_dat;
-  o_dat.read_csv((path+o_fn).c_str());
-  w_dat.read_csv((path+w_fn).c_str());
+  //read file back
+  cv::FileStorage fs(path+"robot_hist.yml", cv::FileStorage::READ);
+  fs["robot"] >> object_histogram;
+  fs["world"] >> background_histogram;
   
-  //write to the Mats
-  const CvMat* o_tmp = o_dat.get_values();
-  const CvMat* w_tmp = w_dat.get_values();
+  cv::Mat temp;
+  fs["world"] >> temp;
   
-  cv::Mat o_mat(o_tmp, true);
-  cv::Mat w_mat(w_tmp, true);
-
-  o_mat.copyTo(object_histogram);
-  w_mat.copyTo(background_histogram);
+  cout << "World size " << background_histogram.size() << endl;
+  cout << "Object size " << object_histogram.size() << endl;
+  cout << "Temp size " << temp.size() << endl;
 }
 
 ColorHistogram::ColorHistogram(int bins, string path, int a_count/*=1*/)
 {
   _thresh = THRESH;
-  float h_range=256.0;//181.0;
+  float h_range=181.0;
   float s_range=256.0;
 
+  _bins_s = bins;
+  _bins_h = 181;
+
   object_histogram = static_cast<double> (a_count) * 
-    cv::Mat::ones(bins, bins, CV_64FC1);
+    cv::Mat::ones(_bins_h, _bins_s, CV_64FC1);
 
   background_histogram = static_cast<double> (a_count) * 
-    cv::Mat::ones(bins, bins, CV_64FC1);
+    cv::Mat::ones(_bins_h, _bins_s, CV_64FC1);
 
-  _bins = bins;
-  _h_size = static_cast<float>(h_range/_bins);
-  _s_size = static_cast<float>(s_range/_bins);
+  //debug
+  cout << "World size " << background_histogram.size() << endl;
+  cout << "Object size " << object_histogram.size() << endl;
+
+
+  _h_size = static_cast<float>(h_range/_bins_h);
+  _s_size = static_cast<float>(s_range/_bins_s);
 
   readFromFile(path);
+  cout << "Done constructing.." << endl;
   return;
 }
 
@@ -158,6 +175,10 @@ void ColorHistogram::testImg(const cv::Mat &im, cv::Mat &fore)
   fore = cv::Mat::zeros(im.size(), CV_8UC1);
   // fore = cv::Scalar(0);
 
+  //debug
+  cout << "Hist-back" << object_histogram.size() << endl;
+  cout << "Hist-Robo" << background_histogram.size() << endl;
+  
   for (int r=0; r<converted.rows; r++){
     cv::Vec3b* conv_r = converted.ptr<cv::Vec3b> (r);
     uchar* fore_r = fore.ptr<uchar> (r);
@@ -166,17 +187,12 @@ void ColorHistogram::testImg(const cv::Mat &im, cv::Mat &fore)
 	cur_ind = getIndex(conv_r[c][0], conv_r[c][1]);
 	double prob = object_histogram.at<double>(cur_ind.x, cur_ind.y) /
 	  background_histogram.at<double>(cur_ind.x, cur_ind.y);
-	if (prob > _thresh)
+	if (prob < _thresh)
 	  fore_r[c] = (uchar)255;
       }
     }
   }
   
-  //debug
-  cv::Mat visuals;
-  im.copyTo(visuals, fore);
-  cv::imshow("Fore", fore);
-  cv::imshow("The Filtered", visuals);
-  cout << "Displayed a frame.." << endl;
-  cv::waitKey(10);
+  //cout << "Displayed a frame.." << endl;
+  //cv::waitKey(10);
 }

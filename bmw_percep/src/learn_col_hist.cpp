@@ -25,17 +25,17 @@ int main(int argc, char** argv)
 
 
   ColorHistogram robo_hist(256);
-  
+
   string read_dir = "data/PCDs/robot2/", pcd_ext=".pcd";
   PointCloudT::Ptr cloud (new PointCloudT);
-  cv::Mat rgb_im, depth_im, depth_mask, fore, fore_hist;
+  cv::Mat rgb_im, depth_im, depth_mask, fore, fore_hist, fore_hist1;
   string read_file;
   int n_frames=0;
   bool done_reading_files=false;
   char c;
   int win_f=30;
 
-  while(ros::ok() && c!=27){
+  while(ros::ok() && c!=27 && n_frames<50){
     n_frames++;
 
     ostringstream read_fr_str;
@@ -106,16 +106,23 @@ int main(int argc, char** argv)
   }
 
   robo_hist.displayHists();
+  robo_hist.writeToFile("data/histograms/robot/");
+  ColorHistogram new_hist(256 ,"data/histograms/robot/");
 
   // test histogram
+  string test_dir = "/home/menchi/dev/shray-hydro-ws/src/ppl_navigate/data/pcd/temp1/";
+  test_dir = read_dir;
   bool done_test=false;
   int test_frame=0;
+
   fore_hist.create(rgb_im.size(), CV_8UC1);
+  fore_hist1.create(rgb_im.size(), CV_8UC1);
+
   while(!done_test){
     test_frame++;
     ostringstream read_fr_str;
-    read_fr_str << backg_frame;
-    string read_file = read_dir + read_fr_str.str() + pcd_ext;
+    read_fr_str << test_frame;
+    string read_file = test_dir + read_fr_str.str() + pcd_ext;
     
     if (pcl::io::loadPCDFile<PointT> (read_file, *cloud) == -1 ){
       //done reading
@@ -123,10 +130,25 @@ int main(int argc, char** argv)
       done_test = true;
       break;
     }
-
+    
     cv_utils::pc_to_img_no_filter(cloud, rgb_im, depth_im, depth_mask);
     robo_hist.testImg(rgb_im, fore_hist);
+    new_hist.testImg(rgb_im, fore_hist1);
+    
     //debug
+    cout << "Done testing image" << endl;
+    
+    //debug
+    //cv::imshow("abc", rgb_im);
+    cv::Mat visuals1, visuals2;
+    rgb_im.copyTo(visuals1, fore_hist);
+    rgb_im.copyTo(visuals2, fore_hist1);
+    cout << "Start visualizing..." << endl;
+
+    //cv::imshow("Fore", fore);
+    cv::imshow("The Filtered1", visuals1);
+    cv::imshow("The Filtered2", visuals2);
+
     c = cv::waitKey(5);
     if (c==27)
       break;
