@@ -1,11 +1,24 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(bmw_percep)
 
+#non catkin packages
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_include_dirs})
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  visualization_msgs
+  cv_bridge
+  image_transport
+  pcl_conversions
+  pcl_ros
   roscpp
+  rospy
+  std_msgs
+  sensor_msgs
+  geometry_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -101,7 +114,7 @@ include_directories(
 # )
 
 ## Declare a cpp executable
-# add_executable(bmw_percep_node src/bmw_percep_node.cpp)
+add_executable(merge_pc src/merge_pc.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -111,6 +124,7 @@ include_directories(
 # target_link_libraries(bmw_percep_node
 #   ${catkin_LIBRARIES}
 # )
+target_link_libraries(merge_pc ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
 ## Install ##
