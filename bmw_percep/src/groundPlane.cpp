@@ -173,8 +173,7 @@ GroundPlane::GroundPlane(const PointCloudT::Ptr& cloud)
       }
       else{
 
-	// if (!compute_plane_dlt(cloud, ground_pts_2d)){
-	if (!compute_plane_dlt_eig(cloud, ground_pts_2d)){
+	if (!compute_plane_dlt(cloud, ground_pts_2d)){
 	  //if plane can't be computed correctly
 	  cout << "\nThe plane wasn't estimated correctly. Label points again.."
 	       << endl ;
@@ -205,67 +204,6 @@ GroundPlane::GroundPlane(const PointCloudT::Ptr& cloud)
 }
 
 bool GroundPlane::compute_plane_dlt(const PointCloudT::Ptr& cloud, 
-				    vector<cv::Point> pts_2d)
-{
-  cv::Mat pt_mat;
-  int mat_cols=4;
-  pt_mat.create(pts_2d.size(), mat_cols, CV_32FC1);
-  // convert 2D points to 3D by accessing point-cloud
-  if (!cloud->empty()){
-    for (int i=0; i<pts_2d.size(); i++){
-      const cv::Point pt_2d = pts_2d.at(i);
-      const PointT pt_3d = cloud->at(pt_2d.x, pt_2d.y);
-      //const Eigen::Vector3i xyz = pt_3d.getXYZVector3i();
-      //set mat-row
-      float* mat_row = pt_mat.ptr<float>(i);
-      mat_row[0] = pt_3d.x;
-      mat_row[1] = pt_3d.y;
-      mat_row[2] = pt_3d.z;
-      mat_row[3] = 1.0; // constant
-    }
-    
-    //debug
-    cout << endl << "---------Point Matrix----------\n" << pt_mat << endl; 
-    
-    //SVD Trick
-    cv::Mat w,u,vt;
-    cv::SVD::compute(pt_mat, w, u, vt);//, cv::SVD::MODIFY_A);
-
-    cv::Mat vt_l_row = vt.row(vt.rows-1);
-    
-    //check if unit vector returned
-    float sum = cv::norm(vt_l_row);
-    if (fabs(sum-1.0) > 1.0e-8){
-      cout << "\n SVD returned non-unit vector.." << endl;
-      return false;
-    }
-   
-    //debug
-    cout << "\nSolved!\n" << vt_l_row << endl;
-    ground_coeffs.at(0) = vt_l_row.at<float>(0,0);
-    ground_coeffs.at(1) = vt_l_row.at<float>(0,1);
-    ground_coeffs.at(2) = vt_l_row.at<float>(0,2);
-    ground_coeffs.at(3) = vt_l_row.at<float>(0,3);
-
-    //debug - check plane fit
-    double diff_max=0.0;
-    for(int pt_i=0; pt_i<pt_mat.rows; pt_i++){
-      cv::Mat pt = pt_mat.row(pt_i);
-      cv::Mat temp_m = pt * vt_l_row.t();
-      //debug
-      cout << "\nDot:" << temp_m << endl;
-      float temp = temp_m.at<float>(0,0); 
-      //debug
-      cout << "\nDot:" << temp << endl;
-      if (fabs(temp)>diff_max)
-	diff_max = fabs(temp);
-    }
-    cout << "\nMax difference= " << diff_max*1000.0 << "mm" << endl;
-  }
-  return true;
-}
-
-bool GroundPlane::compute_plane_dlt_eig(const PointCloudT::Ptr& cloud, 
 				    vector<cv::Point> pts_2d)
 {
   const int mat_cols=4;
