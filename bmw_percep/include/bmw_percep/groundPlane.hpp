@@ -34,6 +34,7 @@ public:
   GroundPlane (string fileName);
 
   //Visualize the plane by coloring all the pixels intersecting with ground *pink*
+  //TODO: Make it so that I can click a point and get the dot product..
   void visualizePlane(const PointCloudT::Ptr& cloud, double inter_thresh=0.01);
 
   //Write the ground-coefficients to file
@@ -41,6 +42,7 @@ public:
   
   // creates a mask of the points in an organized point cloud that 
   // lie close to the ground-plane
+  //TODO: Eigenize this guy, may be store the distances
   void planePtsMask(const PointCloudT::Ptr& cloud, cv::Mat& mask_im, 
 		    double inter_thresh=0.02);
 

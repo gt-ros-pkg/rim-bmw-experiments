@@ -315,25 +315,38 @@ GroundPlane::GroundPlane(string fileName)
 void GroundPlane::visualizePlane(const PointCloudT::Ptr& cloud, 
 				 double inter_thresh /*=0.01*/)
 {
-  cv::Scalar intersection_col = cv::Scalar(0,0, 255);
+  //color intersections "RED"
+  cv::Scalar intersection_col = cv::Scalar(0, 0, 255);
   cv::Mat result;
   int pc_rows = cloud->height;
   int pc_cols = cloud->width;
-  double* coeffs_arr = &ground_coeffs[0];
 
-  cv::Mat ground_mat = cv::Mat(1, ground_coeffs.size(), CV_64F, coeffs_arr);
+  // double* coeffs_arr = &ground_coeffs[0];
+  Eigen::Vector4f ground_vec;
+  ground_vec << 
+    ground_coeffs[0], ground_coeffs[1], ground_coeffs[2], ground_coeffs[3];
+
+  // cv::Mat ground_mat = cv::Mat(1, ground_coeffs.size(), CV_64F, coeffs_arr);
   result.create(pc_rows, pc_cols, CV_8UC3);
-      
+
   for (int r=0; r<pc_rows; r++){
     cv::Vec3b* res_i = result.ptr<cv::Vec3b>(r);
     for (int c=0; c<pc_cols; c++){
       PointT point = cloud->at(c,r);
       //check if plane intersection
-      cv::Mat pt_mat = (cv::Mat_<double>(4,1) << 
-			point.x, point.y, point.z, 1.0);
-      double dot = (cv::Mat(ground_mat * pt_mat)).at<double>(0,0);
+      Eigen::Vector4f pt;
+      pt <<
+	point.x, point.y, point.z, 1.0;
+      double dot = pt.dot(ground_vec);
+
       //NaNs not considered for plane fit
-      if (dot < inter_thresh && !isnan(point.z)){
+      //and painted black
+      if (isnan(point.z)){
+	res_i[c][0] = 0;
+	res_i[c][1] = 0;
+	res_i[c][2] = 0;
+      }
+      else if (dot < inter_thresh){
 	res_i[c][0] = intersection_col[0];
 	res_i[c][1] = intersection_col[1];
 	res_i[c][2] = intersection_col[2];
