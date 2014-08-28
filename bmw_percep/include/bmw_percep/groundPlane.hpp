@@ -9,7 +9,7 @@
 #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/project_inliers.h>
 #include<pcl/common/io.h>
-#include <eigen/SVD>
+#include <Eigen/SVD>
 
 /**
    
@@ -52,7 +52,10 @@ public:
 private:
   vector<double> ground_coeffs; // ax+by+cz+d=0
 
-  //direct linear transform on points to find plane
+  //direct linear transform on points to find plane using opencv
   bool compute_plane_dlt(const PointCloudT::Ptr& cloud, vector<cv::Point> plane_2d_points);
+
+  //direct linear transform on points to find plane using eigen
+  bool compute_plane_dlt_eig(const PointCloudT::Ptr& cloud, vector<cv::Point> plane_2d_points);
 
 };

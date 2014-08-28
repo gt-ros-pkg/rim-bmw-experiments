@@ -172,7 +172,9 @@ GroundPlane::GroundPlane(const PointCloudT::Ptr& cloud)
 	c = 0;
       }
       else{
-	if (!compute_plane_dlt(cloud, ground_pts_2d)){
+
+	// if (!compute_plane_dlt(cloud, ground_pts_2d)){
+	if (!compute_plane_dlt_eig(cloud, ground_pts_2d)){
 	  //if plane can't be computed correctly
 	  cout << "\nThe plane wasn't estimated correctly. Label points again.."
 	       << endl ;
@@ -262,6 +264,70 @@ bool GroundPlane::compute_plane_dlt(const PointCloudT::Ptr& cloud,
   }
   return true;
 }
+
+bool GroundPlane::compute_plane_dlt_eig(const PointCloudT::Ptr& cloud, 
+				    vector<cv::Point> pts_2d)
+{
+  const int mat_cols=4;
+  Eigen::MatrixXf pt_mat(pts_2d.size(), mat_cols);
+
+  // convert 2D points to 3D by accessing point-cloud
+  if (!cloud->empty()){
+    for (int i=0; i<pts_2d.size(); i++){
+      const cv::Point pt_2d = pts_2d.at(i);
+      const PointT pt_3d = cloud->at(pt_2d.x, pt_2d.y);
+      
+      //set mat-row
+      pt_mat(i,0) = pt_3d.x;
+      pt_mat(i,1) = pt_3d.y;
+      pt_mat(i,2) = pt_3d.z;
+      pt_mat(i,3) = 1.0;
+    }
+    
+    //debug
+    cout << endl << "---------Point Matrix----------\n" << pt_mat << endl; 
+    
+    //SVD 'Trick'
+    Eigen::JacobiSVD<Eigen::MatrixXf> svd(pt_mat, Eigen::ComputeFullV);
+    //Get rightmost column from the V matrix
+    Eigen::Vector4f v_l_col = svd.matrixV().rightCols(1);
+
+    //check if returned column is unit vector
+    float sum = v_l_col.norm();
+    if (fabs(sum-1.0) > 1.0e-8){
+      cout << "\n SVD returned non-unit vector.." << endl;
+      return false;
+    }
+
+    //debug
+    cout << "\nSolved!\n" << v_l_col << endl;
+    
+    //Set ground coefficients
+    ground_coeffs.at(0) = v_l_col(0);
+    ground_coeffs.at(1) = v_l_col(1);
+    ground_coeffs.at(2) = v_l_col(2);
+    ground_coeffs.at(3) = v_l_col(3);
+
+    //debug - check plane fit
+    double diff_max=0.0;
+    for(int pt_i=0; pt_i<pt_mat.rows(); pt_i++){
+      Eigen::Vector4f pt = pt_mat.row(pt_i);
+
+      float temp_dist = pt.dot(v_l_col);
+
+      //debug
+      cout << "\nDot:" << temp_dist << endl;
+
+      if (fabs(temp_dist)>diff_max)
+  	diff_max = fabs(temp_dist);
+    }
+    cout << "\nMax difference= " << diff_max*1000.0 << "mm" << endl;
+      
+
+  }
+  return true;
+}
+
 
 void GroundPlane::writeFile(string fileName)
 {
