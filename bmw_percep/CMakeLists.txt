@@ -91,7 +91,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+INCLUDE_DIRS include
 #  LIBRARIES bmw_percep
 #  CATKIN_DEPENDS roscpp
 #  DEPENDS system_lib
@@ -105,6 +105,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -115,6 +116,10 @@ include_directories(
 
 ## Declare a cpp executable
 add_executable(merge_pc src/merge_pc.cpp)
+add_executable(sample_ground
+  src/groundPlane.cpp
+  src/sample_groundPlane.cpp)
+
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -125,6 +130,7 @@ add_executable(merge_pc src/merge_pc.cpp)
 #   ${catkin_LIBRARIES}
 # )
 target_link_libraries(merge_pc ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(sample_ground ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
 ## Install ##

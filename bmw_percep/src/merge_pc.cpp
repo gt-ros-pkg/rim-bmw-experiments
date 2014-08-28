@@ -27,7 +27,6 @@ typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloudT;
 // callback:
 void front_call(const PointCloudT::ConstPtr&);
 void back_call(const PointCloudT::ConstPtr&);
-void click_call(const geometry_msgs::PoseStamped);
 
 //GLOBALs
 //TODO: Get Rid of 'em
