@@ -57,8 +57,8 @@ string back_topic = "/kinect_back/depth_registered/points";
   // interface->registerCallback (f);
   // interface->start ();
 
-new_cloud_available_flag = false;
-ros::spin();
+  new_cloud_available_flag = false;
+  ros::spin();
 
   // Wait for the first frame:
   while(!new_cloud_available_flag) 
@@ -67,6 +67,8 @@ ros::spin();
 
   cloud_mutex.lock ();    // for not overwriting the point cloud
 
+  //debug
+  cout << endl << "Gets here?" << endl;
   GroundPlane ground_obj(global_cloud);
   
   //write these to file?

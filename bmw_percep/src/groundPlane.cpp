@@ -18,6 +18,14 @@ typedef struct callback_args_{
   cv::Mat img;
 } callback_args;
 
+// struct for passing arguments to mouse-callback for Plane-Cut
+// visualizer
+typedef struct plane_cut_cb_args_{
+  cv::Point click_pt;
+  cv::Mat img;
+}  plane_cut_cb_args;
+
+
 void paint_at_point(cv::Mat img, cv::Point loc, cv::Scalar col, int diam=1)
 {
   int l = max(loc.x-diam, 0);
@@ -64,6 +72,30 @@ static void onClick(int event, int x, int y, int,  void* param)
   cv::Point push_pt = cv::Point(x,y);
   
   c_arg->plane_im_pts->push_back(push_pt);
+  
+  //paint point and show
+  cv::Scalar pt_recolor = cv::Scalar(0, 255, 0);
+  c_arg->img.at<cv::Scalar>(y,x) = pt_recolor;
+  paint_at_point(c_arg->img, push_pt, pt_recolor);
+  
+  //debug
+  cout << endl << "Click" << endl;
+  cout << "Point: " << push_pt<< endl;
+  cout << "This was pushed:" << c_arg->plane_im_pts->back() << endl;
+  
+  imshow("Click Points", c_arg->img);
+  return;
+}
+
+static void onClickPC(int event, int x, int y, int,  void* param)
+{
+  //convert param
+  plane_cut_cb_args* c_arg = (plane_cut_cb_args*) param;
+
+  if (event != cv::EVENT_LBUTTONDOWN)
+    return;
+
+  c_arg->click_pt = cv::Point(x,y);
   
   //paint point and show
   cv::Scalar pt_recolor = cv::Scalar(0, 255, 0);
@@ -232,8 +264,11 @@ bool GroundPlane::compute_plane_dlt(const PointCloudT::Ptr& cloud,
 
     //check if returned column is unit vector
     float sum = v_l_col.norm();
-    if (fabs(sum-1.0) > 1.0e-8){
-      cout << "\n SVD returned non-unit vector.." << endl;
+    
+    //check why not a unit vector sometimes
+    if (fabs(sum-1.0) > 1.0e-6){
+      cout << "\n Norm is "<< fixed << setprecision(12) << sum 
+	   << "\n SVD returned non-unit vector.." << endl;
       return false;
     }
 
@@ -247,7 +282,7 @@ bool GroundPlane::compute_plane_dlt(const PointCloudT::Ptr& cloud,
     ground_coeffs.at(3) = v_l_col(3);
 
     //debug - check plane fit
-    double diff_max=0.0;
+    double diff_max = 0.0;
     for(int pt_i=0; pt_i<pt_mat.rows(); pt_i++){
       Eigen::Vector4f pt = pt_mat.row(pt_i);
 
@@ -321,7 +356,6 @@ void GroundPlane::visualizePlane(const PointCloudT::Ptr& cloud,
   int pc_rows = cloud->height;
   int pc_cols = cloud->width;
 
-  // double* coeffs_arr = &ground_coeffs[0];
   Eigen::Vector4f ground_vec;
   ground_vec << 
     ground_coeffs[0], ground_coeffs[1], ground_coeffs[2], ground_coeffs[3];
@@ -359,8 +393,35 @@ void GroundPlane::visualizePlane(const PointCloudT::Ptr& cloud,
       }
     }
   }
+
   //visualize
-  imshow("Plane Cutting", result);
+  cv::namedWindow("Plane Cutting", cv::WINDOW_AUTOSIZE);
+
+  cv::Point clicked_pt;
+  
+  // user callback arguments
+  plane_cut_cb_args c_arg;
+
+  cv::setMouseCallback("Click Points", onClickPC, &c_arg);
+  char c=0; // key-press
+
+  for(;;) { // Quit when press Esc key
+
+    imshow("Plane Cutting", result);
+    c = cv::waitKey(0);
+
+    if (c!=27){
+      PointT point3 = cloud->at(c_arg->click_point.x, c_arg->click_point.y);
+      Eigen::Vector4f pointX(point3.x, point3.y, point3.z, 1.0);
+      Eigen::Vector4f ground_vec(ground_coeffs[0], ground_coeffs[1], ground_coeffs[2], ground_coeffs[3]);
+      
+      cout << "Dot is " << ground_vec.dot(pointX) << endl;
+    }
+    else{
+      //break out if Esc pressed and plane correctly computed
+      break;
+    }
+  }
   cv::waitKey(0);
   cv::destroyWindow("Plane Cutting");
   return;
