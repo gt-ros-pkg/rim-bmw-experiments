@@ -6,6 +6,7 @@
 #include<pcl/conversions.h>
 #include<opencv2/opencv.hpp>
 #include<bmw_percep/shr_cv_utils.hpp>
+#include<bmw_percep/ppl_detection.hpp>
 #include<bmw_percep/groundPlane.hpp>
 
 //ros-includes
@@ -81,9 +82,9 @@ int main(int argc, char** argv)
 
     vector<cv::Point3f> clusters; int max_blob_id;
     
-    // cv_utils::find_euclid_blobs(cloud, viz_cloud,  
-    // 				clusters, max_blob_id,
-    // 				ground_coeffs, cvBg);
+    ppl_detection::find_euclid_blobs(cloud, viz_cloud,  
+    				clusters, max_blob_id,
+    				ground_coeffs);
 
 
     // pcl::copyPointCloud(*cloud, *viz_cloud);

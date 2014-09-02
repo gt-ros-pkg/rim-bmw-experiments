@@ -128,6 +128,7 @@ add_executable(record_kin_pcd
 add_executable(tracker_from_file
   src/groundPlane.cpp
   src/shr_cv_utils.cpp
+  src/ppl_detection.cpp
   src/tracker_from_file.cpp)
 
 
