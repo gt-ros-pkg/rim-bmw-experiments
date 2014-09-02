@@ -125,6 +125,11 @@ add_executable(record_kin_pcd
   src/shr_cv_utils.cpp
   src/record_kin_pcd.cpp)
 
+add_executable(tracker_from_file
+  src/groundPlane.cpp
+  src/shr_cv_utils.cpp
+  src/tracker_from_file.cpp)
+
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -137,6 +142,7 @@ add_executable(record_kin_pcd
 target_link_libraries(merge_pc ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_ground ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(record_kin_pcd ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(tracker_from_file ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
 ## Install ##

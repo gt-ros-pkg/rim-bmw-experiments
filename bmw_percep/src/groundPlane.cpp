@@ -505,3 +505,16 @@ void GroundPlane::pcProject(const PointCloudT::Ptr& cloud, PointCloudT::Ptr& clo
   proj.setModelCoefficients(coefficients);
   proj.filter (*cloud_projected);
 }
+
+void GroundPlane::get_ground_coeffs(Eigen::VectorXf& eig_coeffs)
+{
+if (ground_coeffs.size()==4){
+eig_coeffs.resize(4);
+eig_coeffs[0] = ground_coeffs.at(0);
+eig_coeffs[1] = ground_coeffs.at(1);
+eig_coeffs[2] = ground_coeffs.at(2);
+eig_coeffs[3] = ground_coeffs.at(3);
+}
+else
+cout << "\nGround Coefficients not set." << endl;
+}

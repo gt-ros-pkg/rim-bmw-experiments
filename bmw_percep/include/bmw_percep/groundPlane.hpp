@@ -55,6 +55,9 @@ public:
   //computes the distance of a point to the ground plane
   double pointDistance(Eigen::Vector3f pt);
 
+  //Getter for ground coefficients
+  void get_ground_coeffs(Eigen::VectorXf& eig_coeffs);
+
 private:
   vector<double> ground_coeffs; // ax+by+cz+d=0
 
