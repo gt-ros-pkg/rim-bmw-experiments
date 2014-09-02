@@ -48,28 +48,20 @@ string back_topic = "/kinect_back/depth_registered/points";
   ros::Subscriber pc_sub = nh.subscribe<pcl::PCLPointCloud2> 
     (back_topic, 1, pc_call);
 
-  // // Read Kinect live stream:
-  // PointCloudT::Ptr cloud (new PointCloudT);
-  // bool new_cloud_available_flag = false;
-  // pcl::Grabber* interface = new pcl::OpenNIGrabber();
-  // boost::function<void (const pcl::PointCloud<pcl::PointXYZRGBA>::ConstPtr&)> f =
-  //   boost::bind (&cloud_cb_, _1, cloud, &new_cloud_available_flag);
-  // interface->registerCallback (f);
-  // interface->start ();
-
   new_cloud_available_flag = false;
-  ros::spin();
+  ros::spinOnce();
 
   // Wait for the first frame:
   while(!new_cloud_available_flag) 
     boost::this_thread::sleep(boost::posix_time::milliseconds(1));
   new_cloud_available_flag = false;
 
-  cloud_mutex.lock ();    // for not overwriting the point cloud
+  // cloud_mutex.lock ();    // for not overwriting the point cloud
 
   //debug
   cout << endl << "Gets here?" << endl;
   GroundPlane ground_obj(global_cloud);
+  ground_obj.visualizePlane(global_cloud, .05);
   
   //write these to file?
   char yn;
@@ -88,7 +80,7 @@ string back_topic = "/kinect_back/depth_registered/points";
     ground_obj.writeFile(total_file);
   }
 
-  cloud_mutex.unlock();
+  // cloud_mutex.unlock();
 
   cout << "Locked no more!" << endl;
 
@@ -98,12 +90,14 @@ string back_topic = "/kinect_back/depth_registered/points";
 // callback:
 void pc_call(const pcl::PCLPointCloud2 cloud)
 {
-  cloud_mutex.lock();
+  //cloud_mutex.lock();
   //global_cloud = cloud;
 // pcl::copyPointCloud(*cloud, *global_cloud);
 //global_cloud.reset(new PointCloudT (*cloud));
 //pcl::PointCloud<PointXYZ>(*cloud)); 
-  pcl::fromPCLPointCloud2(cloud, *global_cloud);
-new_cloud_available_flag = true;
-cloud_mutex.unlock();
+  if (!new_cloud_available_flag){
+    pcl::fromPCLPointCloud2(cloud, *global_cloud);
+    new_cloud_available_flag = true;
+  }
+// cloud_mutex.unlock();
 }

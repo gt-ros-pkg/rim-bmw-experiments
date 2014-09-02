@@ -95,19 +95,22 @@ static void onClickPC(int event, int x, int y, int,  void* param)
   if (event != cv::EVENT_LBUTTONDOWN)
     return;
 
+
   c_arg->click_pt = cv::Point(x,y);
   
-  //paint point and show
-  cv::Scalar pt_recolor = cv::Scalar(0, 255, 0);
-  c_arg->img.at<cv::Scalar>(y,x) = pt_recolor;
-  paint_at_point(c_arg->img, push_pt, pt_recolor);
+  cout << "\nClicked on " << c_arg->click_pt << endl;
+  
+  // //paint point and show
+  // cv::Scalar pt_recolor = cv::Scalar(0, 255, 0);
+  // c_arg->img.at<cv::Scalar>(y,x) = pt_recolor;
+  // paint_at_point(c_arg->img, c_arg->click_pt, pt_recolor);
   
   //debug
   cout << endl << "Click" << endl;
-  cout << "Point: " << push_pt<< endl;
-  cout << "This was pushed:" << c_arg->plane_im_pts->back() << endl;
+  // cout << "Point: " << push_pt<< endl;
+  cout << "This was pushed:" << c_arg->click_pt << endl;
   
-  imshow("Click Points", c_arg->img);
+  //imshow("Click Points", c_arg->img);
   return;
 }
 
@@ -151,9 +154,6 @@ cv::Mat pc_to_img(const PointCloudT::Ptr& cloud, bool mask_nans=true)
 
 GroundPlane::GroundPlane(const PointCloudT::Ptr& cloud)
 {
-  //TODO: How stupid is not mentioning what different buttons do.
-  //Print the message
-
   //Instructions
   cout << "\n**********Interaction Instructions**********\n";
   cout << "1. Click on the image to select points. \n";
@@ -247,11 +247,15 @@ bool GroundPlane::compute_plane_dlt(const PointCloudT::Ptr& cloud,
       const cv::Point pt_2d = pts_2d.at(i);
       const PointT pt_3d = cloud->at(pt_2d.x, pt_2d.y);
       
-      //set mat-row
-      pt_mat(i,0) = pt_3d.x;
-      pt_mat(i,1) = pt_3d.y;
-      pt_mat(i,2) = pt_3d.z;
-      pt_mat(i,3) = 1.0;
+      //if of course, not null
+      //TODO: check if number of points still right
+      if (!isnan(pt_3d.z)){
+	//set mat-row
+	pt_mat(i,0) = pt_3d.x;
+	pt_mat(i,1) = pt_3d.y;
+	pt_mat(i,2) = pt_3d.z;
+	pt_mat(i,3) = 1.0;
+      }
     }
     
     //debug
@@ -284,12 +288,11 @@ bool GroundPlane::compute_plane_dlt(const PointCloudT::Ptr& cloud,
     //debug - check plane fit
     double diff_max = 0.0;
     for(int pt_i=0; pt_i<pt_mat.rows(); pt_i++){
-      Eigen::Vector4f pt = pt_mat.row(pt_i);
-
-      float temp_dist = pt.dot(v_l_col);
+      Eigen::Vector3f pt(pt_mat(pt_i,0), pt_mat(pt_i,1), pt_mat(pt_i,2));
+      float temp_dist = pointDistance(pt);
 
       //debug
-      cout << "\nDot:" << temp_dist << endl;
+      cout << "\nDistance:" << temp_dist << endl;
 
       if (fabs(temp_dist)>diff_max)
   	diff_max = fabs(temp_dist);
@@ -301,6 +304,18 @@ bool GroundPlane::compute_plane_dlt(const PointCloudT::Ptr& cloud,
   return true;
 }
 
+double GroundPlane::pointDistance(Eigen::Vector3f pt)
+{
+  Eigen::Vector3f n;
+  n(0) = ground_coeffs[0];
+  n(1) = ground_coeffs[1];
+  n(2) = ground_coeffs[2];
+  float n_norm = n.norm();
+  n /= n_norm;
+  float p = ground_coeffs[3]/n_norm;
+  float distance = pt.dot(n) + p;
+  return double(distance);
+}
 
 void GroundPlane::writeFile(string fileName)
 {
@@ -368,10 +383,15 @@ void GroundPlane::visualizePlane(const PointCloudT::Ptr& cloud,
     for (int c=0; c<pc_cols; c++){
       PointT point = cloud->at(c,r);
       //check if plane intersection
-      Eigen::Vector4f pt;
+      Eigen::Vector3f pt;
       pt <<
-	point.x, point.y, point.z, 1.0;
-      double dot = pt.dot(ground_vec);
+	point.x, point.y, point.z;
+      double pt_dist = pointDistance(pt);
+
+      // Eigen::Vector4f pt;
+      // pt <<
+      // 	point.x, point.y, point.z, 1.0;
+      // double dot = pt.dot(ground_vec);
 
       //NaNs not considered for plane fit
       //and painted black
@@ -380,7 +400,7 @@ void GroundPlane::visualizePlane(const PointCloudT::Ptr& cloud,
 	res_i[c][1] = 0;
 	res_i[c][2] = 0;
       }
-      else if (dot < inter_thresh){
+      else if (pt_dist < inter_thresh){
 	res_i[c][0] = intersection_col[0];
 	res_i[c][1] = intersection_col[1];
 	res_i[c][2] = intersection_col[2];
@@ -402,7 +422,7 @@ void GroundPlane::visualizePlane(const PointCloudT::Ptr& cloud,
   // user callback arguments
   plane_cut_cb_args c_arg;
 
-  cv::setMouseCallback("Click Points", onClickPC, &c_arg);
+  cv::setMouseCallback("Plane Cutting", onClickPC, &c_arg);
   char c=0; // key-press
 
   for(;;) { // Quit when press Esc key
@@ -411,11 +431,13 @@ void GroundPlane::visualizePlane(const PointCloudT::Ptr& cloud,
     c = cv::waitKey(0);
 
     if (c!=27){
-      PointT point3 = cloud->at(c_arg->click_point.x, c_arg->click_point.y);
-      Eigen::Vector4f pointX(point3.x, point3.y, point3.z, 1.0);
-      Eigen::Vector4f ground_vec(ground_coeffs[0], ground_coeffs[1], ground_coeffs[2], ground_coeffs[3]);
-      
-      cout << "Dot is " << ground_vec.dot(pointX) << endl;
+      //debug
+      cout << " Got to the point.." << endl;
+      PointT point3 = cloud->at(c_arg.click_pt.x, c_arg.click_pt.y);
+      //debug
+      cout << " 3D found? " << endl;
+      Eigen::Vector3f pointX(point3.x, point3.y, point3.z);
+      cout << "Distance is " << pointDistance(pointX) << endl;
     }
     else{
       //break out if Esc pressed and plane correctly computed

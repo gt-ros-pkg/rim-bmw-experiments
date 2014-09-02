@@ -1,5 +1,5 @@
 #include <pcl/point_types.h>
-#include<pcl/conversions.h>
+#include <pcl/conversions.h>
 //#include <pcl/sample_consensus/sac_model_plane.h>
 #include <opencv2/opencv.hpp>
 #include <vector>
@@ -8,7 +8,7 @@
 #include <iomanip>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/project_inliers.h>
-#include<pcl/common/io.h>
+#include <pcl/common/io.h>
 #include <Eigen/SVD>
 
 /**
@@ -49,11 +49,16 @@ public:
   // project a point-cloud onto the plane and create the image such
   // mask returns the mask of image locations where a point exists
   // mask if contains zeros and ones would be used to select points to project
-  void pcProject(const PointCloudT::Ptr& cloud, PointCloudT::Ptr& cloud_projected);
+  void pcProject(const PointCloudT::Ptr& cloud, 
+		 PointCloudT::Ptr& cloud_projected);
+  
+  //computes the distance of a point to the ground plane
+  double pointDistance(Eigen::Vector3f pt);
 
 private:
   vector<double> ground_coeffs; // ax+by+cz+d=0
 
   //direct linear transform on points to find plane using eigen
-  bool compute_plane_dlt(const PointCloudT::Ptr& cloud, vector<cv::Point> plane_2d_points);
+  bool compute_plane_dlt(const PointCloudT::Ptr& cloud, 
+			 vector<cv::Point> plane_2d_points);
 };

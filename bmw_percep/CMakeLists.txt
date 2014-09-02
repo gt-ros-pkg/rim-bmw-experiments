@@ -116,9 +116,14 @@ include_directories(
 
 ## Declare a cpp executable
 add_executable(merge_pc src/merge_pc.cpp)
+
 add_executable(sample_ground
   src/groundPlane.cpp
   src/sample_groundPlane.cpp)
+
+add_executable(record_kin_pcd
+  src/shr_cv_utils.cpp
+  src/record_kin_pcd.cpp)
 
 
 ## Add cmake target dependencies of the executable/library
@@ -131,6 +136,7 @@ add_executable(sample_ground
 # )
 target_link_libraries(merge_pc ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_ground ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(record_kin_pcd ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
 ## Install ##
