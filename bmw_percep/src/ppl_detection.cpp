@@ -174,7 +174,6 @@ void ppl_detection::find_ppl_clusters(const PointCloudT::Ptr cloud,
   clusters.clear();
   clusters = new_clusters;
   return;
-  
   new_clusters.clear();
 
   // std::vector<pcl::people::PersonCluster<PointT> > subclusters;
