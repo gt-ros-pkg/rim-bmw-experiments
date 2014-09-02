@@ -131,6 +131,9 @@ add_executable(tracker_from_file
   src/ppl_detection.cpp
   src/tracker_from_file.cpp)
 
+add_executable(pub_pcd
+  src/pub_pcd.cpp)
+
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -144,6 +147,7 @@ target_link_libraries(merge_pc ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_ground ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(record_kin_pcd ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(tracker_from_file ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(pub_pcd ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
 ## Install ##
