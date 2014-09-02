@@ -23,27 +23,33 @@ typedef pcl::PointXYZRGB PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
 
 // Globals
+string hum_frame;
 int frame_rate=30;
-
 enum { COLS=640, ROWS=480};
+
+//Various objects
+PointCloudT::Ptr cloud (new PointCloudT);
+
+bool new_cloud_available_flag;
+
+//Pointcloud callback
+void pc_call(const pcl::PCLPointCloud2 cloud);
 
 // MAIN
 int main(int argc, char** argv)
 {
+  string pub_topic = "/human/debug/pc";
+  string sub_topic = "/read_pcd";
+  string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
+
   //ros
   ros::init(argc, argv, "sample_tracker");
   ros::NodeHandle nh;
-  ros::Publisher db_pc = nh.advertise<pcl::PCLPointCloud2> ("/human/debug/pc", 1);
+  ros::Subscriber pc_sub = nh.subscribe<pcl::PCLPointCloud2> 
+    (sub_topic, 1, pc_call);
+  ros::Publisher db_pc = nh.advertise<pcl::PCLPointCloud2> (pub_topic, 1);
 
-  string hum_frame = "kinect_back_rgb_optical_frame";
-  // string read_dir = "/home/menchi/dev/shray-hydro-ws/src/ppl_navigate/data/pcd/sequences1/9/";
-  string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
-  string read_dir = pkg_dir + "data/test_seq_1/";
-  //  string read_dir = "src/ppl_navigate/data/pcd/temp1/"; 
-  string read_file;
-  string pcd_ext = ".pcd";
-
-  PointCloudT::Ptr cloud (new PointCloudT);
+  // PointCloudT::Ptr cloud (new PointCloudT);
   PointCloudT::Ptr
     tcloud (new PointCloudT);
   pcl::PCLPointCloud2 pub_pc;
@@ -65,22 +71,14 @@ int main(int argc, char** argv)
     viz_cloud (new PointCloudT);
 
   while(ros::ok()){
-    n_frames++;
-
-    ostringstream read_fr_str;
-    read_fr_str << n_frames;
-    read_file = read_dir + read_fr_str.str() + pcd_ext;
-  
-    if (!done_reading_files){
-      if (pcl::io::loadPCDFile<PointT> (read_file, *cloud) == -1 ){
-      //done reading
-      cout << "\n All files read. I guess." << endl;
-      n_frames=0;
-      //break;
-      }
-    }
+    ros::spinOnce();
+    if (new_cloud_available_flag)
+      n_frames++;
+    else
+      continue;
 
     vector<cv::Point3f> clusters; int max_blob_id;
+    
     
     ppl_detection::find_euclid_blobs(cloud, viz_cloud,  
     				clusters, max_blob_id,
@@ -104,4 +102,13 @@ int main(int argc, char** argv)
   }
 
   return 0;
+}
+
+// callback:
+void pc_call(const pcl::PCLPointCloud2 temp_cloud)
+{
+  //cout << "Frame = " << temp_cloud.header.frame_id << endl;
+  hum_frame = temp_cloud.header.frame_id;
+  pcl::fromPCLPointCloud2(temp_cloud, *cloud);
+    new_cloud_available_flag = true;
 }

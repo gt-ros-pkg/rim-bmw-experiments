@@ -125,11 +125,11 @@ add_executable(record_kin_pcd
   src/shr_cv_utils.cpp
   src/record_kin_pcd.cpp)
 
-add_executable(tracker_from_file
+add_executable(tracker_3D
   src/groundPlane.cpp
   src/shr_cv_utils.cpp
   src/ppl_detection.cpp
-  src/tracker_from_file.cpp)
+  src/tracker_3D.cpp)
 
 add_executable(pub_pcd
   src/pub_pcd.cpp)
@@ -146,7 +146,7 @@ add_executable(pub_pcd
 target_link_libraries(merge_pc ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(sample_ground ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(record_kin_pcd ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
-target_link_libraries(tracker_from_file ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(tracker_3D ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(pub_pcd ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
