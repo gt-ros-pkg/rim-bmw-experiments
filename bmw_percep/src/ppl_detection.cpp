@@ -27,7 +27,8 @@ void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud,
   // Ground removal and update:
   pcl::IndicesPtr inliers(new std::vector<int>);
   boost::shared_ptr<pcl::SampleConsensusModelPlane<PointT> > ground_model(new pcl::SampleConsensusModelPlane<PointT>(cloud_filtered));
-  ground_model->selectWithinDistance(ground_coeffs, 3*voxel_size, *inliers);
+  // ground_model->selectWithinDistance(ground_coeffs, 3*voxel_size, *inliers);
+  ground_model->selectWithinDistance(ground_coeffs, 1.5*voxel_size, *inliers);
   PointCloudT::Ptr no_ground_cloud(new PointCloudT);
   pcl::ExtractIndices<PointT> extract;
   extract.setInputCloud(cloud_filtered);
@@ -52,32 +53,32 @@ void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud,
   ec.setInputCloud (no_ground_cloud);
   ec.extract (cluster_indices);
 
-  // std::vector<pcl::people::PersonCluster<PointT> > ppl_clusters; 
+  std::vector<pcl::people::PersonCluster<PointT> > ppl_clusters; 
 
-  // find_ppl_clusters(no_ground_cloud,
-  // 		    cluster_indices,
-  // 		    ppl_clusters,
-  // 		    ground_coeffs);
+  find_ppl_clusters(no_ground_cloud,
+  		    cluster_indices,
+  		    ppl_clusters,
+  		    ground_coeffs);
 
-  // //debug
-  // cout << "No. of clusters: " << cluster_indices.size() << endl;
+  //debug
+  cout << "No. of clusters: " << cluster_indices.size() << endl;
 
-  // int j = 0;
+  int j = 0;
   
-  // //replace cluster indices with people clusters
-  // int n_ppl=0;
-  // cluster_indices.clear();
-  // for(std::vector<pcl::people::PersonCluster<PointT> >::iterator 
-  // 	it = ppl_clusters.begin(); it != ppl_clusters.end(); ++it)
-  //     {
-  // 	cluster_indices.push_back(it->getIndices());
-  // 	n_ppl++;
-  //     }
+  //replace cluster indices with people clusters
+  int n_ppl=0;
+  cluster_indices.clear();
+  for(std::vector<pcl::people::PersonCluster<PointT> >::iterator 
+  	it = ppl_clusters.begin(); it != ppl_clusters.end(); ++it)
+      {
+  	cluster_indices.push_back(it->getIndices());
+  	n_ppl++;
+      }
   
-  // cout << "No. of people: " << n_ppl << endl; 
-  // // string whatupp;
-  // // if (n_ppl > 100)
-  // //   cin >> whatupp;
+  cout << "No. of people: " << n_ppl << endl; 
+  // string whatupp;
+  // if (n_ppl > 100)
+  //   cin >> whatupp;
 
   // visualize by painting each PC another color
   pcl::copyPointCloud(*no_ground_cloud, *cloud_filtered);
@@ -112,4 +113,199 @@ void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud,
     //j++;
 
   }
+}
+
+
+void ppl_detection::find_ppl_clusters(const PointCloudT::Ptr cloud, 
+		  vector<pcl::PointIndices>& init_indices, 
+		  std::vector<pcl::people::PersonCluster<PointT> >& clusters,
+		  const Eigen::VectorXf ground_coeffs)
+{
+  
+  //debug
+  // cout << "Started this finding.." << endl;
+
+  float max_height_= 2.3; float min_height_= 1.3;
+  int min_a_merge = 200; float max_dist_gr=0.4;
+  bool camera_vertical=false, compute_head=false;
+
+  float sqrt_ground_coeffs_ = (ground_coeffs - Eigen::Vector4f
+				(0.0f, 0.0f, 0.0f, ground_coeffs(3))).norm();
+
+  // Person clusters creation from clusters indices:
+  for(std::vector<pcl::PointIndices>::const_iterator it = 
+	init_indices.begin(); it != init_indices.end(); ++it)
+    {
+      pcl::people::PersonCluster<PointT> cluster(cloud, *it, ground_coeffs, sqrt_ground_coeffs_, compute_head, camera_vertical); // PersonCluster creation
+      clusters.push_back(cluster);
+    }
+
+  //debug
+  // cout << "Created ppl clusters.." << endl;
+
+  // Remove clusters with too high height from the ground plane:
+  std::vector<pcl::people::PersonCluster<PointT> > new_clusters;
+  for(unsigned int i = 0; i < clusters.size(); i++) // for every cluster
+    {
+      if (clusters[i].getHeight() <= max_height_)
+	new_clusters.push_back(clusters[i]);
+    }
+
+  //Merge clusters_close in floor coordinates:
+  clusters.clear();
+  mergeClustersCloseInFloorCoordinates(cloud, new_clusters, clusters,
+				       ground_coeffs, sqrt_ground_coeffs_);
+
+  // Remove clusters far away from ground or too short
+  new_clusters.clear();
+  for(unsigned int i = 0; i < clusters.size(); i++) // for every cluster
+    {
+      if (clusters[i].getNumberPoints() > min_a_merge){
+	if (clusters[i].getHeight() >= min_height_){
+	  if (get_min_ground_dist(cloud, clusters[i], ground_coeffs, 
+				  sqrt_ground_coeffs_, max_dist_gr))
+  	    new_clusters.push_back(clusters[i]);
+	}
+      }
+    }
+
+  // //debug
+  // cout << "Donadone.." << endl;
+  clusters.clear();
+  clusters = new_clusters;
+  return;
+  
+  new_clusters.clear();
+
+  // std::vector<pcl::people::PersonCluster<PointT> > subclusters;
+  // int cluster_min_points_sub = int(float(min_points_) * 1.5);
+}
+
+
+void ppl_detection::mergeClustersCloseInFloorCoordinates 
+( const PointCloudT::Ptr cloud, 
+std::vector<pcl::people::PersonCluster<PointT> >& input_clusters,
+ std::vector<pcl::people::PersonCluster<PointT> >& output_clusters, 
+ const Eigen::VectorXf ground_coeffs_, double sqrt_ground_coeffs_)
+{
+  float min_distance_between_cluster_centers = 0.4; // meters
+  float normalize_factor = std::pow(sqrt_ground_coeffs_, 2); // sqrt_ground_coeffs
+							     // ^ 2
+							     // (precomputed
+							     // for
+							     // speed)
+
+  Eigen::Vector3f head_ground_coeffs = ground_coeffs_.head(3); // ground
+							      // plane
+							      // normal
+							      // (precomputed
+							      // for
+							      // speed)
+  std::vector <std::vector<int> > connected_clusters;
+  connected_clusters.resize(input_clusters.size());
+  std::vector<bool> used_clusters; // 0 in correspondence of clusters
+				   // remained to process, 1 for
+				   // already used clusters
+  used_clusters.resize(input_clusters.size());
+  // initialize clusters unused
+  for(vector<bool>::iterator usit=used_clusters.begin(); usit!=used_clusters.end();
+      usit++)
+    *usit = false;
+    
+  for(unsigned int i = 0; i < input_clusters.size(); i++) // for every cluster
+    {
+      Eigen::Vector3f theoretical_center = input_clusters[i].getTCenter();
+      float t = theoretical_center.dot(head_ground_coeffs) /
+	normalize_factor; // height from the ground
+      Eigen::Vector3f current_cluster_center_projection = 
+	theoretical_center - head_ground_coeffs * t; // projection of
+						     // the point on
+						     // the
+						     // groundplane
+      for(unsigned int j = i+1; j < input_clusters.size(); j++) // for
+								// every
+								// remaining
+								// cluster
+	{
+	  theoretical_center = input_clusters[j].getTCenter();
+	  float t = theoretical_center.dot(head_ground_coeffs) 
+	    / normalize_factor; // height from the ground
+	  Eigen::Vector3f new_cluster_center_projection =
+	    theoretical_center - head_ground_coeffs * t; // projection
+							 // of the
+							 // point on
+							 // the
+							 // groundplane
+	  if (((new_cluster_center_projection - 
+		current_cluster_center_projection).norm()) < 
+	      min_distance_between_cluster_centers)
+	    {
+	      connected_clusters[i].push_back(j);
+	    }
+	}
+    }
+
+ for(unsigned int i = 0; i < connected_clusters.size(); i++) // for every cluster
+  {
+    if (!used_clusters[i]) // if this cluster has not been used yet
+    {
+      used_clusters[i] = true;
+      if (connected_clusters[i].empty()) // no other clusters to merge
+      {
+        output_clusters.push_back(input_clusters[i]);
+      }
+      else
+      {
+        // Copy cluster points into new cluster:
+        pcl::PointIndices point_indices;
+        point_indices = input_clusters[i].getIndices();
+        for(unsigned int j = 0; j < connected_clusters[i].size(); j++)
+        {
+          if (!used_clusters[connected_clusters[i][j]]) // if this
+							// cluster has
+							// not been
+							// used yet
+          {
+            used_clusters[connected_clusters[i][j]] = true;
+            for(std::vector<int>::const_iterator points_iterator = 
+		  input_clusters[connected_clusters[i][j]].getIndices().
+		  indices.begin();
+                points_iterator != 
+		  input_clusters[connected_clusters[i][j]].getIndices().
+		  indices.end(); points_iterator++)
+            {
+              point_indices.indices.push_back(*points_iterator);
+            }
+          }
+        }
+        pcl::people::PersonCluster<PointT> cluster(cloud, point_indices, ground_coeffs_, sqrt_ground_coeffs_, false, false);
+        output_clusters.push_back(cluster);
+      }
+    }
+  }
+}
+
+
+bool ppl_detection::get_min_ground_dist (const PointCloudT::Ptr cloud, 
+				    pcl::people::PersonCluster<PointT> person_c, 
+				    const Eigen::VectorXf ground_coeffs, 
+				    double sqrt_ground_coeffs, double min_dist)
+{
+  pcl::PointIndices p_ind = person_c.getIndices();
+  double min_disto=1000.0;
+
+  for (std::vector<int>::const_iterator it = p_ind.indices.begin (); 
+       it != p_ind.indices.end(); ++it){
+    Eigen::Vector4f bott_pt;
+    bott_pt << cloud->points[*it].x, cloud->points[*it].y, cloud->points[*it].z, 1.0f;
+    double dist = fabs(bott_pt.dot(ground_coeffs)/sqrt_ground_coeffs);
+    if (min_disto > dist)
+      min_disto = dist;
+    if (min_dist >= dist)
+      return true;
+  }
+  
+  cout << "Minimum cluster distance is : " << min_disto << endl;
+  return false;
+  
 }

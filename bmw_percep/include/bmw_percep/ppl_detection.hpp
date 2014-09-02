@@ -30,4 +30,23 @@ namespace ppl_detection{
 			 int& max_blob_id,
 			 const Eigen::VectorXf ground_coeffs,
 			 float leaf_size=0.01);
+
+  bool get_min_ground_dist (const PointCloudT::Ptr cloud, 
+			    pcl::people::PersonCluster<PointT> 
+			    person_c, 
+			    const Eigen::VectorXf ground_coeffs, 
+			    double sqrt_ground_coeffs, double min_dist);
+
+  void mergeClustersCloseInFloorCoordinates 
+  ( const PointCloudT::Ptr cloud, 
+    std::vector<pcl::people::PersonCluster<PointT> >& input_clusters,
+    std::vector<pcl::people::PersonCluster<PointT> >& output_clusters, 
+    const Eigen::VectorXf ground_coeffs_, double sqrt_ground_coeffs_);
+
+  void find_ppl_clusters
+  (const PointCloudT::Ptr cloud, 
+   vector<pcl::PointIndices>& init_indices, 
+   std::vector<pcl::people::PersonCluster<PointT> >& clusters,
+   const Eigen::VectorXf ground_coeffs);
+
 }

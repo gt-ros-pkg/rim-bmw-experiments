@@ -98,7 +98,6 @@ int main(int argc, char** argv)
       // cv::imshow("rgb", rgb_im);
       // cv::waitKey(10);
       //boost::this_thread::sleep(boost::posix_time::milliseconds(200));
-
   }
 
   return 0;
