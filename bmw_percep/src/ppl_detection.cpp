@@ -8,8 +8,8 @@ using namespace std;
 
 void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud, 
 				      PointCloudT::Ptr viz_cloud, 
-				      vector<cv::Point3f> clusters, 
-				      int& max_blob_id,
+				      // vector<cv::Point3f> clusters, 
+				      vector<vector<Eigen::Vector3f> > clusters,
 				      const Eigen::VectorXf ground_coeffs,
 				      float leaf_size/*=0.01*/)
 {
@@ -80,6 +80,23 @@ void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud,
       }
   
   cout << "No. of people: " << n_ppl << endl; 
+
+  //copy over the clusters to return
+  clusters.clear();
+  for(std::vector<pcl::people::PersonCluster<PointT> >::iterator 
+  	it = ppl_clusters.begin(); it != ppl_clusters.end(); ++it)
+      {
+	vector<Eigen::Vector3f> temp_cl;
+	temp_cl.clear();
+	vector<int> c_ind = (*it).getIndices().indices;
+	for (vector<int>::iterator cit = c_ind.begin(); 
+	     cit!=c_ind.end(); ++cit){
+	  PointT pty = no_ground_cloud->points[*cit];
+	  Eigen::Vector3f pt_temp(pty.x, pty.y, pty.z);
+	  temp_cl.push_back(pt_temp);
+	}
+	clusters.push_back(temp_cl);
+      } 
 
   // string whatupp;
   // if (n_ppl > 100)
@@ -319,6 +336,10 @@ bool ppl_detection::get_min_ground_dist (const PointCloudT::Ptr cloud,
   return false;
   
 }
+
+//TODO: Fill this up
+void ppl_detection::remove_robot(PointCloudT::ConstPtr cloud, 
+		    PointCloudT::Ptr cloud_f){}
 
 void ppl_detection::rm_ppl_clusters
 ( const PointCloudT::Ptr cloud, 

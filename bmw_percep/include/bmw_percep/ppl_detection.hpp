@@ -26,10 +26,14 @@ namespace ppl_detection{
 
   void find_euclid_blobs(PointCloudT::ConstPtr cloud, 
 			 PointCloudT::Ptr viz_cloud, 
-			 vector<cv::Point3f> clusters, 
-			 int& max_blob_id,
+			 vector<vector<Eigen::Vector3f> > clusters,
 			 const Eigen::VectorXf ground_coeffs,
 			 float leaf_size=0.01);
+
+  //Removes the robot points from the point cloud
+  void remove_robot(PointCloudT::ConstPtr cloud, 
+		    PointCloudT::Ptr cloud_f);
+
 
   bool get_min_ground_dist (const PointCloudT::Ptr cloud, 
 			    pcl::people::PersonCluster<PointT> 

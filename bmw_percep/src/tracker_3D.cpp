@@ -8,6 +8,7 @@
 #include<bmw_percep/shr_cv_utils.hpp>
 #include<bmw_percep/ppl_detection.hpp>
 #include<bmw_percep/groundPlane.hpp>
+#include<bmw_percep/pplTrack.hpp>
 
 //ros-includes
 #include<ros/ros.h>
@@ -65,6 +66,8 @@ int main(int argc, char** argv)
   GroundPlane ground_obj(gr_file_name);
   ground_obj.get_ground_coeffs(ground_coeffs);
 
+  //People Tracker
+PplTrack ppl_tracker(ground_coeffs);
   int n_frames=0;
   
   bool done_reading_files = false;
@@ -79,11 +82,10 @@ int main(int argc, char** argv)
     else
       continue;
 
-    vector<cv::Point3f> clusters; int max_blob_id;
+vector<vector<Eigen::Vector3f> > clusters;
     
-    
-    ppl_detection::find_euclid_blobs(cloud, viz_cloud,  
-    				clusters, max_blob_id,
+ppl_detection::find_euclid_blobs(cloud, viz_cloud,  
+    				clusters,
     				ground_coeffs);
 
 
