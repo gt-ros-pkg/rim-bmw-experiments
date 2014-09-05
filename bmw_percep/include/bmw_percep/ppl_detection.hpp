@@ -10,7 +10,7 @@
 #include <pcl/sample_consensus/sac_model_plane.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/people/person_cluster.h>
-
+#include <limits>
 /** 
     Utility functions for People Detection
 **/
@@ -47,6 +47,17 @@ namespace ppl_detection{
   (const PointCloudT::Ptr cloud, 
    vector<pcl::PointIndices>& init_indices, 
    std::vector<pcl::people::PersonCluster<PointT> >& clusters,
-   const Eigen::VectorXf ground_coeffs);
+   const Eigen::VectorXf ground_coeffs,
+   const int max_c_size,
+   const int min_c_size);
 
+void rm_ppl_clusters
+( const PointCloudT::Ptr cloud, 
+  std::vector<pcl::people::PersonCluster<PointT> >& in_cl,
+  std::vector<pcl::people::PersonCluster<PointT> >& out_cl, 
+  const Eigen::Vector4f ground_coeffs_, double sqrt_ground_coeffs_,
+  const float max_ht, const float min_ht, 
+  const float max_gr_dist,
+  const int max_c_size,
+  const int min_c_size);
 }

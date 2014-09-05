@@ -15,7 +15,8 @@ void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud,
 {
 
   float voxel_size=0.06;
-
+  int max_cluster_size = 800;
+  int min_cluster_size = 100;
   // Create the filtering object: downsample the dataset using a leaf size of 1cm
   pcl::VoxelGrid<PointT> vg;
   PointCloudT::Ptr cloud_filtered(new PointCloudT);
@@ -48,7 +49,8 @@ void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud,
   pcl::EuclideanClusterExtraction<PointT> ec;
   ec.setClusterTolerance (2* 0.06); // 2cm
   ec.setMinClusterSize (30);
-  ec.setMaxClusterSize (5000);
+  // ec.setMaxClusterSize (5000);
+  ec.setMaxClusterSize (max_cluster_size);
   ec.setSearchMethod (tree);
   ec.setInputCloud (no_ground_cloud);
   ec.extract (cluster_indices);
@@ -58,7 +60,9 @@ void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud,
   find_ppl_clusters(no_ground_cloud,
   		    cluster_indices,
   		    ppl_clusters,
-  		    ground_coeffs);
+  		    ground_coeffs,
+		    max_cluster_size,
+		    min_cluster_size);
 
   //debug
   cout << "No. of clusters: " << cluster_indices.size() << endl;
@@ -76,6 +80,7 @@ void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud,
       }
   
   cout << "No. of people: " << n_ppl << endl; 
+
   // string whatupp;
   // if (n_ppl > 100)
   //   cin >> whatupp;
@@ -119,13 +124,15 @@ void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud,
 void ppl_detection::find_ppl_clusters(const PointCloudT::Ptr cloud, 
 		  vector<pcl::PointIndices>& init_indices, 
 		  std::vector<pcl::people::PersonCluster<PointT> >& clusters,
-		  const Eigen::VectorXf ground_coeffs)
+				      const Eigen::VectorXf ground_coeffs,
+				      const int max_c_size,
+				      const int min_c_size)
 {
   
   //debug
   // cout << "Started this finding.." << endl;
 
-  float max_height_= 2.3; float min_height_= 1.3;
+  float max_height_= 2.3; float min_height_= 1.2;
   int min_a_merge = 200; float max_dist_gr=0.4;
   bool camera_vertical=false, compute_head=false;
 
@@ -143,12 +150,11 @@ void ppl_detection::find_ppl_clusters(const PointCloudT::Ptr cloud,
   //debug
   // cout << "Created ppl clusters.." << endl;
 
-  // Remove clusters with too high height from the ground plane:
   std::vector<pcl::people::PersonCluster<PointT> > new_clusters;
   for(unsigned int i = 0; i < clusters.size(); i++) // for every cluster
     {
-      if (clusters[i].getHeight() <= max_height_)
-	new_clusters.push_back(clusters[i]);
+      // if (clusters[i].getHeight() <= max_height_)
+  	new_clusters.push_back(clusters[i]);
     }
 
   //Merge clusters_close in floor coordinates:
@@ -156,15 +162,20 @@ void ppl_detection::find_ppl_clusters(const PointCloudT::Ptr cloud,
   mergeClustersCloseInFloorCoordinates(cloud, new_clusters, clusters,
 				       ground_coeffs, sqrt_ground_coeffs_);
 
-  // Remove clusters far away from ground or too short
-  new_clusters.clear();
-  for(unsigned int i = 0; i < clusters.size(); i++) // for every cluster
+  std::vector<pcl::people::PersonCluster<PointT> > ppl_filtered;
+  // Remove clusters according to rules
+  rm_ppl_clusters(cloud, clusters, new_clusters,
+		  ground_coeffs, sqrt_ground_coeffs_, max_height_, min_height_,
+		  max_dist_gr, max_c_size, min_c_size);
+
+  ppl_filtered.clear();
+  for(unsigned int i = 0; i < new_clusters.size(); i++) // for every cluster
     {
-      if (clusters[i].getNumberPoints() > min_a_merge){
-	if (clusters[i].getHeight() >= min_height_){
-	  if (get_min_ground_dist(cloud, clusters[i], ground_coeffs, 
+      if (new_clusters[i].getNumberPoints() > min_a_merge){
+	if (new_clusters[i].getHeight() >= min_height_){
+	  if (get_min_ground_dist(cloud, new_clusters[i], ground_coeffs, 
 				  sqrt_ground_coeffs_, max_dist_gr))
-  	    new_clusters.push_back(clusters[i]);
+  	    ppl_filtered.push_back(new_clusters[i]);
 	}
       }
     }
@@ -172,9 +183,9 @@ void ppl_detection::find_ppl_clusters(const PointCloudT::Ptr cloud,
   // //debug
   // cout << "Donadone.." << endl;
   clusters.clear();
-  clusters = new_clusters;
+  clusters = ppl_filtered;
   return;
-  new_clusters.clear();
+  // new_clusters.clear();
 
   // std::vector<pcl::people::PersonCluster<PointT> > subclusters;
   // int cluster_min_points_sub = int(float(min_points_) * 1.5);
@@ -306,5 +317,75 @@ bool ppl_detection::get_min_ground_dist (const PointCloudT::Ptr cloud,
   
   cout << "Minimum cluster distance is : " << min_disto << endl;
   return false;
+  
+}
+
+void ppl_detection::rm_ppl_clusters
+( const PointCloudT::Ptr cloud, 
+  std::vector<pcl::people::PersonCluster<PointT> >& in_cl,
+  std::vector<pcl::people::PersonCluster<PointT> >& out_cl, 
+  const Eigen::Vector4f ground_coeffs_, double sqrt_ground_coeffs_,
+  const float max_ht, const float min_ht, 
+  const float max_gr_dist,
+  const int max_c_size,
+  const int min_c_size)
+{
+  //Precomputation for point distance compute
+  Eigen::Vector3f n;
+  n(0) = ground_coeffs_(0);
+  n(1) = ground_coeffs_(1);
+  n(2) = ground_coeffs_(2);
+  float n_norm = n.norm();
+  n /= n_norm;
+  float p = ground_coeffs_(3)/n_norm;
+  // float distance = pt.dot(n) + p;
+
+  //Ppl properties
+  vector<float> heights;
+  vector<float> gr_dists;
+  heights.clear();
+  gr_dists.clear();
+  out_cl.clear();
+  
+  // for each person cluster
+  for(vector<pcl::people::PersonCluster<PointT> >::iterator 
+	persona = in_cl.begin();
+      persona!= in_cl.end(); persona++){
+    vector<int> temp_in;
+    temp_in = ((*persona).getIndices()).indices;
+    
+
+    //debug
+    cout << "\nCluster Size= "<< temp_in.size() << endl;
+
+    //Check size of cluster
+    if(temp_in.size()>max_c_size && temp_in.size()<min_c_size){
+      continue;
+    }
+    float person_ht=0.;
+    float person_dist=numeric_limits<float>::infinity();
+ 
+    //for each point in the cluster
+    for(vector<int>::iterator pin=temp_in.begin(); 
+	pin != temp_in.end(); pin++){
+      //Get actual point
+      const PointT* pt = &cloud->points[*pin];
+      Eigen::Vector3f pt_v((*pt).x, (*pt).y, (*pt).z);
+      //compute ground distance
+      float distance = pt_v.dot(n) + p;
+      if (distance>person_ht)
+	person_ht = distance;
+      if(distance<person_dist)
+	person_dist = distance;
+    }
+    heights.push_back(person_ht);
+    gr_dists.push_back(person_dist);
+    
+    //Decide which clusters go in
+    if (person_ht<=max_ht && person_ht>=min_ht && person_dist<=max_gr_dist)
+      out_cl.push_back(*persona);
+  }
+
+  return;
   
 }

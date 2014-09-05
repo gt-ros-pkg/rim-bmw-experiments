@@ -39,7 +39,10 @@ void pc_call(const pcl::PCLPointCloud2 cloud);
 int main(int argc, char** argv)
 {
   string pub_topic = "/human/debug/pc";
-  string sub_topic = "/read_pcd";
+  string file_topic = "/read_pcd"; 
+  string live_bg_topic = "/subtracted_read_pcd";
+  // string sub_topic = live_bg_topic;
+  string sub_topic = file_topic;
   string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
 
   //ros
@@ -53,7 +56,6 @@ int main(int argc, char** argv)
   PointCloudT::Ptr
     tcloud (new PointCloudT);
   pcl::PCLPointCloud2 pub_pc;
-      
   // cv::Mat rgb_im, depth_im, valid_depth, foreMask, back_im, disp_im, box_mask, box_mask2, box_mask_inliers;
 
   //ground-plane
