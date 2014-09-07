@@ -12,6 +12,7 @@ typedef pcl::PointCloud<PointT> PointCloudT;
 
 PplTrack::PplTrack(Eigen::Vector4f ground_coeffs)
 {
+  table_link = false;
   ground_coeffs_ = ground_coeffs;
 }
 
@@ -132,12 +133,22 @@ void PplTrack::estimate(PointCloudT::Ptr cloud,
 			const Eigen::VectorXf ground_coeffs,
 			float leaf_size/*=0.06*/)
 {
-  workspace_limit(cloud);
-  ppl_detection::find_euclid_blobs(cloud, viz_cloud,  
-				   clusters,
-				   ground_coeffs, leaf_size);
-  estimate(clusters);
- 
+  if (!table_link){
+    //workspace_limit(cloud);
+    ppl_detection::find_euclid_blobs(cloud, viz_cloud,  
+				     clusters,
+				     ground_coeffs, leaf_size);
+    estimate(clusters);
+  }
+  else{
+
+
+    int max_cluster_size = 800;
+    int min_cluster_size = 100;
+    
+    //
+
+  }
 }
 
 void PplTrack::workspace_limit(PointCloudT::Ptr cloud)
@@ -149,4 +160,9 @@ void PplTrack::workspace_limit(PointCloudT::Ptr cloud)
   //Plane behind front table
 
   return;
+}
+
+PplTrack::PplTrack(float z){
+  ground_coeffs_ =   Eigen::Vector4f(0.0,0.0,0.0,-z);
+  table_link = true;
 }

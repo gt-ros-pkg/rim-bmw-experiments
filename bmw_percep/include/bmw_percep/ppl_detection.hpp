@@ -58,8 +58,8 @@ namespace ppl_detection{
    const int max_c_size,
    const int min_c_size);
 
-void rm_ppl_clusters
-( const PointCloudT::Ptr cloud, 
+  void rm_ppl_clusters
+  ( const PointCloudT::Ptr cloud, 
   std::vector<pcl::people::PersonCluster<PointT> >& in_cl,
   std::vector<pcl::people::PersonCluster<PointT> >& out_cl, 
   const Eigen::Vector4f ground_coeffs_, double sqrt_ground_coeffs_,
@@ -67,6 +67,12 @@ void rm_ppl_clusters
   const float max_gr_dist,
   const int max_c_size,
   const int min_c_size);
+
+  //Voxel filter a point cloud
+  void voxelize_cloud(PointCloudT::ConstPtr cloud, 
+		      PointCloudT::Ptr filtered_cloud, 
+		      float leaf_size=0.06);
+  
 }
 
 #endif

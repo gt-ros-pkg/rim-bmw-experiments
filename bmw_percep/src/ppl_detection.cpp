@@ -415,3 +415,23 @@ void ppl_detection::rm_ppl_clusters
   return;
   
 }
+
+void ppl_detection::voxelize_cloud(PointCloudT::ConstPtr cloud, 
+		      PointCloudT::Ptr filtered_cloud, 
+				   float leaf_size/*=0.01*/)
+  {
+    float voxel_size=leaf_size;
+
+    //Voxelize the space
+    pcl::VoxelGrid<PointT> vg;
+    PointCloudT::Ptr cloud_filtered(new PointCloudT);
+    vg.setInputCloud(cloud);
+    vg.setLeafSize(voxel_size, voxel_size, voxel_size);
+    vg.filter(*cloud_filtered);
+    
+    //debug
+    cout << "PointCloud after filtering has: " << 
+      cloud_filtered->points.size ()  << " data points." << endl;
+    cout << "Vs. " << cloud->points.size() << " before." << endl;
+
+}

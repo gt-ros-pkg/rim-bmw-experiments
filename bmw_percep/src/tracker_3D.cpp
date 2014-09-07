@@ -44,11 +44,12 @@ void pc_call(const pcl::PCLPointCloud2 cloud);
 // MAIN
 int main(int argc, char** argv)
 {
-string pub_topic = "/human/debug/pc";
-string file_topic = "/read_pcd"; 
+  string pub_topic = "/human/debug/pc";
+  string file_topic = "/read_pcd"; 
   string live_bg_topic = "/subtracted_read_pcd";
+  string live_topic = "/kinect_both/depth_registered/points";
   // string sub_topic = live_bg_topic;
-  string sub_topic = file_topic;
+  string sub_topic = live_topic;
   string viz_topic = "/human/visuals";
   string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
 
@@ -79,8 +80,9 @@ string file_topic = "/read_pcd";
   ground_obj.get_ground_coeffs(ground_coeffs);
 
   //People Tracker
-PplTrack ppl_tracker(ground_coeffs);
-bool ppl_frame_set = false;
+  // PplTrack ppl_tracker(ground_coeffs);
+  PplTrack ppl_tracker(0.1);
+  bool ppl_frame_set = false;
   int n_frames=0;
   
   bool done_reading_files = false;

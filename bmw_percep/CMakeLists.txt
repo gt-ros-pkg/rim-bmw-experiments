@@ -117,7 +117,9 @@ include_directories(
 # )
 
 ## Declare a cpp executable
-add_executable(merge_pc src/merge_pc.cpp)
+add_executable(merge_pc
+  src/ppl_detection.cpp
+  src/merge_pc.cpp)
 
 add_executable(sample_ground
   src/groundPlane.cpp

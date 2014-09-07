@@ -8,7 +8,8 @@
 #include <opencv2/opencv.hpp>
 #include <geometry_msgs/PoseStamped.h>
 #include <boost/timer.hpp>
-//#include<bmw_percep/pcl_cv_utils.hpp>
+#include <pcl/filters/voxel_grid.h>
+//#include<bmw_percep/ppl_detection.hpp>
 //#include<bmw_percep/groundPlane.hpp>
 
 //ros-includes
@@ -30,6 +31,7 @@ struct pclTransform{
   Eigen::Vector3d translation;
   Eigen::Quaterniond rotation;
 };
+
 // typedef sensor_msgs::PointCloud PointCloudSM;
 
 using namespace std;
@@ -37,12 +39,14 @@ using namespace std;
 // callback:
 void front_call(const PointCloudSM::ConstPtr&);
 void back_call(const PointCloudSM::ConstPtr&);
-
+void voxelize_cloud(PointCloudSM::Ptr cloud, 
+		    PointCloudSM::Ptr filtered_cloud, 
+		    float leaf_size=0.06);
 //GLOBALs
 //TODO: Get Rid of 'em
 string front_frame, back_frame;
-PointCloudSM front_pc;
-PointCloudSM back_pc;
+PointCloudSM::Ptr front_pc;
+PointCloudSM::Ptr back_pc;
 bool new_pc_f, new_pc_b;
 
 //TODO: Time stamp checks on the two pointclouds
@@ -62,8 +66,8 @@ int main(int argc, char** argv)
   string new_frame = "table_link";
 
   //Point Clouds
-  PointCloudSM pub_pc;
-  PointCloudSM new_b_pc, new_f_pc;
+  PointCloudSM::Ptr pub_pc;
+  PointCloudSM::Ptr new_b_pc(new PointCloudSM), new_f_pc(new PointCloudSM);
 
   //Listeners for both transformations
   tf::TransformListener trans_back_table;
@@ -125,8 +129,8 @@ int main(int argc, char** argv)
       tf::vectorTFToEigen(t_front.getOrigin(), front_transform.translation);      
       tf::quaternionTFToEigen(t_front.getRotation(), front_transform.rotation);
       
-      pcl::transformPointCloud(front_pc, new_b_pc, front_transform.translation, 
-			       front_transform.rotation);
+      // pcl::transformPointCloud(front_pc, new_b_pc, front_transform.translation, 
+      // 			       front_transform.rotation);
     }
 
     // pub_pc = new_b_pc + new_f_pc;
@@ -155,20 +159,32 @@ int main(int argc, char** argv)
     if (new_pc_f && new_pc_b){
       
       timer_transform.restart();
-      pcl::transformPointCloud(back_pc, new_b_pc, back_transform.translation, 
-			       back_transform.rotation);
-      pcl::transformPointCloud(front_pc, pub_pc, front_transform.translation, 
-			       front_transform.rotation);
+
+      // pcl::transformPointCloud(back_pc, new_b_pc, back_transform.translation, 
+      // 			       back_transform.rotation);
+      // pcl::transformPointCloud(front_pc, pub_pc, front_transform.translation, 
+      // 			       front_transform.rotation);
+
+      cout << "Get to voxelize??" << endl;
+      //Voxelize-first
+      voxelize_cloud(back_pc, new_b_pc);
+      voxelize_cloud(front_pc, new_f_pc);
+
+      // pcl::transformPointCloud(*back_pc, new_b_pc, back_transform.translation, 
+      // 			       back_transform.rotation);
+      // pcl::transformPointCloud(*front_pc, pub_pc, front_transform.translation, 
+      // 			       front_transform.rotation);
+
       time_transform+=timer_transform.elapsed();
 
       //concatenate
       // pcl::transformPointCloud(front_pc, pub_pc, TransMat ); 
       timer_concat.restart();
-      pub_pc += new_b_pc;
+      *pub_pc += *new_b_pc;
       time_concat += timer_concat.elapsed();
 
       //set frame
-      pub_pc.header.frame_id = new_frame;
+      pub_pc->header.frame_id = new_frame;
 
       new_pc_f = false;
       new_pc_b = false;
@@ -200,7 +216,7 @@ void front_call(const PointCloudSM::ConstPtr& cloud)
 {
   if (!new_pc_f){
     front_frame = cloud->header.frame_id;
-    front_pc = *cloud;
+    *front_pc = *cloud;
     new_pc_f = true;
   }
     
@@ -210,7 +226,27 @@ void back_call(const PointCloudSM::ConstPtr& cloud)
 {
   if (!new_pc_b){
     back_frame = cloud->header.frame_id;
-    back_pc = *cloud;
+    *back_pc = *cloud;
     new_pc_b = true;
   }
+}
+
+ void voxelize_cloud(PointCloudSM::Ptr cloud, 
+		     PointCloudSM::Ptr filtered_cloud, 
+		    float leaf_size/*=0.01*/)
+{
+  float voxel_size=leaf_size;
+
+  //Voxelize the space
+  pcl::VoxelGrid<pcl::PointXYZRGB> vg;
+  //PointCloudSM::Ptr cloud_filtered(new PointCloudSM);
+  vg.setInputCloud(cloud);
+  vg.setLeafSize(voxel_size, voxel_size, voxel_size);
+  vg.filter(*filtered_cloud);
+    
+  //debug
+  cout << "PointCloud after filtering has: " << 
+    filtered_cloud->points.size ()  << " data points." << endl;
+  cout << "Vs. " << cloud->points.size() << " before." << endl;
+
 }

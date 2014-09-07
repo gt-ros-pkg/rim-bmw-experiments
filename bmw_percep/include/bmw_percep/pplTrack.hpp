@@ -44,9 +44,12 @@ typedef Eigen::Vector3f ClusterPoint;
 class PplTrack
 {
 public:
-  //Constructor
+  //Constructor if ground plane required
   PplTrack(Eigen::Vector4f ground_coeffs);
   
+  //If pointcloud in table_link frame
+  PplTrack(float z);
+
   void estimate(vector<vector<ClusterPoint> > clusters);
   
   // Takes in point cloud 
@@ -70,6 +73,7 @@ public:
   void workspace_limit(PointCloudT::Ptr cloud);
 
 private:
+  bool table_link;
   vector<int> person_ids_;
   PointCloudT::Ptr cur_cloud_;
   Eigen::Vector4f ground_coeffs_;
