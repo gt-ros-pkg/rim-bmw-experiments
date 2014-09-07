@@ -9,7 +9,7 @@ using namespace std;
 void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud, 
 				      PointCloudT::Ptr viz_cloud, 
 				      // vector<cv::Point3f> clusters, 
-				      vector<vector<Eigen::Vector3f> > clusters,
+				      vector<vector<Eigen::Vector3f> >& clusters,
 				      const Eigen::VectorXf ground_coeffs,
 				      float leaf_size/*=0.01*/)
 {
@@ -97,7 +97,12 @@ void ppl_detection::find_euclid_blobs(PointCloudT::ConstPtr cloud,
 	}
 	clusters.push_back(temp_cl);
       } 
-
+  //debug
+  if (clusters.size()!=n_ppl){
+    cout << "No. of copied clusters: " << clusters.size()<<endl;
+    string whatp;
+    cin>>whatp;
+  }
   // string whatupp;
   // if (n_ppl > 100)
   //   cin >> whatupp;

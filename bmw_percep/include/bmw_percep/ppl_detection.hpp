@@ -1,3 +1,6 @@
+#ifndef PPL_DETECTION
+#define PPL_DETECTION
+
 #include <opencv2/opencv.hpp>
 #include <pcl/point_types.h>
 #include <pcl/conversions.h>
@@ -26,7 +29,7 @@ namespace ppl_detection{
 
   void find_euclid_blobs(PointCloudT::ConstPtr cloud, 
 			 PointCloudT::Ptr viz_cloud, 
-			 vector<vector<Eigen::Vector3f> > clusters,
+			 vector<vector<Eigen::Vector3f> > &clusters,
 			 const Eigen::VectorXf ground_coeffs,
 			 float leaf_size=0.01);
 
@@ -65,3 +68,5 @@ void rm_ppl_clusters
   const int max_c_size,
   const int min_c_size);
 }
+
+#endif

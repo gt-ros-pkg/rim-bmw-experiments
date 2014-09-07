@@ -1,3 +1,6 @@
+#ifndef GROUNDPLANE
+#define GROUNDPLANE
+
 #include <pcl/point_types.h>
 #include <pcl/conversions.h>
 //#include <pcl/sample_consensus/sac_model_plane.h>
@@ -65,3 +68,5 @@ private:
   bool compute_plane_dlt(const PointCloudT::Ptr& cloud, 
 			 vector<cv::Point> plane_2d_points);
 };
+
+#endif

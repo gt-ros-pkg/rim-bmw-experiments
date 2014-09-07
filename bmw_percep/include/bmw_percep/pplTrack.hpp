@@ -1,3 +1,6 @@
+#ifndef PPL_TRACK
+#define PPL_TRACK
+
 #include <pcl/point_types.h>
 #include <pcl/conversions.h>
 #include <opencv2/opencv.hpp>
@@ -9,8 +12,22 @@
 #include <pcl/filters/project_inliers.h>
 #include <pcl/common/io.h>
 #include <Eigen/SVD>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/kdtree/kdtree.h>
+#include <pcl/search/kdtree.h>
+#include <pcl/segmentation/extract_clusters.h>
+#include <pcl/common/common_headers.h>
+#include <pcl/sample_consensus/sac_model_plane.h>
+#include <pcl/filters/extract_indices.h>
+#include <bmw_percep/ppl_detection.hpp>
 
+//ros-includes
 #include<ros/ros.h>
+#include<visualization_msgs/MarkerArray.h>
+#include<visualization_msgs/Marker.h>
+#include<std_msgs/UInt8.h>
+#include<std_msgs/Bool.h>
+#include<geometry_msgs/PoseStamped.h>
 
 /**
    
@@ -32,15 +49,34 @@ public:
   
   void estimate(vector<vector<ClusterPoint> > clusters);
   
+  // Takes in point cloud 
+  // (background subtracted or not undecided)
+  // Performs the complete pipeline of PC 
+  // processing and then estimates the position of
+  // person or people
+  void estimate(PointCloudT::Ptr cloud, 
+		PointCloudT::Ptr viz_cloud, 
+		vector<vector<ClusterPoint> > &clusters,
+		const Eigen::VectorXf ground_coeffs,
+		float leaf_size=0.06);
   
   void visualize(ros::Publisher pub);
+
+  void set_viz_frame(string viz_frame)
+  {viz_frame_ = viz_frame;}
+
+  //removes points from the cloud that are not part of 
+  //the defined workspace..
+  void workspace_limit(PointCloudT::Ptr cloud);
 
 private:
   vector<int> person_ids_;
   PointCloudT::Ptr cur_cloud_;
   Eigen::Vector4f ground_coeffs_;
-  string visual_topic_;
-  ClusterPoint cur_pos;
+  string viz_frame_;
+  vector<ClusterPoint> cur_pos_;
   void estimate(vector<ClusterPoint> cluster);
   int getOneCluster(const vector<vector<ClusterPoint> > clusters);
 };
+
+#endif

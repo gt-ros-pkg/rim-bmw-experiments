@@ -1,3 +1,6 @@
+#ifndef SHR_CV_UTILS
+#define SHR_CV_UTILS
+
 #include <opencv2/opencv.hpp>
 #include <pcl/point_types.h>
 #include <pcl/conversions.h>
@@ -36,3 +39,4 @@ namespace shr_cv_utils{
 		   cv::Mat& d_depth, cv::Mat& d_dmask);
 }
 
+#endif

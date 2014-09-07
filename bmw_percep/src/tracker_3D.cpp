@@ -6,12 +6,17 @@
 #include<pcl/conversions.h>
 #include<opencv2/opencv.hpp>
 #include<bmw_percep/shr_cv_utils.hpp>
-#include<bmw_percep/ppl_detection.hpp>
+// #include<bmw_percep/ppl_detection.hpp>
 #include<bmw_percep/groundPlane.hpp>
 #include<bmw_percep/pplTrack.hpp>
 
 //ros-includes
 #include<ros/ros.h>
+#include<visualization_msgs/MarkerArray.h>
+#include<visualization_msgs/Marker.h>
+#include<std_msgs/UInt8.h>
+#include<std_msgs/Bool.h>
+#include<geometry_msgs/PoseStamped.h>
 
 /**
    Sample program for PCL based people detection
@@ -39,19 +44,26 @@ void pc_call(const pcl::PCLPointCloud2 cloud);
 // MAIN
 int main(int argc, char** argv)
 {
-  string pub_topic = "/human/debug/pc";
-  string file_topic = "/read_pcd"; 
+string pub_topic = "/human/debug/pc";
+string file_topic = "/read_pcd"; 
   string live_bg_topic = "/subtracted_read_pcd";
   // string sub_topic = live_bg_topic;
   string sub_topic = file_topic;
+  string viz_topic = "/human/visuals";
   string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
 
   //ros
   ros::init(argc, argv, "sample_tracker");
   ros::NodeHandle nh;
+// subscribe to input Point Cloud
   ros::Subscriber pc_sub = nh.subscribe<pcl::PCLPointCloud2> 
     (sub_topic, 1, pc_call);
+//Publish the human clusters
   ros::Publisher db_pc = nh.advertise<pcl::PCLPointCloud2> (pub_topic, 1);
+//Publish visualizations for the human
+  ros::Publisher pub_viz = nh.advertise<visualization_msgs::MarkerArray> (viz_topic, 1);
+
+  //subscribes to the robots attributes 
 
   // PointCloudT::Ptr cloud (new PointCloudT);
   PointCloudT::Ptr
@@ -68,6 +80,7 @@ int main(int argc, char** argv)
 
   //People Tracker
 PplTrack ppl_tracker(ground_coeffs);
+bool ppl_frame_set = false;
   int n_frames=0;
   
   bool done_reading_files = false;
@@ -84,10 +97,29 @@ PplTrack ppl_tracker(ground_coeffs);
 
 vector<vector<Eigen::Vector3f> > clusters;
     
-ppl_detection::find_euclid_blobs(cloud, viz_cloud,  
-    				clusters,
-    				ground_coeffs);
+// ppl_detection::find_euclid_blobs(cloud, viz_cloud,  
+//     				clusters,
+//     				ground_coeffs);
 
+
+// //debug
+// if(viz_cloud->points.size()>0){
+// cout << "The numbero peeps is " << clusters.size();
+// string whap;
+// cin >> whap;
+// }
+
+//track
+ppl_tracker.estimate(cloud, viz_cloud,  
+		       clusters,
+		       ground_coeffs);
+
+// set frame-id if first frame
+if(!ppl_frame_set){
+ppl_tracker.set_viz_frame(hum_frame);
+ppl_frame_set=true;}
+  
+ppl_tracker.visualize(pub_viz);
 
     // pcl::copyPointCloud(*cloud, *viz_cloud);
     if (viz_cloud->points.size()>0){
