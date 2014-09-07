@@ -9,6 +9,8 @@ include_directories(${OpenCV_include_dirs})
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  tf
+  tf_conversions
   visualization_msgs
   cv_bridge
   image_transport

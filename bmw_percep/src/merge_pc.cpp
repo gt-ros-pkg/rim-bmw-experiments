@@ -7,81 +7,187 @@
 #include <pcl/registration/transforms.h>
 #include <opencv2/opencv.hpp>
 #include <geometry_msgs/PoseStamped.h>
-
+#include <boost/timer.hpp>
 //#include<bmw_percep/pcl_cv_utils.hpp>
 //#include<bmw_percep/groundPlane.hpp>
 
 //ros-includes
 #include<ros/ros.h>
 #include <pcl_ros/point_cloud.h>
+#include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
 
 
 /**
    Subscribe to two point clouds, transform into 
    one frame. Merge them and then publish as a
-   new Point Cloud
+   new Point Cloud.
 **/
 
-typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloudT;
+typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloudSM;
 
-// callback:
-void front_call(const PointCloudT::ConstPtr&);
-void back_call(const PointCloudT::ConstPtr&);
-
-//GLOBALs
-//TODO: Get Rid of 'em
-PointCloudT front_pc;
-PointCloudT back_pc;
-bool new_pc_f, new_pc_b;
+struct pclTransform{
+  Eigen::Vector3d translation;
+  Eigen::Quaterniond rotation;
+};
+// typedef sensor_msgs::PointCloud PointCloudSM;
 
 using namespace std;
 
+// callback:
+void front_call(const PointCloudSM::ConstPtr&);
+void back_call(const PointCloudSM::ConstPtr&);
+
+//GLOBALs
+//TODO: Get Rid of 'em
+string front_frame, back_frame;
+PointCloudSM front_pc;
+PointCloudSM back_pc;
+bool new_pc_f, new_pc_b;
+
+//TODO: Time stamp checks on the two pointclouds
 int main(int argc, char** argv)
 {
   //ros
   ros::init(argc, argv, "merge_pc");
   ros::NodeHandle nh;
-  ros::Publisher pc_pub = nh.advertise<PointCloudT> 
+  ros::Publisher pc_pub = nh.advertise<PointCloudSM> 
     ("/kinect_both/depth_registered/points", 1);
-  ros::Subscriber front_sub = nh.subscribe<PointCloudT> 
+  ros::Subscriber front_sub = nh.subscribe<PointCloudSM> 
     ("/kinect_front/depth_registered/points", 1, front_call);
-  ros::Subscriber back_sub = nh.subscribe<PointCloudT> 
+  ros::Subscriber back_sub = nh.subscribe<PointCloudSM> 
     ("/kinect_back/depth_registered/points", 1, back_call);
 
-  //TODO: Change to a frame that is truly its
-  string new_frame = "base_link";
+  //world frame for easy clipping of workspace
+  string new_frame = "table_link";
 
   //Point Clouds
-  PointCloudT pub_pc;
+  PointCloudSM pub_pc;
+  PointCloudSM new_b_pc, new_f_pc;
 
-  //create a 3D trasnformation matrix 
-  Eigen::Matrix4f TransMat; 
-  TransMat <<         
-    -0.7181,   -0.9601,   -0.1699,   -0.3431,
-    0.2667,    0.4643,    0.8790,   -2.4817,
-    -0.8105,    2.0802,    0.3348,    2.4483,
-    0.0,         0.0,         0.0,    1.0000;
+  //Listeners for both transformations
+  tf::TransformListener trans_back_table;
+  tf::TransformListener trans_front_table;
 
-  //TODO: Change to Pointclouds from PointCloudTs
-  //pcl::transformPointCloud(front_pc, pub_pc, TransMat ); 
+  //Transformers for the PointClouds
+  pclTransform back_transform, front_transform;
+
+  //listen for transform until one is gotten
+  //since its static, don't look for transform afterwards
+  bool found_back_t=false, found_front_t=false;
 
   new_pc_f = false;
   new_pc_b = false;
 
+  while (nh.ok() && !(found_back_t && found_front_t)){
+    ros::spinOnce();
+    
+    if (!(new_pc_f && new_pc_b))
+      continue; // spin again if both Pointclouds not get
+
+    //Back kinect transform
+    if(!found_back_t){
+      tf::StampedTransform t_back;
+      try{
+	trans_back_table.waitForTransform(new_frame, back_frame, ros::Time(0),
+					  ros::Duration(10.0));
+	trans_back_table.lookupTransform(new_frame, back_frame, ros::Time(0),
+					 t_back);
+      }
+      catch(tf::TransformException &ex){
+	cout << ex.what() << endl;
+	ROS_ERROR("%s", ex.what());
+	continue;
+      }
+      //Store transform
+      found_back_t=true;
+      tf::vectorTFToEigen(t_back.getOrigin(), back_transform.translation);      
+      tf::quaternionTFToEigen(t_back.getRotation(), back_transform.rotation);
+      
+    }
+
+    //Front kinect transform
+    if(!found_front_t){
+      tf::StampedTransform t_front;
+      try{
+	trans_front_table.waitForTransform(new_frame, front_frame, ros::Time(0),
+					  ros::Duration(10.0));
+	trans_front_table.lookupTransform(new_frame, front_frame, ros::Time(0),
+					 t_front);
+      }
+      catch(tf::TransformException &ex){
+	cout << ex.what() << endl;
+	ROS_ERROR("%s", ex.what());
+	continue;
+      }
+      //Store transform
+      found_front_t=true;
+      tf::vectorTFToEigen(t_front.getOrigin(), front_transform.translation);      
+      tf::quaternionTFToEigen(t_front.getRotation(), front_transform.rotation);
+      
+      pcl::transformPointCloud(front_pc, new_b_pc, front_transform.translation, 
+			       front_transform.rotation);
+    }
+
+    // pub_pc = new_b_pc + new_f_pc;
+    // pcl::concatenatePointCloud(new_b_pc, new_f_pc, pub_pc);
+    
+  }
+
+  new_pc_f = false;
+  new_pc_b = false;
+  //pcl::transformPointCloud(front_pc, pub_pc, TransMat ); 
+
+  //debug
+  // cout << "\nBoth transformed, time to merge!\n";
+  
+  boost::timer timer_transform, timer_concat, timer_total;
+  double time_transform=0.0, time_concat=0.0, time_total=0.0;
+  unsigned long n_frames=0;
+
   while(ros::ok()){
+
+    timer_total.restart();
+
     ros::spinOnce();
 
     //if both PCs new then concatenate
     if (new_pc_f && new_pc_b){
+      
+      timer_transform.restart();
+      pcl::transformPointCloud(back_pc, new_b_pc, back_transform.translation, 
+			       back_transform.rotation);
+      pcl::transformPointCloud(front_pc, pub_pc, front_transform.translation, 
+			       front_transform.rotation);
+      time_transform+=timer_transform.elapsed();
+
       //concatenate
-      pcl::transformPointCloud(front_pc, pub_pc, TransMat ); 
-      pub_pc += back_pc;
+      // pcl::transformPointCloud(front_pc, pub_pc, TransMat ); 
+      timer_concat.restart();
+      pub_pc += new_b_pc;
+      time_concat += timer_concat.elapsed();
+
+      //set frame
+      pub_pc.header.frame_id = new_frame;
 
       new_pc_f = false;
       new_pc_b = false;
 
       //publish
       pc_pub.publish(pub_pc);
+
+      time_total+=timer_total.elapsed();
+      n_frames++;
+
+      if (n_frames%10 == 0)
+	{
+	  cout << "\n**********COMPUTE-TIMES**********\n";
+	  cout << "Transform = " << time_transform/n_frames << " seconds\n";
+	  cout << "Concatenation = " << time_concat/n_frames << " seconds\n";
+	  cout << "Total = " << time_total/n_frames << " seconds" << endl;
+
+	}
+	
     }
 
   }
@@ -90,18 +196,20 @@ int main(int argc, char** argv)
 }
 
 // callback:
-void front_call(const PointCloudT::ConstPtr& cloud)
+void front_call(const PointCloudSM::ConstPtr& cloud)
 {
   if (!new_pc_f){
+    front_frame = cloud->header.frame_id;
     front_pc = *cloud;
     new_pc_f = true;
   }
     
 }
 
-void back_call(const PointCloudT::ConstPtr& cloud)
+void back_call(const PointCloudSM::ConstPtr& cloud)
 {
   if (!new_pc_b){
+    back_frame = cloud->header.frame_id;
     back_pc = *cloud;
     new_pc_b = true;
   }
