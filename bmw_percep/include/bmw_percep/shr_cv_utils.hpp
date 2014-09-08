@@ -41,8 +41,8 @@ namespace shr_cv_utils{
   //Convert a quaternion and translation to
   //a homogenous transformation matrix
   void to_trans_mat(const Eigen::Quaterniond quat,
-		  const Eigen::Vector3d trans,
-		  Eigen::Matrix4f &trans_mat);
+		    const Eigen::Vector3d trans,
+		    Eigen::Matrix4f &trans_mat);
 
   //Transforms PointCloud acc to the
   //homogenous transformation matrix
