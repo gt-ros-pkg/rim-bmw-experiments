@@ -186,7 +186,7 @@ bool shr_cv_utils::pc_to_depth(const PointCloudX::Ptr& cloud,
   return true;
 }
 
-void shr_cv_utils::toTransMat(const Eigen::Quaterniond quat,
+void shr_cv_utils::to_trans_mat(const Eigen::Quaterniond quat,
 		const Eigen::Vector3d trans,
 		Eigen::Matrix4f &trans_mat)
 {

@@ -149,6 +149,14 @@ int main(int argc, char** argv)
   //debug
   // cout << "\nBoth transformed, time to merge!\n";
   
+  //Convert into homogenous transformation matrices
+  Eigen::Matrix4f back_trans_mat;
+  shr_cv_utils::to_trans_mat(back_transform.rotation, back_transform.translation,
+			     back_trans_mat);
+  Eigen::Matrix4f front_trans_mat;
+  shr_cv_utils::to_trans_mat(front_transform.rotation, front_transform.translation,
+			     front_trans_mat);
+
   boost::timer timer_transform, timer_concat, timer_total;
   double time_transform=0.0, time_concat=0.0, time_total=0.0;
   unsigned long n_frames=0;
@@ -170,27 +178,24 @@ int main(int argc, char** argv)
       // 			       front_transform.rotation);
 
       // cout << "Get to voxelize??" << endl;
-      // //Voxelize-first
-      // voxelize_cloud(back_pc, new_b_pc);
-      // voxelize_cloud(front_pc, new_f_pc);
+      //Voxelize-first
+      voxelize_cloud(back_pc, new_b_pc);
+      voxelize_cloud(front_pc, new_f_pc);
 
-      // pcl::transformPointCloud(*new_b_pc, *back_pc, back_transform.translation, 
-      // 			       back_transform.rotation);
-      // pcl::transformPointCloud(*new_f_pc, *pub_pc, front_transform.translation, 
-      // 			       front_transform.rotation);
-
-      pcl::transformPointCloud(*back_pc, *new_b_pc, back_transform.translation, 
+      pcl::transformPointCloud(*new_b_pc, *back_pc, back_transform.translation, 
       			       back_transform.rotation);
-      pcl::transformPointCloud(*front_pc, *pub_pc, front_transform.translation, 
+      pcl::transformPointCloud(*new_f_pc, *pub_pc, front_transform.translation, 
       			       front_transform.rotation);
 
+      // shr_cv_utils::transPoints(back_pc, back_trans_mat, new_b_pc);
+      // shr_cv_utils::transPoints(front_pc, front_trans_mat, pub_pc);
 
       time_transform+=timer_transform.elapsed();
 
       //concatenate
       // pcl::transformPointCloud(front_pc, pub_pc, TransMat ); 
       timer_concat.restart();
-      *pub_pc += *new_b_pc;
+      *pub_pc += *back_pc;
       time_concat += timer_concat.elapsed();
 
       //set frame
@@ -206,14 +211,14 @@ int main(int argc, char** argv)
       n_frames++;
 
       //debug
-      // if (n_frames%10 == 0)
-      // 	{
-      // 	  cout << "\n**********COMPUTE-TIMES**********\n";
-      // 	  cout << "Transform = " << time_transform/n_frames << " seconds\n";
-      // 	  cout << "Concatenation = " << time_concat/n_frames << " seconds\n";
-      // 	  cout << "Total = " << time_total/n_frames << " seconds" << endl;
+      if (n_frames%10 == 0)
+      	{
+      	  cout << "\n**********COMPUTE-TIMES**********\n";
+      	  cout << "Transform = " << time_transform/n_frames << " seconds\n";
+      	  cout << "Concatenation = " << time_concat/n_frames << " seconds\n";
+      	  cout << "Total = " << time_total/n_frames << " seconds" << endl;
 
-      // 	}
+      	}
 	
     }
 
