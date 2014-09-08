@@ -81,7 +81,7 @@ int main(int argc, char** argv)
 
   //People Tracker
   // PplTrack ppl_tracker(ground_coeffs);
-  PplTrack ppl_tracker(0.1);
+  PplTrack ppl_tracker(0.15);
   bool ppl_frame_set = false;
   int n_frames=0;
   
@@ -112,9 +112,9 @@ vector<vector<Eigen::Vector3f> > clusters;
 // }
 
 //track
-ppl_tracker.estimate(cloud, viz_cloud,  
-		       clusters,
-		       ground_coeffs);
+ppl_tracker.estimate(cloud, 
+		     clusters,
+		     ground_coeffs);
 
 // set frame-id if first frame
 if(!ppl_frame_set){
@@ -124,8 +124,8 @@ ppl_frame_set=true;}
 ppl_tracker.visualize(pub_viz);
 
     // pcl::copyPointCloud(*cloud, *viz_cloud);
-    if (viz_cloud->points.size()>0){
-      pcl::copyPointCloud(*viz_cloud, *tcloud);
+    if (cloud->points.size()>0){
+      pcl::copyPointCloud(*cloud, *tcloud);
       pcl::toPCLPointCloud2(*tcloud, pub_pc);
       pub_pc.header.frame_id = hum_frame;
       db_pc.publish(pub_pc);

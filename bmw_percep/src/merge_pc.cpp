@@ -9,7 +9,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <boost/timer.hpp>
 #include <pcl/filters/voxel_grid.h>
-//#include<bmw_percep/ppl_detection.hpp>
+#include<bmw_percep/shr_cv_utils.hpp>
 //#include<bmw_percep/groundPlane.hpp>
 
 //ros-includes
@@ -52,6 +52,10 @@ bool new_pc_f, new_pc_b;
 //TODO: Time stamp checks on the two pointclouds
 int main(int argc, char** argv)
 {
+  //initialize shared pointers
+  front_pc = boost::shared_ptr<PointCloudSM>(new PointCloudSM);
+  back_pc = boost::shared_ptr<PointCloudSM>(new PointCloudSM);
+  
   //ros
   ros::init(argc, argv, "merge_pc");
   ros::NodeHandle nh;
@@ -66,7 +70,7 @@ int main(int argc, char** argv)
   string new_frame = "table_link";
 
   //Point Clouds
-  PointCloudSM::Ptr pub_pc;
+  PointCloudSM::Ptr pub_pc(new PointCloudSM);
   PointCloudSM::Ptr new_b_pc(new PointCloudSM), new_f_pc(new PointCloudSM);
 
   //Listeners for both transformations
@@ -160,20 +164,26 @@ int main(int argc, char** argv)
       
       timer_transform.restart();
 
-      // pcl::transformPointCloud(back_pc, new_b_pc, back_transform.translation, 
+      // pcl::transformPointCloud(*back_pc, *new_b_pc, back_transform.translation, 
       // 			       back_transform.rotation);
-      // pcl::transformPointCloud(front_pc, pub_pc, front_transform.translation, 
+      // pcl::transformPointCloud(*front_pc, *pub_pc, front_transform.translation, 
       // 			       front_transform.rotation);
 
-      cout << "Get to voxelize??" << endl;
-      //Voxelize-first
-      voxelize_cloud(back_pc, new_b_pc);
-      voxelize_cloud(front_pc, new_f_pc);
+      // cout << "Get to voxelize??" << endl;
+      // //Voxelize-first
+      // voxelize_cloud(back_pc, new_b_pc);
+      // voxelize_cloud(front_pc, new_f_pc);
 
-      // pcl::transformPointCloud(*back_pc, new_b_pc, back_transform.translation, 
+      // pcl::transformPointCloud(*new_b_pc, *back_pc, back_transform.translation, 
       // 			       back_transform.rotation);
-      // pcl::transformPointCloud(*front_pc, pub_pc, front_transform.translation, 
+      // pcl::transformPointCloud(*new_f_pc, *pub_pc, front_transform.translation, 
       // 			       front_transform.rotation);
+
+      pcl::transformPointCloud(*back_pc, *new_b_pc, back_transform.translation, 
+      			       back_transform.rotation);
+      pcl::transformPointCloud(*front_pc, *pub_pc, front_transform.translation, 
+      			       front_transform.rotation);
+
 
       time_transform+=timer_transform.elapsed();
 
@@ -195,14 +205,15 @@ int main(int argc, char** argv)
       time_total+=timer_total.elapsed();
       n_frames++;
 
-      if (n_frames%10 == 0)
-	{
-	  cout << "\n**********COMPUTE-TIMES**********\n";
-	  cout << "Transform = " << time_transform/n_frames << " seconds\n";
-	  cout << "Concatenation = " << time_concat/n_frames << " seconds\n";
-	  cout << "Total = " << time_total/n_frames << " seconds" << endl;
+      //debug
+      // if (n_frames%10 == 0)
+      // 	{
+      // 	  cout << "\n**********COMPUTE-TIMES**********\n";
+      // 	  cout << "Transform = " << time_transform/n_frames << " seconds\n";
+      // 	  cout << "Concatenation = " << time_concat/n_frames << " seconds\n";
+      // 	  cout << "Total = " << time_total/n_frames << " seconds" << endl;
 
-	}
+      // 	}
 	
     }
 
@@ -244,9 +255,9 @@ void back_call(const PointCloudSM::ConstPtr& cloud)
   vg.setLeafSize(voxel_size, voxel_size, voxel_size);
   vg.filter(*filtered_cloud);
     
-  //debug
-  cout << "PointCloud after filtering has: " << 
-    filtered_cloud->points.size ()  << " data points." << endl;
-  cout << "Vs. " << cloud->points.size() << " before." << endl;
+  // //debug
+  // cout << "PointCloud after filtering has: " << 
+  //   filtered_cloud->points.size ()  << " data points." << endl;
+  // cout << "Vs. " << cloud->points.size() << " before." << endl;
 
 }

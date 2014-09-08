@@ -37,6 +37,19 @@ namespace shr_cv_utils{
   //Extract only Depth, and Valid-depth maps from point cloud
   bool pc_to_depth(const PointCloudX::Ptr& cloud, 
 		   cv::Mat& d_depth, cv::Mat& d_dmask);
+
+  //Convert a quaternion and translation to
+  //a homogenous transformation matrix
+  void to_trans_mat(const Eigen::Quaterniond quat,
+		  const Eigen::Vector3d trans,
+		  Eigen::Matrix4f &trans_mat);
+
+  //Transforms PointCloud acc to the
+  //homogenous transformation matrix
+  //Courtesy: Kelsey Hawkins
+  void transPoints(const PointCloudT::Ptr pc_in, 
+		   const Eigen::Matrix4f &trans, 
+		   PointCloudT::Ptr &pc_out);
 }
 
 #endif

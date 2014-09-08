@@ -127,13 +127,13 @@ void PplTrack::visualize(ros::Publisher pub)
   pub.publish(mark_arr);
 }
 
-void PplTrack::estimate(PointCloudT::Ptr cloud, 
-			PointCloudT::Ptr viz_cloud, 
+void PplTrack::estimate(PointCloudT::Ptr& cloud, 
 			vector<vector<ClusterPoint> > &clusters,
 			const Eigen::VectorXf ground_coeffs,
 			float leaf_size/*=0.06*/)
 {
   if (!table_link){
+    PointCloudT::Ptr viz_cloud(new PointCloudT);
     //workspace_limit(cloud);
     ppl_detection::find_euclid_blobs(cloud, viz_cloud,  
 				     clusters,
@@ -141,18 +141,47 @@ void PplTrack::estimate(PointCloudT::Ptr cloud,
     estimate(clusters);
   }
   else{
-
+    
+    workspace_limit(cloud);
 
     int max_cluster_size = 800;
     int min_cluster_size = 100;
     
-    //
-
   }
 }
 
-void PplTrack::workspace_limit(PointCloudT::Ptr cloud)
+void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
 {
+  //debug
+  cout << "Initial points" << cloud->points.size() << endl;
+  
+  PointCloudT::Ptr cloud_f(new PointCloudT);
+  
+  //Groundplane removal
+  cloud_f->points.clear();
+  float ground_z_min = -ground_coeffs_(3);
+  
+  //debug
+  cout << "Ground Z max: " << ground_z_min << endl;
+  //
+  for (PointCloudT::iterator pit = cloud->begin();
+       pit!= cloud->end(); ++pit){
+    if(!isnan(pit->z))
+      if (pit->z>ground_z_min) //Groundplane removal
+	if(pit->y>0.84) //Robot table clipping
+	  if(pit->x>0.05) //front table clipping
+	    if(pit->x<4.3) //back range
+	      if(pit->x<2.9 || pit->y>2.0)//back table
+		if(pit->y<4.0) // Side range
+		  {cloud_f->points.push_back(*pit);}
+  }
+
+  cloud_f->width = cloud_f->points.size ();
+  cloud_f->height = 1;
+  cloud_f->is_dense = true;
+  
+  cloud = cloud_f;
+  
   //Robot table plane
   
   //Back-table block (cuboid)

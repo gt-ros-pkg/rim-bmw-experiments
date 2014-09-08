@@ -185,3 +185,29 @@ bool shr_cv_utils::pc_to_depth(const PointCloudX::Ptr& cloud,
 
   return true;
 }
+
+void shr_cv_utils::toTransMat(const Eigen::Quaterniond quat,
+		const Eigen::Vector3d trans,
+		Eigen::Matrix4f &trans_mat)
+{
+  trans_mat.setZero();
+  trans_mat.topLeftCorner(3,3) = quat.toRotationMatrix().cast<float>();
+  trans_mat.topRightCorner(3,1) = trans.cast<float>();
+  trans_mat(3,3) = 1.0;
+}
+
+void shr_cv_utils::transPoints(const PointCloudT::Ptr pc_in, 
+			       const Eigen::Matrix4f &trans, 
+			       PointCloudT::Ptr &pc_out)
+{
+  Eigen::MatrixXf m(4,(*pc_in).size());
+    for(size_t i=0;i<(*pc_in).size();i++) {
+      m(0,i) = (*pc_in)[i].x; m(1,i) = (*pc_in)[i].y; m(2,i) = (*pc_in)[i].z; m(3,i) = 1;
+    }
+    m = trans * m;
+    for(size_t i=0;i<(*pc_in).size();i++) {
+        PointT pt;
+        pt.x = m(0,i); pt.y = m(1,i); pt.z = m(2,i); pt.rgb = (*pc_in)[i].rgb;
+        (*pc_out).push_back(pt);
+    }
+}

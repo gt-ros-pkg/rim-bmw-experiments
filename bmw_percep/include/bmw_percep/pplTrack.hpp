@@ -57,8 +57,7 @@ public:
   // Performs the complete pipeline of PC 
   // processing and then estimates the position of
   // person or people
-  void estimate(PointCloudT::Ptr cloud, 
-		PointCloudT::Ptr viz_cloud, 
+  void estimate(PointCloudT::Ptr& cloud, 
 		vector<vector<ClusterPoint> > &clusters,
 		const Eigen::VectorXf ground_coeffs,
 		float leaf_size=0.06);
@@ -70,7 +69,7 @@ public:
 
   //removes points from the cloud that are not part of 
   //the defined workspace..
-  void workspace_limit(PointCloudT::Ptr cloud);
+  void workspace_limit(PointCloudT::Ptr& cloud);
 
 private:
   bool table_link;
