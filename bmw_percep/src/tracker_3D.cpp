@@ -156,23 +156,23 @@ void pc_call(const pcl::PCLPointCloud2 temp_cloud)
   hum_frame = temp_cloud.header.frame_id;
   pcl::fromPCLPointCloud2(temp_cloud, *cloud);
   
-  // //also listen to robot--right now
-  // tf::StampedTransform robo_form;
-  // try{
-  //   tf_listener.waitForTransform(robo_frame, hum_frame, ros::Time(0),
-  // 				 ros::Duration(1.5));
-  //   tf_listener.lookupTransform(robo_frame, hum_frame, ros::Time(0),
-  // 				      robo_form);
-  // }
-  // catch(tf::TransformException &ex){
-  //   cout << ex.what() << endl;
-  //   ROS_ERROR("%s", ex.what());
-  //   return;
-  // }
+  //also listen to robot--right now
+  tf::StampedTransform robo_form;
+  try{
+    tf_listener.waitForTransform(hum_frame, robo_frame, ros::Time(0),
+  				 ros::Duration(1.0));
+    tf_listener.lookupTransform(hum_frame, robo_frame, ros::Time(0),
+  				      robo_form);
+  }
+  catch(tf::TransformException &ex){
+    cout << ex.what() << endl;
+    ROS_ERROR("%s", ex.what());
+    return;
+  }
 
-  // Eigen::Vector3d temp_vec;
-  // tf::vectorTFToEigen(robo_form.getOrigin(), temp_vec);
-  // robo_loc = temp_vec.cast<float>();
-  // cout << "Get here?" << endl;
+  Eigen::Vector3d temp_vec;
+  tf::vectorTFToEigen(robo_form.getOrigin(), temp_vec);
+  robo_loc = temp_vec.cast<float>();
+  cout << "Get here? Robot location: " << robo_loc <<  endl;
   new_cloud_available_flag = true;
 }

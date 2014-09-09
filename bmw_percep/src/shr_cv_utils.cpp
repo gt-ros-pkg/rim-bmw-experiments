@@ -213,8 +213,8 @@ void shr_cv_utils::transPoints(const PointCloudT::Ptr pc_in,
 }
 
 
-void shr_cv_utils::crop_axis_a_cylinder(Eigen::Vector3f origin,
-					PointCloudT::Ptr& cloud,
+void shr_cv_utils::crop_axis_a_cylinder(typename PointCloudT::Ptr& cloud,
+					Eigen::Vector3f origin,
 					float radius,
 					float length)
 {
@@ -222,13 +222,23 @@ void shr_cv_utils::crop_axis_a_cylinder(Eigen::Vector3f origin,
   cloud_f->points.clear();
 
   if (cloud->is_dense){
-    Eigen::Vector2f range_z;
     if (!(length>0)){ //infinitely long cylinder
       for (PointCloudT::iterator pit = cloud->begin();
 	   pit!= cloud->end(); ++pit){
 	Eigen::Vector2f cur_pt_2d(pit->x, pit->y);
-	float dist = (cur_pt_2d-origin.segment(0,2)).norm();
-	if (dist<radius)
+	Eigen::Vector2f loc_2d = origin.segment(0,2);
+	float dist = (cur_pt_2d-loc_2d).norm();
+
+	// //debug
+	// cout << "Point is " << (*pit).x << ',' << (*pit).y << endl;
+	// cout << "Robot at " << loc_2d(0) << ',' << loc_2d(1) << endl;
+	// cout << "Distance is " << dist << endl;
+	
+	// if (((*pit).x)-0.1<0.01){
+	// string shatupp;
+	// cin >> shatupp;
+	// }
+	if (dist>radius)
 	  {cloud_f->push_back(*pit);}
       }
     }

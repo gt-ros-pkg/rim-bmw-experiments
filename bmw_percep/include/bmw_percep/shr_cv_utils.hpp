@@ -52,8 +52,8 @@ namespace shr_cv_utils{
 		   PointCloudT::Ptr &pc_out);
 
   //Crops an axis-aligned cylinder from the point cloud
-  void crop_axis_a_cylinder(Eigen::Vector3f origin,
-			    PointCloudT::Ptr& cloud,
+  void crop_axis_a_cylinder(typename PointCloudT::Ptr& cloud,
+			    Eigen::Vector3f origin,
 			    float radius,
 			    float length);
 }

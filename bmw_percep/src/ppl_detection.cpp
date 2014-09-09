@@ -165,7 +165,8 @@ void ppl_detection::find_ppl_clusters(const PointCloudT::Ptr cloud,
   for(std::vector<pcl::PointIndices>::const_iterator it = 
 	init_indices.begin(); it != init_indices.end(); ++it)
     {
-      pcl::people::PersonCluster<PointT> cluster(cloud, *it, ground_coeffs, sqrt_ground_coeffs_, compute_head, camera_vertical); // PersonCluster creation
+      pcl::people::PersonCluster<PointT> 
+	cluster(cloud, *it, ground_coeffs, sqrt_ground_coeffs_, compute_head, camera_vertical); // PersonCluster creation
       clusters.push_back(cluster);
     }
 

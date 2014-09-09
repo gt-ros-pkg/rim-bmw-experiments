@@ -41,6 +41,11 @@ using namespace std;
 typedef pcl::PointXYZRGB PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
 typedef Eigen::Vector3f ClusterPoint;
+struct ClusterStats{
+ClusterPoint mean;
+ClusterPoint std;
+};
+typedef struct ClusterStats ClusterStats;
 
 class PplTrack
 {
@@ -86,8 +91,14 @@ private:
   Eigen::Vector4f ground_coeffs_;
   string viz_frame_;
   vector<ClusterPoint> cur_pos_;
+float max_height_, min_height_, max_dist_gr_;
+int max_c_size_, min_c_size_;
+
+//member functions
   void estimate(vector<ClusterPoint> cluster);
   int getOneCluster(const vector<vector<ClusterPoint> > clusters);
+void merge_floor_clusters(PointCloudT::Ptr cloud, 
+			    vector<pcl::PointIndices> cluster_indices);
 };
 
 #endif

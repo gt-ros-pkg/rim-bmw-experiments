@@ -146,7 +146,8 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     PointCloudT::Ptr viz_cloud(new PointCloudT);
 
     workspace_limit(cloud);
-    //robot_remove(cloud, robo_loc);
+    robot_remove(cloud, robo_loc);
+    return;
     int max_cluster_size = 800;
     int min_cluster_size = 100;
 
@@ -154,7 +155,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
     tree->setInputCloud (cloud);
 
-    std::vector<pcl::PointIndices> cluster_indices;
+    vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<PointT> ec;
     ec.setClusterTolerance (2* leaf_size); // 2cm
     // ec.setMinClusterSize (30);
@@ -163,7 +164,9 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     ec.setSearchMethod (tree);
     ec.setInputCloud (cloud);
     ec.extract (cluster_indices);
-    
+
+    //merge
+    merge_floor_clusters(cloud, cluster_indices);
 
     //debug
     // visualize by painting each PC another color
@@ -254,14 +257,34 @@ void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
 PplTrack::PplTrack(float z){
   ground_coeffs_ =   Eigen::Vector4f(0.0,0.0,0.0,-z);
   table_link = true;
+
+  max_height_=2.3; min_height_=1.0; max_dist_gr_=0.4;
+  max_c_size_=800; min_c_size_=30;
+
 }
 
 void PplTrack::robot_remove(PointCloudT::Ptr &cloud,
 			    Eigen::Vector3f robo_loc)
 {
+  //debug
+  cout << "Points before robot removal = " << cloud->points.size() << endl;
+
   float a = 0.5;
-  
-  shr_cv_utils::crop_axis_a_cylinder(robo_loc, cloud, a, -1.);
+  // shr_cv_utils::crop_axis_a_cylinder(robo_loc, cloud, a, -1.);
+  shr_cv_utils::crop_axis_a_cylinder(cloud, robo_loc, a, -1.);
+
+  //debug
+  cout << "Points after robot removal = " << cloud->points.size() << endl;
+
   // cloud = cloud_f;
   // shr_cv_utils::transPoints(cloud, Eigen::Matrix4f::Zero(4,4), cloud);
+}
+
+void PplTrack::merge_floor_clusters(PointCloudT::Ptr cloud, 
+				    vector<pcl::PointIndices> cluster_indices)
+{
+  //Get cluster statistics
+  vector<ClusterStats> cluster_stats;
+
+  // for(vector<pcl::PointIndices>::iterator cit = cluster_indices.; )
 }
