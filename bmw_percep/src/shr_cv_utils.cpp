@@ -187,8 +187,8 @@ bool shr_cv_utils::pc_to_depth(const PointCloudX::Ptr& cloud,
 }
 
 void shr_cv_utils::to_trans_mat(const Eigen::Quaterniond quat,
-		const Eigen::Vector3d trans,
-		Eigen::Matrix4f &trans_mat)
+				const Eigen::Vector3d trans,
+				Eigen::Matrix4f &trans_mat)
 {
   trans_mat.setZero();
   trans_mat.topLeftCorner(3,3) = quat.toRotationMatrix().cast<float>();
@@ -210,4 +210,51 @@ void shr_cv_utils::transPoints(const PointCloudT::Ptr pc_in,
         pt.x = m(0,i); pt.y = m(1,i); pt.z = m(2,i); pt.rgb = (*pc_in)[i].rgb;
         (*pc_out).push_back(pt);
     }
+}
+
+
+void shr_cv_utils::crop_axis_a_cylinder(Eigen::Vector3f origin,
+					PointCloudT::Ptr& cloud,
+					float radius,
+					float length)
+{
+  PointCloudT::Ptr cloud_f(new PointCloudT);
+  cloud_f->points.clear();
+
+  if (cloud->is_dense){
+    Eigen::Vector2f range_z;
+    if (!(length>0)){ //infinitely long cylinder
+      for (PointCloudT::iterator pit = cloud->begin();
+	   pit!= cloud->end(); ++pit){
+	Eigen::Vector2f cur_pt_2d(pit->x, pit->y);
+	float dist = (cur_pt_2d-origin.segment(0,2)).norm();
+	if (dist<radius)
+	  {cloud_f->push_back(*pit);}
+      }
+    }
+    else{ //if cylinder not infinitely long
+    Eigen::Vector2f range_z;
+    range_z = Eigen::Vector2f(origin(2)-(length/2), origin(2)+(length/2));
+
+    if (!(length>0)){ //infinitely long cylinder
+      for (PointCloudT::iterator pit = cloud->begin();
+	   pit!= cloud->end(); ++pit){
+	Eigen::Vector2f cur_pt_2d(pit->x, pit->y);
+	float dist = (cur_pt_2d-origin.segment(0,2)).norm();
+	if (dist<radius)
+	  if(pit->z>range_z(0) && pit->z<range_z(1))
+	    {cloud_f->push_back(*pit);}
+      }
+    }
+    }
+
+    cloud_f->width = cloud_f->points.size ();
+    cloud_f->height = 1;
+    cloud_f->is_dense = true;
+  
+    cloud = cloud_f;
+  }
+  else{
+    cout << "\nCloud should be dense. If not going to be the case then a little rewriting is the order of the day. Error from Cropping Axis aligned cylinder." << endl;
+  }
 }

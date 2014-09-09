@@ -20,6 +20,7 @@
 #include <pcl/sample_consensus/sac_model_plane.h>
 #include <pcl/filters/extract_indices.h>
 #include <bmw_percep/ppl_detection.hpp>
+#include <bmw_percep/shr_cv_utils.hpp>
 
 //ros-includes
 #include<ros/ros.h>
@@ -60,6 +61,7 @@ public:
   void estimate(PointCloudT::Ptr& cloud, 
 		vector<vector<ClusterPoint> > &clusters,
 		const Eigen::VectorXf ground_coeffs,
+		const Eigen::Vector3f robo_loc,
 		float leaf_size=0.06);
   
   void visualize(ros::Publisher pub);
@@ -70,6 +72,12 @@ public:
   //removes points from the cloud that are not part of 
   //the defined workspace..
   void workspace_limit(PointCloudT::Ptr& cloud);
+
+  //remove points belonging to the robot
+  //currently removes an infinite .5m cylinder
+  //from the base_link
+  void robot_remove(PointCloudT::Ptr &cloud,
+		    Eigen::Vector3f robo_loc);
 
 private:
   bool table_link;

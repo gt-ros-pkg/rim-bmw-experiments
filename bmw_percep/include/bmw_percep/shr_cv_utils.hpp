@@ -50,6 +50,12 @@ namespace shr_cv_utils{
   void transPoints(const PointCloudT::Ptr pc_in, 
 		   const Eigen::Matrix4f &trans, 
 		   PointCloudT::Ptr &pc_out);
+
+  //Crops an axis-aligned cylinder from the point cloud
+  void crop_axis_a_cylinder(Eigen::Vector3f origin,
+			    PointCloudT::Ptr& cloud,
+			    float radius,
+			    float length);
 }
 
 #endif

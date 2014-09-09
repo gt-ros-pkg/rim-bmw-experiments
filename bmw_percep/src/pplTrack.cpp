@@ -130,6 +130,7 @@ void PplTrack::visualize(ros::Publisher pub)
 void PplTrack::estimate(PointCloudT::Ptr& cloud, 
 			vector<vector<ClusterPoint> > &clusters,
 			const Eigen::VectorXf ground_coeffs,
+			const Eigen::Vector3f robo_loc,
 			float leaf_size/*=0.06*/)
 {
   if (!table_link){
@@ -142,11 +143,70 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
   }
   else{
     
-    workspace_limit(cloud);
+    PointCloudT::Ptr viz_cloud(new PointCloudT);
 
+    workspace_limit(cloud);
+    //robot_remove(cloud, robo_loc);
     int max_cluster_size = 800;
     int min_cluster_size = 100;
+
+    // Creating the KdTree object for the search method of the extraction
+    pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
+    tree->setInputCloud (cloud);
+
+    std::vector<pcl::PointIndices> cluster_indices;
+    pcl::EuclideanClusterExtraction<PointT> ec;
+    ec.setClusterTolerance (2* leaf_size); // 2cm
+    // ec.setMinClusterSize (30);
+    // ec.setMaxClusterSize (5000);
+    // ec.setMaxClusterSize (max_cluster_size);
+    ec.setSearchMethod (tree);
+    ec.setInputCloud (cloud);
+    ec.extract (cluster_indices);
     
+
+    //debug
+    // visualize by painting each PC another color
+    // pcl::copyPointCloud(*no_ground_cloud, *cloud_filtered);
+    PointCloudT::Ptr cloud_filtered;
+    cloud_filtered = cloud;
+    viz_cloud->points.clear();
+
+    for (std::vector<pcl::PointIndices>::const_iterator 
+	   it = cluster_indices.begin (); 
+	 it != cluster_indices.end (); ++it){
+      uint8_t r(rand()%255), g(rand()%255), b(rand()%255);
+
+      for (std::vector<int>::const_iterator pit = it->indices.begin (); 
+	   pit != it->indices.end (); pit++){
+	// create RGB point to push in
+	PointT new_pt;
+	new_pt.x = cloud_filtered->points[*pit].x;
+	new_pt.y = cloud_filtered->points[*pit].y;
+	new_pt.z = cloud_filtered->points[*pit].z;
+
+	// new_pt.r = cloud_filtered->points[*pit].r;
+	// new_pt.g = cloud_filtered->points[*pit].g;
+	// new_pt.b = cloud_filtered->points[*pit].b;
+
+	new_pt.r = r; new_pt.g = g; new_pt.b = b;
+	// new_pt.a = 1.0;
+	viz_cloud->points.push_back (new_pt); //*
+      }
+      //
+      
+    //std::cout << "PointCloud representing the Cluster: " << viz_cloud->points.size () << " data points." << std::endl;
+    //writer.write<pcl::PointXYZ> (ss.str (), *cloud_cluster, false); //*
+    //j++;
+
+    }
+
+    viz_cloud->width = viz_cloud->points.size ();
+    viz_cloud->height = 1;
+    viz_cloud->is_dense = true;
+
+    cloud = viz_cloud;
+
   }
 }
 
@@ -194,4 +254,14 @@ void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
 PplTrack::PplTrack(float z){
   ground_coeffs_ =   Eigen::Vector4f(0.0,0.0,0.0,-z);
   table_link = true;
+}
+
+void PplTrack::robot_remove(PointCloudT::Ptr &cloud,
+			    Eigen::Vector3f robo_loc)
+{
+  float a = 0.5;
+  
+  shr_cv_utils::crop_axis_a_cylinder(robo_loc, cloud, a, -1.);
+  // cloud = cloud_f;
+  // shr_cv_utils::transPoints(cloud, Eigen::Matrix4f::Zero(4,4), cloud);
 }
