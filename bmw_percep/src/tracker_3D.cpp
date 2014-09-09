@@ -9,6 +9,7 @@
 // #include<bmw_percep/ppl_detection.hpp>
 #include<bmw_percep/groundPlane.hpp>
 #include<bmw_percep/pplTrack.hpp>
+#include <boost/timer.hpp>
 
 //ros-includes
 #include<ros/ros.h>
@@ -39,7 +40,6 @@ enum { COLS=640, ROWS=480};
 PointCloudT::Ptr cloud (new PointCloudT);
 //subscribes to the robots location
 Eigen::Vector3f robo_loc;
-  
 
 bool new_cloud_available_flag;
 
@@ -149,19 +149,22 @@ int main(int argc, char** argv)
 // callback:
 void pc_call(const pcl::PCLPointCloud2 temp_cloud)
 {
+
+  hum_frame = temp_cloud.header.frame_id;
+
+  boost::timer timer_total, timer_tf;
   //Subscribe tf
   tf::TransformListener tf_listener;
 
   //cout << "Frame = " << temp_cloud.header.frame_id << endl;
-  hum_frame = temp_cloud.header.frame_id;
-  pcl::fromPCLPointCloud2(temp_cloud, *cloud);
   
   //also listen to robot--right now
   tf::StampedTransform robo_form;
   try{
-    tf_listener.waitForTransform(hum_frame, robo_frame, ros::Time(0),
+    ros::Time a = ros::Time(0);
+    tf_listener.waitForTransform(hum_frame, robo_frame, a,
   				 ros::Duration(1.0));
-    tf_listener.lookupTransform(hum_frame, robo_frame, ros::Time(0),
+    tf_listener.lookupTransform(hum_frame, robo_frame, a,
   				      robo_form);
   }
   catch(tf::TransformException &ex){
@@ -173,6 +176,19 @@ void pc_call(const pcl::PCLPointCloud2 temp_cloud)
   Eigen::Vector3d temp_vec;
   tf::vectorTFToEigen(robo_form.getOrigin(), temp_vec);
   robo_loc = temp_vec.cast<float>();
-  cout << "Get here? Robot location: " << robo_loc <<  endl;
+  // //debug
+  // cout << "Get here? Robot location: " << robo_loc <<  endl;
+
+  float time_tf = timer_tf.elapsed();
+
+  pcl::fromPCLPointCloud2(temp_cloud, *cloud);
+
   new_cloud_available_flag = true;
+  
+  float time_total = timer_total.elapsed();
+  
+  //debug
+  cout << "**********TIMES**********\n";
+  cout << "Time TF = " << time_tf << '\n';
+  cout << "Time Total = " << time_total << endl;
 }

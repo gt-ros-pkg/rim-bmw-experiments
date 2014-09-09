@@ -215,8 +215,9 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 
 void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
 {
-  //debug
-  cout << "Initial points" << cloud->points.size() << endl;
+
+  // //debug
+  // cout << "Initial points" << cloud->points.size() << endl;
   
   PointCloudT::Ptr cloud_f(new PointCloudT);
   
@@ -224,8 +225,8 @@ void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
   cloud_f->points.clear();
   float ground_z_min = -ground_coeffs_(3);
   
-  //debug
-  cout << "Ground Z max: " << ground_z_min << endl;
+  // //debug
+  // cout << "Ground Z max: " << ground_z_min << endl;
   //
   for (PointCloudT::iterator pit = cloud->begin();
        pit!= cloud->end(); ++pit){
@@ -266,15 +267,15 @@ PplTrack::PplTrack(float z){
 void PplTrack::robot_remove(PointCloudT::Ptr &cloud,
 			    Eigen::Vector3f robo_loc)
 {
-  //debug
-  cout << "Points before robot removal = " << cloud->points.size() << endl;
+  // //debug
+  // cout << "Points before robot removal = " << cloud->points.size() << endl;
 
   float a = 0.5;
   // shr_cv_utils::crop_axis_a_cylinder(robo_loc, cloud, a, -1.);
   shr_cv_utils::crop_axis_a_cylinder(cloud, robo_loc, a, -1.);
 
-  //debug
-  cout << "Points after robot removal = " << cloud->points.size() << endl;
+  // //debug
+  // cout << "Points after robot removal = " << cloud->points.size() << endl;
 
   // cloud = cloud_f;
   // shr_cv_utils::transPoints(cloud, Eigen::Matrix4f::Zero(4,4), cloud);
