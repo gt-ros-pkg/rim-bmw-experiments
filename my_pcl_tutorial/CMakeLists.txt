@@ -126,14 +126,14 @@ add_definitions(${PCL_DEFINITIONS})
 
 
 
-add_executable(subscriber_live_ppl_detect src/subscriber_live_ppl_detect.cpp)
+#add_executable(subscriber_live_ppl_detect src/subscriber_live_ppl_detect.cpp)
 add_executable(subscriber_live src/subscriber_live.cpp)
 add_executable(subscriber_from_file src/subscriber_from_file.cpp)
 add_executable(subscriber_from_file1 src/subscriber_from_file1.cpp)
 
 
 
-target_link_libraries(subscriber_live_ppl_detect ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
+#target_link_libraries(subscriber_live_ppl_detect ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 target_link_libraries(subscriber_live ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 target_link_libraries(subscriber_from_file ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 target_link_libraries(subscriber_from_file1 ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})

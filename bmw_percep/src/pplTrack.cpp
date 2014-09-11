@@ -261,8 +261,8 @@ PplTrack::PplTrack(float z){
   ground_coeffs_ =   Eigen::Vector4f(0.0,0.0,0.0,-z);
   table_link = true;
 
-  max_height_=2.3; min_height_=1.0; max_dist_gr_=0.4;
-  max_c_size_=800; min_c_size_=30;
+  max_height_=0.3; min_height_=1.0; max_dist_gr_=0.4;
+  max_c_size_=800; min_c_size_=50;
 
 }
 
@@ -388,4 +388,30 @@ void PplTrack::get_clusters_stats(PointCloudT::ConstPtr cloud,
     clusters_stats.push_back(cluster_stats);
   }
 
+}
+
+void PplTrack::rm_clusters_rules(PointCloudT::Ptr &cloud,
+			 vector<pcl::PointIndices> cs_indices)
+{
+  vector<ClusterStats> cs_stats;
+  vector<pcl::PointIndices> cs_new;
+
+  get_clusters_stats(cloud, cs_indices, cs_stats);
+
+  for (int i=0; i<cs_indices.size(); ++i){
+    ClusterStats cur_stats = cs_stats[i];
+    
+    //check z distance from ground
+    if (cur_stats.min(2)<max_dist_gr_){
+      //is height in range
+      float cur_ht=cur_stats.max(2);
+      if(cur_ht>min_height_ && cur_ht<max_height_){
+	//cluster size in range
+	int no_pts = cs_indices.size();
+	if (no_pts>min_c_size_ && no_pts<max_c_size_)
+	  {cs_new.push_back(cs_indices[i]);}
+      }
+    }
+  }
+  cs_new = cs_indices;
 }

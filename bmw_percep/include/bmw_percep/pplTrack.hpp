@@ -95,6 +95,10 @@ public:
   //from the base_link
   void robot_remove(PointCloudT::Ptr &cloud,
 		    Eigen::Vector3f robo_loc);
+//Apply rules to "rule-out" the clusters not
+//satisfying human rules
+void rm_clusters_rules(PointCloudT::Ptr &cloud,
+			 vector<pcl::PointIndices> cs_indices);
 
 //Get statistics on the clusters
 void get_clusters_stats(PointCloudT::ConstPtr cloud, 
