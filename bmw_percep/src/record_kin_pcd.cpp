@@ -24,7 +24,7 @@ boost::mutex cloud_mutex;
 enum { COLS=640, ROWS=480};
 //Various objects
 PointCloudT::Ptr cloud (new PointCloudT);
-cv::Mat rgb_im, depth_im, depth_mask;
+// cv::Mat rgb_im, depth_im, depth_mask;
 bool new_cloud_available_flag;
 
 //Pointcloud callback
@@ -44,7 +44,7 @@ int main (int argc, char** argv)
   ros::init(argc, argv, "sample_tracker");
   ros::NodeHandle nh;
   ros::Subscriber pc_sub = nh.subscribe<pcl::PCLPointCloud2> 
-    (back_topic, 1, pc_call);
+    (both_topic, 1, pc_call);
 
 
   int nframes=0;
@@ -56,11 +56,11 @@ int main (int argc, char** argv)
       nframes++;
     else
       continue;
-    shr_cv_utils::pc_to_img(cloud, rgb_im, depth_im, depth_mask);
-    cv::imshow("RGB image", rgb_im);
-    cv::imshow("Depth image", depth_im);
-      c = cv::waitKey(5);
-      if (c==27){break;}
+    // shr_cv_utils::pc_to_img(cloud, rgb_im, depth_im, depth_mask);
+    // cv::imshow("RGB image", rgb_im);
+    // cv::imshow("Depth image", depth_im);
+    //   c = cv::waitKey(5);
+    //   if (c==27){break;}
       //write PCD
       ostringstream convertToStr;
       convertToStr << nframes;
@@ -77,7 +77,7 @@ int main (int argc, char** argv)
       //if (nframes>100)
       //break;
   }
-cv::destroyAllWindows();
+// cv::destroyAllWindows();
   return 0;
 }
 

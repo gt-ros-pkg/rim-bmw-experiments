@@ -1,4 +1,5 @@
 #include <bmw_percep/pplTrack.hpp>
+
 /**
    
    Class *implementation* for tracking people from RGBD imagery.
@@ -160,23 +161,23 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<PointT> ec;
     ec.setClusterTolerance (2* leaf_size); // 2cm
-    // ec.setMinClusterSize (30);
-    // ec.setMaxClusterSize (5000);
+    ec.setMinClusterSize (30);
+    ec.setMaxClusterSize (5000);
     // ec.setMaxClusterSize (max_cluster_size);
     ec.setSearchMethod (tree);
     ec.setInputCloud (cloud);
     ec.extract (cluster_indices);
 
-    //debug
-    cout << "Initial no. of clusters : " << cluster_indices.size() << endl;
+    // //debug
+    // cout << "Initial no. of clusters : " << cluster_indices.size() << endl;
     //merge
     merge_floor_clusters(cloud, cluster_indices);
-    //debug
-    cout << "After merge operation : " << cluster_indices.size() << endl;
+    // //debug
+    // cout << "After merge operation : " << cluster_indices.size() << endl;
     //remove clusters acc to rules
     rm_clusters_rules(cloud, cluster_indices);
-    //debug
-    cout << "After applying the rules : " << cluster_indices.size() << endl;
+    // //debug
+    // cout << "After applying the rules : " << cluster_indices.size() << endl;
     // string whatupp;
     // cin >> whatupp;
 
@@ -200,11 +201,14 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	new_pt.y = cloud_filtered->points[*pit].y;
 	new_pt.z = cloud_filtered->points[*pit].z;
 
-	// new_pt.r = cloud_filtered->points[*pit].r;
-	// new_pt.g = cloud_filtered->points[*pit].g;
-	// new_pt.b = cloud_filtered->points[*pit].b;
-
+	if(!RANDOM_COLORS){
+	new_pt.r = cloud_filtered->points[*pit].r;
+	new_pt.g = cloud_filtered->points[*pit].g;
+	new_pt.b = cloud_filtered->points[*pit].b;
+	}
+	else{
 	new_pt.r = r; new_pt.g = g; new_pt.b = b;
+	}
 	// new_pt.a = 1.0;
 	viz_cloud->points.push_back (new_pt); //*
       }
@@ -239,16 +243,19 @@ void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
   
   // //debug
   // cout << "Ground Z max: " << ground_z_min << endl;
-  //
+
   for (PointCloudT::iterator pit = cloud->begin();
        pit!= cloud->end(); ++pit){
     if(!isnan(pit->z))
       if (pit->z>ground_z_min) //Groundplane removal
-	if(pit->y>0.84) //Robot table clipping
-	  if(pit->x>0.05) //front table clipping
+	if(pit->y>0.84) //Robot table plane clipping
+	  if (pit->y>1.0 || pit->z>1.0) //Robot table more precise
+	  if(pit->x>0.05) //behind front table clipping
 	    if(pit->x<4.3) //back range
 	      if(pit->x<2.9 || pit->y>2.0)//back table
 		if(pit->y<4.0) // Side range
+		  //clipping the front table
+		  if(!(pit->x<1.10 && pit->z<0.98 && pit->y<2.3) )
 		  {cloud_f->points.push_back(*pit);}
   }
 
@@ -258,6 +265,12 @@ void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
   
   cloud = cloud_f;
   
+  // //debug
+  // for (PointCloudT::iterator pit = cloud->begin();
+  //      pit!= cloud->end(); ++pit){
+  //   if (static_cast<float>(pit->z) < static_cast<float>(ground_z_min))
+  //     {cout << " What the F???" << endl;}
+  // }
   //Robot table plane
   
   //Back-table block (cuboid)
@@ -272,7 +285,7 @@ PplTrack::PplTrack(float z){
   table_link = true;
 
   max_height_=2.3; min_height_=1.0; max_dist_gr_=0.4;
-  max_c_size_=800; min_c_size_=0;
+  max_c_size_=1800; min_c_size_=100;
 
 }
 

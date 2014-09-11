@@ -82,7 +82,7 @@ got_transform_ = false;
   string live_bg_topic = "/subtracted_read_pcd";
   string live_topic = "/kinect_both/depth_registered/points";
   // string sub_topic = live_bg_topic;
-  string sub_topic = live_topic;
+  string sub_topic = file_topic;
   string viz_topic = "/human/visuals";
   string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
   robo_frame = "base_link";
@@ -115,7 +115,7 @@ got_transform_ = false;
 
   //People Tracker
   // PplTrack ppl_tracker(ground_coeffs);
-  PplTrack ppl_tracker(0.15);
+  PplTrack ppl_tracker(0.25);
   bool ppl_frame_set = false;
   int n_frames=0;
   

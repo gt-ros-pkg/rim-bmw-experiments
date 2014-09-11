@@ -38,6 +38,8 @@
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/min.hpp>
 
+#define RANDOM_COLORS true
+
 /**
    
    Class *definition* for tracking people from RGBD imagery.
@@ -106,7 +108,7 @@ void get_clusters_stats(PointCloudT::ConstPtr cloud,
 			  vector<ClusterStats>& clusters_stats);
 
 private:
-  bool table_link;
+bool table_link;
   vector<int> person_ids_;
   PointCloudT::Ptr cur_cloud_;
   Eigen::Vector4f ground_coeffs_;
@@ -116,8 +118,8 @@ float max_height_, min_height_, max_dist_gr_;
 int max_c_size_, min_c_size_;
 
 //member functions
-  void estimate(vector<ClusterPoint> cluster);
-  int getOneCluster(const vector<vector<ClusterPoint> > clusters);
+void estimate(vector<ClusterPoint> cluster);
+int getOneCluster(const vector<vector<ClusterPoint> > clusters);
 void merge_floor_clusters(const PointCloudT::Ptr cloud, 
 			    vector<pcl::PointIndices> &cluster_indices);
 };

@@ -9,6 +9,8 @@
 //ros-includes
 #include<ros/ros.h>
 
+#define LOOP_RATE 30
+
 /**
    Program to read PCD files from a folder and publish on a ROS topic.
 **/
@@ -35,10 +37,11 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
   ros::Publisher db_pc = nh.advertise<pcl::PCLPointCloud2> ("/read_pcd/", 1);
 
-  string hum_frame = "kinect_back_rgb_optical_frame";
+  // string hum_frame = "kinect_back_rgb_optical_frame";
+  string hum_frame = "table_link";
   // string read_dir = "/home/menchi/dev/shray-hydro-ws/src/ppl_navigate/data/pcd/sequences1/9/";
   string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
-  string read_dir = pkg_dir + "data/test_seq_1/";
+  string read_dir = pkg_dir + "data/test_2_kin_1/";
   //  string read_dir = "src/ppl_navigate/data/pcd/temp1/"; 
   string read_file;
   string pcd_ext = ".pcd";
@@ -51,8 +54,12 @@ int main(int argc, char** argv)
   bool done_reading_files = false;
   bool reached = false;
 
+  ros::Rate loop_rate(LOOP_RATE);
+
+  int loop_skip=10;
+
   while(ros::ok()){
-    n_frames++;
+    n_frames+=loop_skip;
 
     ostringstream read_fr_str;
     read_fr_str << n_frames;
@@ -73,6 +80,8 @@ int main(int argc, char** argv)
       pub_pc.header.frame_id = hum_frame;
       db_pc.publish(pub_pc);
     }
+    
+    loop_rate.sleep();
   }
 
   return 0;
