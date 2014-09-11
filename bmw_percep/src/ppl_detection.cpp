@@ -241,8 +241,8 @@ std::vector<pcl::people::PersonCluster<PointT> >& input_clusters,
 				   // already used clusters
   used_clusters.resize(input_clusters.size());
   // initialize clusters unused
-  for(vector<bool>::iterator usit=used_clusters.begin(); usit!=used_clusters.end();
-      usit++)
+  for(vector<bool>::iterator usit=used_clusters.begin(); usit!=used_clusters.end()
+	;usit++)
     *usit = false;
     
   for(unsigned int i = 0; i < input_clusters.size(); i++) // for every cluster

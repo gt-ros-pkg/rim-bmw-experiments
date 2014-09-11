@@ -131,6 +131,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 			vector<vector<ClusterPoint> > &clusters,
 			const Eigen::VectorXf ground_coeffs,
 			const Eigen::Vector3f robo_loc,
+			bool got_tf_robot,
 			float leaf_size/*=0.06*/)
 {
   if (!table_link){
@@ -146,8 +147,9 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     PointCloudT::Ptr viz_cloud(new PointCloudT);
 
     workspace_limit(cloud);
-    robot_remove(cloud, robo_loc);
-    return;
+    if (got_tf_robot) // in case the robots location is known
+      robot_remove(cloud, robo_loc);
+
     int max_cluster_size = 800;
     int min_cluster_size = 100;
 
@@ -167,7 +169,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 
     //merge
     merge_floor_clusters(cloud, cluster_indices);
-
+    
     //debug
     // visualize by painting each PC another color
     // pcl::copyPointCloud(*no_ground_cloud, *cloud_filtered);
@@ -284,8 +286,106 @@ void PplTrack::robot_remove(PointCloudT::Ptr &cloud,
 void PplTrack::merge_floor_clusters(PointCloudT::Ptr cloud, 
 				    vector<pcl::PointIndices> cluster_indices)
 {
-  //Get cluster statistics
-  vector<ClusterStats> cluster_stats;
+  vector<pcl::PointIndices> output_indices;
 
-  // for(vector<pcl::PointIndices>::iterator cit = cluster_indices.; )
+  vector<ClusterStats> clusters_stats;
+  get_clusters_stats(cloud, cluster_indices, clusters_stats);
+
+  std::vector <std::vector<int> > connected_clusters;
+  connected_clusters.resize(cluster_indices.size());
+  std::vector<bool> used_clusters; // 0 in correspondence of clusters
+  				   // remained to process, 1 for
+  				   // already used clusters
+  used_clusters.resize(cluster_indices.size());
+  
+  // initialize clusters unused
+  for(vector<bool>::iterator usit=used_clusters.begin(); usit!=used_clusters.end()
+  	;usit++)
+    *usit = false;
+    
+  for(unsigned int i = 0; i < cluster_indices.size(); ++i){ // for every cluster
+
+    //Projection on ground plane is just the x,y coordinates
+    Eigen::Vector2f cur_cluster_c = 
+      Eigen::Vector2f(clusters_stats[i].mean(0), clusters_stats[i].mean(1));
+      
+    // for every remaining cluster
+    for(unsigned int j = i+1; j < cluster_indices.size(); j++) {
+      
+      Eigen::Vector2f new_cluster_c =
+      Eigen::Vector2f(clusters_stats[j].mean(0), clusters_stats[j].mean(1));
+
+      //TODO: Pass max cluster distance as an argument
+      if (((new_cluster_c-cur_cluster_c).norm()) < 0.4){
+  	connected_clusters[i].push_back(j);
+      }
+    }
+  }
+
+  //Merge 'em
+  output_indices.clear();
+  for(unsigned int i = 0; i < connected_clusters.size(); i++){ // for every cluster
+    if (!used_clusters[i]){ // if this cluster has not been used yet
+      used_clusters[i] = true;
+      if (connected_clusters[i].empty()) {// no other clusters to merge
+  	output_indices.push_back(cluster_indices[i]);
+      }
+      else
+      {
+        // Copy cluster points into new cluster:
+        pcl::PointIndices point_indices;
+        point_indices = cluster_indices[i];
+        for(unsigned int j = 0; j < connected_clusters[i].size(); j++){
+
+  	  //if this cluster has not been used yet
+          if (!used_clusters[connected_clusters[i][j]]) {
+            used_clusters[connected_clusters[i][j]] = true;
+            for(std::vector<int>::const_iterator points_iterator = 
+  		  cluster_indices[connected_clusters[i][j]].indices.
+  		  begin();
+                points_iterator != 
+  		  cluster_indices[connected_clusters[i][j]].
+  		  indices.end(); points_iterator++)
+            {
+              point_indices.indices.push_back(*points_iterator);
+            }
+          }
+        }
+  	//add to new clusters
+  	output_indices.push_back(point_indices);
+      }
+    }
+  }
+  
+  cluster_indices = output_indices;
+}
+
+void PplTrack::get_clusters_stats(PointCloudT::ConstPtr cloud, 
+				 const vector<pcl::PointIndices> cluster_indices,
+				 vector<ClusterStats>& clusters_stats)
+{
+  //Get cluster statistics
+  clusters_stats.clear();
+
+  //Go through cluster indices and take statistics
+  for(vector<pcl::PointIndices>::const_iterator cit = cluster_indices.begin();
+      cit != cluster_indices.end(); ++cit){
+    accumulator_set< float, stats<tag::mean, tag::moment<2>, 
+  				  tag::min, tag::max> > x_acc, y_acc, z_acc; 
+    for(vector<int>::const_iterator pint = cit->indices.begin(); 
+    	pint!=cit->indices.end(); ++pint){
+      PointT p = cloud->points[*pint];
+      x_acc(p.x);
+      y_acc(p.y);
+      z_acc(p.z);
+    }
+    ClusterStats cluster_stats; //Stats for one cluster
+    cluster_stats.mean = ClusterPoint(boost::accumulators::mean(x_acc), boost::accumulators::mean(y_acc), boost::accumulators::mean(z_acc));
+    cluster_stats.var = ClusterPoint(moment<2>(x_acc), moment<2>(y_acc), moment<2>(z_acc));
+    cluster_stats.min = ClusterPoint(boost::accumulators::min(x_acc), boost::accumulators::min(y_acc), boost::accumulators::min(z_acc));    
+    cluster_stats.max = ClusterPoint(boost::accumulators::max(x_acc), boost::accumulators::max(y_acc), boost::accumulators::max(z_acc));    
+
+    clusters_stats.push_back(cluster_stats);
+  }
+
 }

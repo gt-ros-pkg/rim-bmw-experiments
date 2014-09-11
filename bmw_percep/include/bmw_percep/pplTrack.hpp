@@ -30,6 +30,14 @@
 #include<std_msgs/Bool.h>
 #include<geometry_msgs/PoseStamped.h>
 
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/mean.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/moment.hpp>
+#include <boost/accumulators/statistics/max.hpp>
+#include <boost/accumulators/statistics/min.hpp>
+
 /**
    
    Class *definition* for tracking people from RGBD imagery.
@@ -37,13 +45,16 @@
 **/
 
 using namespace std;
+using namespace boost::accumulators;
 
 typedef pcl::PointXYZRGB PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
 typedef Eigen::Vector3f ClusterPoint;
 struct ClusterStats{
 ClusterPoint mean;
-ClusterPoint std;
+ClusterPoint var; //variance
+ClusterPoint min; 
+ClusterPoint max; //all these stats are taken independent in the dimensions
 };
 typedef struct ClusterStats ClusterStats;
 
@@ -67,6 +78,7 @@ public:
 		vector<vector<ClusterPoint> > &clusters,
 		const Eigen::VectorXf ground_coeffs,
 		const Eigen::Vector3f robo_loc,
+		  bool got_tf_robot,
 		float leaf_size=0.06);
   
   void visualize(ros::Publisher pub);
@@ -83,6 +95,11 @@ public:
   //from the base_link
   void robot_remove(PointCloudT::Ptr &cloud,
 		    Eigen::Vector3f robo_loc);
+
+//Get statistics on the clusters
+void get_clusters_stats(PointCloudT::ConstPtr cloud, 
+			  const vector<pcl::PointIndices> cluster_indices,
+			  vector<ClusterStats>& clusters_stats);
 
 private:
   bool table_link;

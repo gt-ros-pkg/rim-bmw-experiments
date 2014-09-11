@@ -181,6 +181,9 @@ int main(int argc, char** argv)
       //Voxelize-first
       voxelize_cloud(back_pc, new_b_pc);
       voxelize_cloud(front_pc, new_f_pc);
+      
+      // pcl::copyPointCloud(*back_pc, *new_b_pc);
+      // pcl::copyPointCloud(*front_pc, *new_f_pc);
 
       pcl::transformPointCloud(*new_b_pc, *back_pc, back_transform.translation, 
       			       back_transform.rotation);

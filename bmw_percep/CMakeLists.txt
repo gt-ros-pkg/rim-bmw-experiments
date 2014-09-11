@@ -131,6 +131,7 @@ add_executable(record_kin_pcd
   src/record_kin_pcd.cpp)
 
 add_executable(tracker_3D
+  #src/tracker_3D_class.cpp
   src/pplTrack.cpp
   src/groundPlane.cpp
   src/shr_cv_utils.cpp
