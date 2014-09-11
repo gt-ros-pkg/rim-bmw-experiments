@@ -289,7 +289,7 @@ pcl::PCLPointCloud2 pcl_pcd;
 ros::Publisher pcd_pub;
 pcd_pub = nh.advertise<sensor_msgs::PointCloud2> ("subtracted_read_pcd", 1);
 
-std::string svm_filename = "/home/asif/ur10_new_ws/src/my_pcl_tutorial/data/trainedLinearSVMForPeopleDetectionWithHOG.yaml";
+std::string svm_filename = "~/dev/hydro_ws/src/rim_bmw_experiments/my_pcl_tutorial/data/trainedLinearSVMForPeopleDetectionWithHOG.yaml";
 float min_confidence = -1.5;
 float min_height = 1.3;
 float max_height = 2.3;

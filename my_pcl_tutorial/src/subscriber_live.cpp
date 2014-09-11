@@ -27,12 +27,10 @@
 using namespace cv;  
 using namespace std; 
 
-
-
-typedef pcl::PointXYZRGBA PointT;
+int bg_frames = 100; //Number of frames to build the background
+std::string kinect_name = "blah";
+typedef pcl::PointXYZRGB PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
-
-pcl::visualization::PCLVisualizer viewer("PCL viewer");
 
 
 float 	baseline_ = 0.075;
@@ -63,9 +61,9 @@ float* frame_buffer;
 float* output_buffer;
 float* maskthresh_buffer;
 
-static unsigned learnedFrames = 0;
-float bad_point = numeric_limits<float>::quiet_NaN();
 
+float bad_point = numeric_limits<float>::quiet_NaN();
+int learnedFrames = 0; 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Structure used for storing color info of a point in point in pointcloud
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,10 +92,10 @@ bg_buffer = (float*)bg.data;
 frame_buffer = (float*)frame.data;
 output_buffer = (float*)output.data;
 maskthresh_buffer = (float*)mask_thresh.data;
- if (learnedFrames >= 20) { 
+ if (learnedFrames >= bg_frames) { 
    
-if(learnedFrames == 20){
-std::cout<<"BACKGROUND DONE!"<<std::endl;
+if(learnedFrames == bg_frames){
+std::cout<<"BACKGROUND DONE for " + kinect_name<<std::endl;
 
 }
    for (unsigned j = 0; j < height*width; ++j,++bg_buffer, ++frame_buffer,++output_buffer,++maskthresh_buffer)
@@ -116,9 +114,9 @@ std::cout<<"BACKGROUND DONE!"<<std::endl;
         cv::normalize(output, output_norm, 0, 1, NORM_MINMAX, CV_32FC1);
         cv::normalize(frame, frame_norm, 0, 1, NORM_MINMAX, CV_32FC1);          
         cv::normalize(bg, bg_norm, 0, 1, NORM_MINMAX, CV_32FC1);
-        cv::imshow("Subtracted Display", output_norm);
-        cv::imshow("Background", bg_norm);
-        cv::imshow("Actual Display", frame_norm);
+        //cv::imshow("Subtracted Display for " + kinect_name, output_norm);
+        //cv::imshow("Background for " + kinect_name, bg_norm);
+        //cv::imshow("Actual Display for " + kinect_name, frame_norm);
     }
  else {
     	if(learnedFrames == 0){
@@ -262,22 +260,28 @@ cloud_mutex.unlock();
 int main (int argc, char** argv)
 {
 
-ros::init(argc, argv, "listener");
-ros::NodeHandle nh;
 
+ros::init(argc, argv, "listener");
+ros::NodeHandle nh("~");
+nh.getParam("kinect_name", kinect_name);
+nh.getParam("bg_frames", bg_frames);
 sensor_msgs::PointCloud2 pcd;
 pcl::PCLPointCloud2 pcl_pcd;
 ros::Publisher pcd_pub;
-pcd_pub = nh.advertise<sensor_msgs::PointCloud2> ("subtracted_read_pcd", 1);
+
+
+pcd_pub = nh.advertise<sensor_msgs::PointCloud2> ("/" + kinect_name + "/subtracted_pcd", 1);
+
+
 
 
 Eigen::Matrix3f rgb_intrinsics_matrix;
 rgb_intrinsics_matrix << 525, 0.0, 319.5, 0.0, 525, 239.5, 0.0, 0.0, 1.0; // Kinect RGB camera intrinsics
  
   //Starting the CV windows for displaying images
-cv::namedWindow("Subtracted Display");
-cv::namedWindow("Background");
-cv::namedWindow("Actual Display");
+//cv::namedWindow("Subtracted Display for " + kinect_name);
+//cv::namedWindow("Background for " + kinect_name);
+//cv::namedWindow("Actual Display for " + kinect_name);
 cvStartWindowThread();
 PointCloudT::Ptr cloud (new PointCloudT);
 cv::Mat rgb_mat = cv::Mat(height, width, CV_8UC3);
@@ -289,8 +293,8 @@ bool new_cloud_available_flag = false;
 //boost::function<void (const sensor_msgs::PointCloud2ConstPtr& )> f = boost::bind (&cloud_cb, _1,  cloud, &new_cloud_available_flag);
 //ros::Subscriber sub = nh.subscribe("/kinect_front/depth_registered/points", 1000, f);
 
-message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/kinect_back/rgb/image_raw", 1);
-message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "/kinect_back/depth_registered/image_raw", 1);
+message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/" + kinect_name + "/rgb/image_raw", 1);
+message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "/" + kinect_name + "/depth_registered/image_raw", 1);
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> MySyncPolicy;
 message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), rgb_sub, depth_sub);
@@ -306,16 +310,9 @@ new_cloud_available_flag = false;
 
 
 
-std::cout << "WAIT WHILE BACKGROUND IS BUILDING UP!" << std::endl;
+std::cout << "WAIT WHILE BACKGROUND IS BUILDING UP for " + kinect_name << std::endl;
   
  
-
-
-
-
-
-
-  
 static unsigned count = 0;
 static double last = pcl::getTime ();
 
@@ -329,7 +326,7 @@ if (new_cloud_available_flag && cloud_mutex.try_lock ())    // if a new cloud is
       sub_depth_mat =  subtract(depth_mat, bg);
       *cloud =  *convertToXYZRGBPointCloud<PointT>(rgb_mat,sub_depth_mat);
        pcl::toPCLPointCloud2(*cloud,pcl_pcd);
-       pcl_pcd.header.frame_id = "kinect_back_rgb_optical_frame";
+       pcl_pcd.header.frame_id = kinect_name + "_rgb_optical_frame";
        pcl_conversions::fromPCL(pcl_pcd, pcd);
        pcd_pub.publish(pcd);
        
@@ -337,7 +334,7 @@ if (new_cloud_available_flag && cloud_mutex.try_lock ())    // if a new cloud is
 	if (++count == 30)
       	{
         double now = pcl::getTime ();
-        std::cout << "Average framerate: " << double(count)/double(now - last) << " Hz" <<  std::endl;
+        std::cout << "Average framerate for " + kinect_name + " : " << double(count)/double(now - last) << " Hz" <<  std::endl;
         count = 0;
         last = now;
        }
