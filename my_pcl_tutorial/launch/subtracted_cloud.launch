@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+
+<launch>
+   
+
+   
+  <node name="kinect_back" pkg="my_pcl_tutorial" type="subscriber_live" output="screen">
+      <param name="kinect_name" value="kinect_back" />
+      <param name="bg_frames" value="100" />
+  </node>
+  <node name="kinect_front" pkg="my_pcl_tutorial" type="subscriber_live" output="screen"> 
+	<param name="kinect_name" value="kinect_front" />
+        <param name="bg_frames" value="100" />
+  </node>
+
+
+</launch>
