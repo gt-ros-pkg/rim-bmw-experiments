@@ -148,6 +148,9 @@ got_transform_ = false;
     // cin >> whap;
     // }
 
+    //check if cloud empty
+    if (cloud->points.size()<1)
+      continue;
     //track
     ppl_tracker.estimate(cloud, 
 			 clusters,

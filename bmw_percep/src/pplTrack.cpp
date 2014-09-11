@@ -167,9 +167,19 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     ec.setInputCloud (cloud);
     ec.extract (cluster_indices);
 
+    //debug
+    cout << "Initial no. of clusters : " << cluster_indices.size() << endl;
     //merge
     merge_floor_clusters(cloud, cluster_indices);
-    
+    //debug
+    cout << "After merge operation : " << cluster_indices.size() << endl;
+    //remove clusters acc to rules
+    rm_clusters_rules(cloud, cluster_indices);
+    //debug
+    cout << "After applying the rules : " << cluster_indices.size() << endl;
+    // string whatupp;
+    // cin >> whatupp;
+
     //debug
     // visualize by painting each PC another color
     // pcl::copyPointCloud(*no_ground_cloud, *cloud_filtered);
@@ -261,8 +271,8 @@ PplTrack::PplTrack(float z){
   ground_coeffs_ =   Eigen::Vector4f(0.0,0.0,0.0,-z);
   table_link = true;
 
-  max_height_=0.3; min_height_=1.0; max_dist_gr_=0.4;
-  max_c_size_=800; min_c_size_=50;
+  max_height_=2.3; min_height_=1.0; max_dist_gr_=0.4;
+  max_c_size_=800; min_c_size_=0;
 
 }
 
@@ -283,8 +293,8 @@ void PplTrack::robot_remove(PointCloudT::Ptr &cloud,
   // shr_cv_utils::transPoints(cloud, Eigen::Matrix4f::Zero(4,4), cloud);
 }
 
-void PplTrack::merge_floor_clusters(PointCloudT::Ptr cloud, 
-				    vector<pcl::PointIndices> cluster_indices)
+void PplTrack::merge_floor_clusters(const PointCloudT::Ptr cloud, 
+				    vector<pcl::PointIndices> &cluster_indices)
 {
   vector<pcl::PointIndices> output_indices;
 
@@ -390,8 +400,8 @@ void PplTrack::get_clusters_stats(PointCloudT::ConstPtr cloud,
 
 }
 
-void PplTrack::rm_clusters_rules(PointCloudT::Ptr &cloud,
-			 vector<pcl::PointIndices> cs_indices)
+void PplTrack::rm_clusters_rules(const PointCloudT::Ptr &cloud,
+			 vector<pcl::PointIndices>& cs_indices)
 {
   vector<ClusterStats> cs_stats;
   vector<pcl::PointIndices> cs_new;
@@ -407,11 +417,12 @@ void PplTrack::rm_clusters_rules(PointCloudT::Ptr &cloud,
       float cur_ht=cur_stats.max(2);
       if(cur_ht>min_height_ && cur_ht<max_height_){
 	//cluster size in range
-	int no_pts = cs_indices.size();
+	int no_pts = cs_indices[i].indices.size();
 	if (no_pts>min_c_size_ && no_pts<max_c_size_)
-	  {cs_new.push_back(cs_indices[i]);}
+	  {	
+	    cs_new.push_back(cs_indices[i]);}
       }
     }
   }
-  cs_new = cs_indices;
+  cs_indices = cs_new;
 }

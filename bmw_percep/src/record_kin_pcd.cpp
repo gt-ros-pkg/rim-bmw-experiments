@@ -38,6 +38,7 @@ int main (int argc, char** argv)
 
   string front_topic = "/kinect_front/depth_registered/points";
   string back_topic = "/kinect_back/depth_registered/points";
+  string both_topic = "/kinect_both/depth_registered/points";
 
   //ros
   ros::init(argc, argv, "sample_tracker");

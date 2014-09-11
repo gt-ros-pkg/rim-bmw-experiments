@@ -97,8 +97,8 @@ public:
 		    Eigen::Vector3f robo_loc);
 //Apply rules to "rule-out" the clusters not
 //satisfying human rules
-void rm_clusters_rules(PointCloudT::Ptr &cloud,
-			 vector<pcl::PointIndices> cs_indices);
+void rm_clusters_rules(const PointCloudT::Ptr &cloud,
+			 vector<pcl::PointIndices> &cs_indices);
 
 //Get statistics on the clusters
 void get_clusters_stats(PointCloudT::ConstPtr cloud, 
@@ -118,8 +118,8 @@ int max_c_size_, min_c_size_;
 //member functions
   void estimate(vector<ClusterPoint> cluster);
   int getOneCluster(const vector<vector<ClusterPoint> > clusters);
-void merge_floor_clusters(PointCloudT::Ptr cloud, 
-			    vector<pcl::PointIndices> cluster_indices);
+void merge_floor_clusters(const PointCloudT::Ptr cloud, 
+			    vector<pcl::PointIndices> &cluster_indices);
 };
 
 #endif
