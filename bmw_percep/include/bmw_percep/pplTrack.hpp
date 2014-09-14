@@ -21,6 +21,7 @@
 #include <pcl/filters/extract_indices.h>
 #include <bmw_percep/ppl_detection.hpp>
 #include <bmw_percep/shr_cv_utils.hpp>
+#include <bmw_percep/particleFilter.hpp>
 #include <math.h>
 
 //ros-includes
@@ -68,39 +69,39 @@ typedef struct ClusterStats ClusterStats;
 class PplTrack
 {
 public:
-  //Constructor if ground plane required
-  PplTrack(Eigen::Vector4f ground_coeffs);
+//Constructor if ground plane required
+PplTrack(Eigen::Vector4f ground_coeffs);
   
-  //If pointcloud in table_link frame
-  PplTrack(float z);
+//If pointcloud in table_link frame
+PplTrack(float z);
 
-  void estimate(vector<vector<ClusterPoint> > clusters);
-  
-  // Takes in point cloud 
-  // (background subtracted or not undecided)
-  // Performs the complete pipeline of PC 
-  // processing and then estimates the position of
-  // person or people
-  void estimate(PointCloudT::Ptr& cloud, 
+void estimate(vector<vector<ClusterPoint> > clusters);
+
+// Takes in point cloud 
+// (background subtracted or not undecided)
+// Performs the complete pipeline of PC 
+// processing and then estimates the position of
+// person or people
+void estimate(PointCloudT::Ptr& cloud, 
 		vector<vector<ClusterPoint> > &clusters,
 		const Eigen::VectorXf ground_coeffs,
 		const Eigen::Vector3f robo_loc,
-		  bool got_tf_robot,
+		bool got_tf_robot,
 		float leaf_size=0.06);
   
-  void visualize(ros::Publisher pub);
+void visualize(ros::Publisher pub);
 
-  void set_viz_frame(string viz_frame)
-  {viz_frame_ = viz_frame;}
+void set_viz_frame(string viz_frame)
+{viz_frame_ = viz_frame;}
 
-  //removes points from the cloud that are not part of 
-  //the defined workspace..
-  void workspace_limit(PointCloudT::Ptr& cloud);
+//removes points from the cloud that are not part of 
+//the defined workspace..
+void workspace_limit(PointCloudT::Ptr& cloud);
 
-  //remove points belonging to the robot
-  //currently removes an infinite .5m cylinder
-  //from the base_link
-  void robot_remove(PointCloudT::Ptr &cloud,
+//remove points belonging to the robot
+//currently removes an infinite .5m cylinder
+//from the base_link
+void robot_remove(PointCloudT::Ptr &cloud,
 		    Eigen::Vector3f robo_loc);
 //Apply rules to "rule-out" the clusters not
 //satisfying human rules
@@ -120,16 +121,19 @@ void get_clusters_stats(PointCloudT::ConstPtr cloud,
 private:
 bool table_link;
 int person_id_; // the index of the person from the person clusters
-  PointCloudT::Ptr cur_cloud_;
-  Eigen::Vector4f ground_coeffs_;
-  string viz_frame_;
+PointCloudT::Ptr cur_cloud_;
+Eigen::Vector4f ground_coeffs_;
+string viz_frame_;
 vector<vector<ClusterPoint> > per_cs_; // person clusters
 vector<ClusterStats> per_stats_;
-  vector<ClusterPoint> cur_pos_;
+vector<vector<ClusterStats> > history_per_stats_; //keeps history of person stats
+vector<ClusterPoint> cur_pos_;
 float max_height_, min_height_, max_dist_gr_;
 int max_c_size_, min_c_size_;
 bool more_than_one_;
 ros::Time pub_time; //time-stamp associated with human estimation
+particleFilter2D human_tracker_;
+
 
 //member functions
 void reset_vals(); //resets the variables for calculating anew

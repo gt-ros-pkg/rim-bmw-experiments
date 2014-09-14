@@ -15,6 +15,7 @@ PplTrack::PplTrack(Eigen::Vector4f ground_coeffs)
 {
   table_link = false;
   ground_coeffs_ = ground_coeffs;
+  history_per_stats_.clear();
 }
 
 void PplTrack::estimate(vector<vector<ClusterPoint> > clusters)
@@ -353,6 +354,7 @@ PplTrack::PplTrack(float z){
   max_height_=2.3; min_height_=1.0; max_dist_gr_=0.4;
   max_c_size_=1800; min_c_size_=100;
 
+  history_per_stats_.clear();
 }
 
 void PplTrack::robot_remove(PointCloudT::Ptr &cloud,

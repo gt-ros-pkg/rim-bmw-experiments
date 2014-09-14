@@ -136,6 +136,7 @@ add_executable(tracker_3D
   src/groundPlane.cpp
   src/shr_cv_utils.cpp
   src/ppl_detection.cpp
+  src/particleFilter.cpp
   src/tracker_3D.cpp)
 
 add_executable(pub_pcd
