@@ -22,6 +22,7 @@
 #include <bmw_percep/ppl_detection.hpp>
 #include <bmw_percep/shr_cv_utils.hpp>
 #include <bmw_percep/particleFilter.hpp>
+#include <queue>
 #include <math.h>
 
 //ros-includes
@@ -126,7 +127,8 @@ Eigen::Vector4f ground_coeffs_;
 string viz_frame_;
 vector<vector<ClusterPoint> > per_cs_; // person clusters
 vector<ClusterStats> per_stats_;
-vector<vector<ClusterStats> > history_per_stats_; //keeps history of person stats
+queue<vector<ClusterStats> > history_per_stats_; //keeps history of person stats
+int history_size_; // number of frames to keep in history
 vector<ClusterPoint> cur_pos_;
 float max_height_, min_height_, max_dist_gr_;
 int max_c_size_, min_c_size_;
@@ -141,6 +143,9 @@ void estimate(vector<ClusterPoint> cluster);
 int getOneCluster(const vector<vector<ClusterPoint> > clusters);
 void merge_floor_clusters(const PointCloudT::Ptr cloud, 
 			    vector<pcl::PointIndices> &cluster_indices);
+void clear_history();
+
+
 };
 
 #endif

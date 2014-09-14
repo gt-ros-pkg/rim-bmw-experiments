@@ -15,7 +15,7 @@ PplTrack::PplTrack(Eigen::Vector4f ground_coeffs)
 {
   table_link = false;
   ground_coeffs_ = ground_coeffs;
-  history_per_stats_.clear();
+  clear_history();
 }
 
 void PplTrack::estimate(vector<vector<ClusterPoint> > clusters)
@@ -246,8 +246,14 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 
     //TODO:Publish people properties
     
-    //TODO: Track them
+    // Track them
+    
 
+    //store history
+    if (history_per_stats_.size() < history_size_)
+      history_per_stats_.pop();
+    history_per_stats_.push(per_stats_);
+    
     //debug
     // visualize by painting each PC another color
     // pcl::copyPointCloud(*no_ground_cloud, *cloud_filtered);
@@ -292,7 +298,9 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     viz_cloud->is_dense = true;
 
     cloud = viz_cloud;
-
+    
+    
+    
   }
 }
 
@@ -354,7 +362,9 @@ PplTrack::PplTrack(float z){
   max_height_=2.3; min_height_=1.0; max_dist_gr_=0.4;
   max_c_size_=1800; min_c_size_=100;
 
-  history_per_stats_.clear();
+  history_size_ = 10;
+
+  clear_history();
 }
 
 void PplTrack::robot_remove(PointCloudT::Ptr &cloud,
@@ -546,4 +556,10 @@ void PplTrack::reset_vals()
   per_stats_.clear();
   cur_pos_.clear();
   more_than_one_ = false;
+}
+
+void PplTrack::clear_history()
+{
+  queue<vector<ClusterStats> > empty_hist;
+  swap(history_per_stats_, empty_hist);
 }
