@@ -72,6 +72,7 @@ int main (int argc, char** argv)
       //int a =1;
       //new_cloud_available_flag = true;
       cout << "\n Continue On.." << endl;
+      new_cloud_available_flag = false;
       //continue;
       //debug
       //if (nframes>100)
@@ -84,6 +85,7 @@ int main (int argc, char** argv)
 // callback:
 void pc_call(const pcl::PCLPointCloud2 temp_cloud)
 {
+  cout << "Timestamp: " << temp_cloud.header.stamp << endl;
   pcl::fromPCLPointCloud2(temp_cloud, *cloud);
     new_cloud_available_flag = true;
 }

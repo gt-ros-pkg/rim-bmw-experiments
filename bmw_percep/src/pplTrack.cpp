@@ -50,6 +50,8 @@ void PplTrack::estimate(vector<ClusterPoint> cluster)
 
 int PplTrack::getOneCluster(const vector<vector<ClusterPoint> > clusters)
 {
+  //can only get cluster if size not zero
+  if (clusters.size()>0){
   //Presently chooses the one with max number of points
   int max_size=0;
   int max_id=0; int cur_id=0;
@@ -64,68 +66,118 @@ int PplTrack::getOneCluster(const vector<vector<ClusterPoint> > clusters)
   }
   
   return max_id;
-    
+  }
+  
+  else{return -1;}
 }
 
 //Only points to the person's position yet
 //Also publishes a cylinder enclosing the trunk
 void PplTrack::visualize(ros::Publisher pub)
 {
+  //debug
+  cout << "Person ID: " << person_id_ << endl;
+  if(person_id_>-1){
+  //markers object
   visualization_msgs::MarkerArray mark_arr;
-
   mark_arr.markers.clear();
-  for(vector<ClusterPoint>::iterator cpit=cur_pos_.begin(); 
-      cpit!=cur_pos_.end(); ++cpit){
-    ClusterPoint per_pos = *cpit;
-    visualization_msgs::Marker pos_marker;
-    // Set the frame ID and timestamp.  
-    pos_marker.header.frame_id = viz_frame_;
+
+  //assumption- one person only
+  ClusterStats per_stats = per_stats_[person_id_];
+
+  //Inner-cylinder marker
+  visualization_msgs::Marker inn_cyl_marker;
+  // Set the frame ID and timestamp.  
+  inn_cyl_marker.header.frame_id = viz_frame_;
   
-    //debug
-    cout << "Frame is " << viz_frame_ << endl;
-    pos_marker.header.stamp = ros::Time::now();
+  // //debug
+  // cout << "Frame is " << viz_frame_ << endl;
+  inn_cyl_marker.header.stamp = pub_time;
 
-    // Set the namespace and id for this marker.  This serves to create a unique ID
-    // Any marker sent with the same namespace and id will overwrite the old one
-    pos_marker.ns = "human";
-    pos_marker.id = 0;
+  // Set the namespace and id for this marker.  This serves to create a unique ID
+  // Any marker sent with the same namespace and id will overwrite the old one
+  inn_cyl_marker.ns = "human";
+  //TODO: use enum and not these numbers
+  inn_cyl_marker.id = 0;
 
-    // Set the marker type to Cylinder
-    uint32_t cylinder = visualization_msgs::Marker::CYLINDER;
-    uint32_t sphere = visualization_msgs::Marker::SPHERE;
-    pos_marker.type = cylinder;
+  // Set the marker type to Cylinder
+  uint32_t cylinder = visualization_msgs::Marker::CYLINDER;
+  uint32_t sphere = visualization_msgs::Marker::SPHERE;
+  inn_cyl_marker.type = cylinder;
 
-    // Set the pos_marker action
-    pos_marker.action = visualization_msgs::Marker::ADD;
+  // Set the inn_cyl_marker action
+  inn_cyl_marker.action = visualization_msgs::Marker::ADD;
 
-  // Set the pose of the pos_marker.  This is a full 6DOF pose relative to the frame/time specified in the header
-  pos_marker.pose.position.x = per_pos(0);
-  pos_marker.pose.position.y = per_pos(1);
-  pos_marker.pose.position.z = per_pos(2);
-  pos_marker.pose.orientation.x = 0.0;
-  pos_marker.pose.orientation.y = 0.0;
-  pos_marker.pose.orientation.z = 0.0;
-  pos_marker.pose.orientation.w = 1.0;
+
+  // inn_cyl_marker.scale.x = (per_stats.max(0)-per_stats.min(0));
+  // inn_cyl_marker.scale.y = (per_stats.max(1)-per_stats.min(1));
+  // inn_cyl_marker.scale.z = (per_stats.max(2)); // only distance from ground
+
+  // Set the pose of the inn_cyl_marker.  This is a full 6DOF pose relative to the frame/time specified in the header
+  inn_cyl_marker.pose.position.x = per_stats.median(0);//(per_stats.max(0)+per_stats.min(0))/2;
+  inn_cyl_marker.pose.position.y = per_stats.median(1);//(per_stats.max(1)+per_stats.min(1))/2;
+  inn_cyl_marker.pose.position.z = (per_stats.max(2))/2; // only distance from ground
+
+  //the cylinder is oriented along z
+  inn_cyl_marker.pose.orientation.x = 0.0;
+  inn_cyl_marker.pose.orientation.y = 0.0;
+  inn_cyl_marker.pose.orientation.z = 0.0;
+  inn_cyl_marker.pose.orientation.w = 1.0;
+
+  // Set the scale of the inn_cyl_marker -- 1x1x1 here means 1m on a side
+  inn_cyl_marker.scale.x = sqrt(per_stats.var(0))*2.0;
+  inn_cyl_marker.scale.y = sqrt(per_stats.var(1))*2.0; 
+  inn_cyl_marker.scale.z = (per_stats.max(2)); // only distance from ground
+
   
-  // Set the scale of the pos_marker -- 1x1x1 here means 1m on a side
-  pos_marker.scale.x = 0.6;
-  pos_marker.scale.y = 0.6;
-  pos_marker.scale.z = 0.6;
+  //debug
+  cout << "Positions set.. " << endl;
+  
   
   // Set the color -- be sure to set alpha to something non-zero!
-  pos_marker.color.r = 1.0f;
-  pos_marker.color.g = 0.0f;
-  pos_marker.color.b = 0.0f;
-  pos_marker.color.a = 1.0;
+  inn_cyl_marker.color.r = 0.0f;
+  inn_cyl_marker.color.g = 0.0f;
+  inn_cyl_marker.color.b = 1.0f;
+  inn_cyl_marker.color.a = 1.0;
 
-  // pos_marker.pose.position.z += pos_marker.scale.z/2;
+  //debug
+  cout << "Colors set.. " << endl;
+
+  // inn_cyl_marker.pose.position.z += inn_cyl_marker.scale.z/2;
   
-  pos_marker.lifetime = ros::Duration();
+  inn_cyl_marker.lifetime = ros::Duration();
 
+  mark_arr.markers.push_back(inn_cyl_marker);
 
-  mark_arr.markers.push_back(pos_marker);
-  }
+  //add the outer human cylinder
+  visualization_msgs::Marker out_cyl_marker;
+  out_cyl_marker = inn_cyl_marker;
+
+  out_cyl_marker.id = 1;
+
+  // Set the scale of the out_cyl_marker -- 1x1x1 here means 1m on a side
+  float scale_x = (std::max(std::fabs(per_stats.max(0)-out_cyl_marker.scale.x),
+			    std::fabs(-per_stats.min(0)+out_cyl_marker.scale.x)));
+  float scale_y = (std::max(std::fabs(per_stats.max(1)-out_cyl_marker.scale.y),
+			    std::fabs(-per_stats.min(1)+out_cyl_marker.scale.y)));
+
+  out_cyl_marker.scale.x = scale_x;
+  out_cyl_marker.scale.y = scale_y; 
+  out_cyl_marker.scale.z = (per_stats.max(2)); // only distance from ground
+
+  // Set the color -- be sure to set alpha to something non-zero!
+  out_cyl_marker.color.r = 1.0f;
+  out_cyl_marker.color.g = 0.0f;
+  out_cyl_marker.color.b = 0.0f;
+  out_cyl_marker.color.a = 0.5;
+
+  mark_arr.markers.push_back(out_cyl_marker);
+  
   pub.publish(mark_arr);
+  }
+  else // in case no people detected
+    {//TODO:delete visualization from earlier?
+    }
 }
 
 void PplTrack::estimate(PointCloudT::Ptr& cloud, 
@@ -135,6 +187,8 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 			bool got_tf_robot,
 			float leaf_size/*=0.06*/)
 {
+  reset_vals();
+  
   if (!table_link){
     PointCloudT::Ptr viz_cloud(new PointCloudT);
     //workspace_limit(cloud);
@@ -168,18 +222,30 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     ec.setInputCloud (cloud);
     ec.extract (cluster_indices);
 
-    // //debug
-    // cout << "Initial no. of clusters : " << cluster_indices.size() << endl;
     //merge
     merge_floor_clusters(cloud, cluster_indices);
-    // //debug
-    // cout << "After merge operation : " << cluster_indices.size() << endl;
+
     //remove clusters acc to rules
     rm_clusters_rules(cloud, cluster_indices);
-    // //debug
-    // cout << "After applying the rules : " << cluster_indices.size() << endl;
-    // string whatupp;
-    // cin >> whatupp;
+
+    cout << "Problem with assigning cluster if empty?" << endl;
+    //assign person clusters to the private member
+    assign_ppl_clusters(cloud, cluster_indices);
+    cout << "No its not, haha.." << endl;
+    //this is our guy/gal
+    person_id_ = getOneCluster(per_cs_);
+
+    if (per_cs_.size()>1)
+      more_than_one_=true;
+    else
+      more_than_one_=false;
+    
+    //TODO: May be publish the timestamp of PointCloud instead
+    pub_time = ros::Time::now();
+
+    //TODO:Publish people properties
+    
+    //TODO: Track them
 
     //debug
     // visualize by painting each PC another color
@@ -393,8 +459,9 @@ void PplTrack::get_clusters_stats(PointCloudT::ConstPtr cloud,
   //Go through cluster indices and take statistics
   for(vector<pcl::PointIndices>::const_iterator cit = cluster_indices.begin();
       cit != cluster_indices.end(); ++cit){
-    accumulator_set< float, stats<tag::mean, tag::moment<2>, 
-  				  tag::min, tag::max> > x_acc, y_acc, z_acc; 
+    accumulator_set< float, stats<tag::mean, tag::variance, 
+  				  tag::min, tag::max, 
+				  tag::median> > x_acc, y_acc, z_acc; 
     for(vector<int>::const_iterator pint = cit->indices.begin(); 
     	pint!=cit->indices.end(); ++pint){
       PointT p = cloud->points[*pint];
@@ -404,9 +471,18 @@ void PplTrack::get_clusters_stats(PointCloudT::ConstPtr cloud,
     }
     ClusterStats cluster_stats; //Stats for one cluster
     cluster_stats.mean = ClusterPoint(boost::accumulators::mean(x_acc), boost::accumulators::mean(y_acc), boost::accumulators::mean(z_acc));
-    cluster_stats.var = ClusterPoint(moment<2>(x_acc), moment<2>(y_acc), moment<2>(z_acc));
+    cluster_stats.var = ClusterPoint(variance(x_acc), variance(y_acc), variance(z_acc));
     cluster_stats.min = ClusterPoint(boost::accumulators::min(x_acc), boost::accumulators::min(y_acc), boost::accumulators::min(z_acc));    
     cluster_stats.max = ClusterPoint(boost::accumulators::max(x_acc), boost::accumulators::max(y_acc), boost::accumulators::max(z_acc));    
+    cluster_stats.median = ClusterPoint(boost::accumulators::median(x_acc), boost::accumulators::median(y_acc), boost::accumulators::median(z_acc));    
+
+  //   //debug
+  //    cout << "Std Devs: (" << sqrt(cluster_stats.var(0)) << ',' <<
+  //     sqrt(cluster_stats.var(1)) << ',' << sqrt(cluster_stats.var(2)) << ")" << endl;
+  //   cout << "Diff ranges: (" << cluster_stats.max(0)-cluster_stats.min(0) << ',' <<
+  //     cluster_stats.max(1)-cluster_stats.min(1) << ',' << cluster_stats.max(2)-cluster_stats.min(2)
+  //      << ")" << endl;
+  // // string whadupp; cin>>whadupp;
 
     clusters_stats.push_back(cluster_stats);
   }
@@ -438,4 +514,34 @@ void PplTrack::rm_clusters_rules(const PointCloudT::Ptr &cloud,
     }
   }
   cs_indices = cs_new;
+}
+
+void PplTrack::assign_ppl_clusters(PointCloudT::ConstPtr cloud, 
+				   const vector<pcl::PointIndices> cluster_indices)
+{
+  per_cs_.clear();
+  for(vector<pcl::PointIndices>::const_iterator cit = cluster_indices.begin();
+      cit != cluster_indices.end(); ++cit){
+    vector<ClusterPoint> cur_c;
+    for(vector<int>::const_iterator pint = cit->indices.begin(); 
+    	pint!=cit->indices.end(); ++pint){
+      PointT p = cloud->points[*pint];
+      ClusterPoint cur_pt(p.x, p.y,p.z);
+      cur_c.push_back(cur_pt);
+    }
+    per_cs_.push_back(cur_c);
+  }
+
+  //get statistics
+  get_clusters_stats(cloud, cluster_indices, per_stats_);
+}
+
+void PplTrack::reset_vals()
+{
+  person_id_ = -1;
+  cur_cloud_ = PointCloudT::Ptr(new PointCloudT);
+  per_cs_.clear();
+  per_stats_.clear();
+  cur_pos_.clear();
+  more_than_one_ = false;
 }

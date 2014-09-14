@@ -21,6 +21,7 @@
 #include <pcl/filters/extract_indices.h>
 #include <bmw_percep/ppl_detection.hpp>
 #include <bmw_percep/shr_cv_utils.hpp>
+#include <math.h>
 
 //ros-includes
 #include<ros/ros.h>
@@ -37,13 +38,16 @@
 #include <boost/accumulators/statistics/moment.hpp>
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/median.hpp>
+#include <boost/accumulators/statistics/variance.hpp>
 
-#define RANDOM_COLORS true
+#define RANDOM_COLORS false
 
 /**
    
    Class *definition* for tracking people from RGBD imagery.
    Uses PCL.
+
 **/
 
 using namespace std;
@@ -57,6 +61,7 @@ ClusterPoint mean;
 ClusterPoint var; //variance
 ClusterPoint min; 
 ClusterPoint max; //all these stats are taken independent in the dimensions
+ClusterPoint median;
 };
 typedef struct ClusterStats ClusterStats;
 
@@ -102,6 +107,11 @@ public:
 void rm_clusters_rules(const PointCloudT::Ptr &cloud,
 			 vector<pcl::PointIndices> &cs_indices);
 
+
+//assign clusters to the private member
+void assign_ppl_clusters(PointCloudT::ConstPtr cloud, 
+			   const vector<pcl::PointIndices> cluster_indices);
+
 //Get statistics on the clusters
 void get_clusters_stats(PointCloudT::ConstPtr cloud, 
 			  const vector<pcl::PointIndices> cluster_indices,
@@ -109,15 +119,20 @@ void get_clusters_stats(PointCloudT::ConstPtr cloud,
 
 private:
 bool table_link;
-  vector<int> person_ids_;
+int person_id_; // the index of the person from the person clusters
   PointCloudT::Ptr cur_cloud_;
   Eigen::Vector4f ground_coeffs_;
   string viz_frame_;
+vector<vector<ClusterPoint> > per_cs_; // person clusters
+vector<ClusterStats> per_stats_;
   vector<ClusterPoint> cur_pos_;
 float max_height_, min_height_, max_dist_gr_;
 int max_c_size_, min_c_size_;
+bool more_than_one_;
+ros::Time pub_time; //time-stamp associated with human estimation
 
 //member functions
+void reset_vals(); //resets the variables for calculating anew
 void estimate(vector<ClusterPoint> cluster);
 int getOneCluster(const vector<vector<ClusterPoint> > clusters);
 void merge_floor_clusters(const PointCloudT::Ptr cloud, 

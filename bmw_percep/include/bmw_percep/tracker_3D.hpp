@@ -78,7 +78,7 @@ got_transform_ = false;
   cout << "Are you even compiling?" << endl;
   frame_rate=30;
   string pub_topic = "/human/debug/pc";
-  string file_topic = "/read_pcd"; 
+  string file_topic = "/read_pcd";
   string live_bg_topic = "/subtracted_read_pcd";
   string live_topic = "/kinect_both/depth_registered/points";
   // string sub_topic = live_bg_topic;
@@ -162,8 +162,10 @@ got_transform_ = false;
       ppl_tracker.set_viz_frame(hum_frame);
       ppl_frame_set=true;}
   
+    //debug
+    cout << "Problem with visualize??" << endl;
     ppl_tracker.visualize(pub_viz);
-
+    cout << "No its not. Haha" << endl;
     // pcl::copyPointCloud(*cloud, *viz_cloud);
     if (cloud->points.size()>0){
       pcl::copyPointCloud(*cloud, *tcloud);
@@ -212,7 +214,7 @@ void Tracker3d::pc_call(const PointCloudT::ConstPtr& temp_cloud)
     return;
   }
 
-got_transform_ = true;
+  got_transform_ = true;
 
   Eigen::Vector3d temp_vec;
   tf::vectorTFToEigen(robo_form.getOrigin(), temp_vec);
