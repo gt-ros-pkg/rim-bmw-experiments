@@ -259,7 +259,7 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
 
     //visualize velocity if present
     if(!isnan(person.vel(0))){
-      double frame_rate = 1./30.;
+      double frame_rate = 30.;
       double delta_t = 1 * frame_rate; // 1 secs
       double vel_mag = person.vel.norm();
       double mark_scale = delta_t * vel_mag;
@@ -337,6 +337,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
   }
   else{
     
+    // human_tracker_.set_image(cloud);
     PointCloudT::Ptr viz_cloud(new PointCloudT);
 
     workspace_limit(cloud);
@@ -396,6 +397,10 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	  //assign to the estimate
 	  pers_est_.pos = Eigen::Vector2f(cur_pos.x, cur_pos.y);
 	  pers_est_.vel = Eigen::Vector2f(cur_vel.x, cur_vel.y);
+	  // pers_est_.vel = Eigen::Vector2f(1., 1.);
+	  
+	  //debug
+	  cout << "Velocity = " << cur_vel << endl;
 	}
 	else{
 	  cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
@@ -542,6 +547,12 @@ PplTrack::PplTrack(float z){
 
   max_height_=2.3; min_height_=1.0; max_dist_gr_=0.4;
   max_c_size_=1800; min_c_size_=100;
+  
+  ws_min_ = Eigen::Vector3f(.05, .84, -ground_coeffs_(3));
+  ws_max_ = Eigen::Vector3f(4.3, 4.0, 5.0);
+  human_tracker_.set_range_gran(Eigen::Vector2f(ws_min_(0), ws_min_(1)), 
+				Eigen::Vector2f(ws_max_(0), ws_max_(1)),
+				0.06);
 
   history_size_ = 10;
   currently_filtering_ = false;
@@ -651,11 +662,12 @@ void PplTrack::get_clusters_stats(PointCloudT::ConstPtr cloud,
   //Get cluster statistics
   clusters_stats.clear();
 
-  float t_max=-100.0, t_min=100.0;
 
   //Go through cluster indices and take statistics
   for(vector<pcl::PointIndices>::const_iterator cit = cluster_indices.begin();
       cit != cluster_indices.end(); ++cit){
+    float t_max=-100.0, t_min=100.0;
+
     accumulator_set< float, stats<tag::mean, tag::variance, 
   				  tag::min, tag::max, 
 				  tag::median> > x_acc, y_acc, z_acc; 

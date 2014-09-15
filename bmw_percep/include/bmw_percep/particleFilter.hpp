@@ -7,6 +7,9 @@
 #include<numeric>
 #include<boost/random/normal_distribution.hpp>
 #include<limits>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+
 /**
    Class *definitions* for 2D particle filter
    -- has a bit of unnecessary dependence on OpenCV - to get rid of later
@@ -18,6 +21,8 @@
 using namespace std;
 
 typedef vector<vector< double> > State;  // x, y, vx, vy and weights
+typedef pcl::PointXYZRGB PointT;
+typedef pcl::PointCloud<PointT> PointCloudT;
 
 class particleFilter2D{
 public:
@@ -45,6 +50,14 @@ public:
   //point-estimate of the state given an observation of position & velocity
   void estimate(const cv::Point2f obs, const cv::Point2f obs_vel, 
 		cv::Point2f &pos, cv::Point2f &vel);
+  
+  //set the image to overlay particles on
+  void set_image(const typename PointCloudT::ConstPtr cloud);
+
+  //overlay the image with particles
+  void overlay_w_points();
+  //set range of workspace and the leaf size
+  void set_range_gran(Eigen::Vector2f r_min, Eigen::Vector2f r_max, float leaf);
 
 private:
   void reweigh(cv::Point2f obs, double sigma=1.0); //reweigh particles
@@ -74,5 +87,8 @@ private:
   double effective_part_thresh; // if the ratio of effective to
 				// ineffictive particles goes below
 				// threshold then resample
+  cv::Point2f r_min_, r_max_; //workspace range
+  double leaf_size_;
+  cv::Mat overlay_im_;
   boost::mt19937 gen;
 };

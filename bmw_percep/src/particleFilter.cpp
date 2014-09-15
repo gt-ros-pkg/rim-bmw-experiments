@@ -104,7 +104,10 @@ particleFilter2D::particleFilter2D()
 void particleFilter2D::estimate(const cv::Point2f obs, const cv::Point2f obs_vel, 
 	      cv::Point2f &pos, cv::Point2f &vel)
 {
-  // weigh them according to observation
+  //debug
+  cout << "Observed Velocity = " << obs_vel << endl;
+
+  // weigh them according to observed position and velocity
   reweigh(obs, obs_vel);
 
   // get effective number of particles
@@ -464,4 +467,69 @@ void particleFilter2D::resample_particles()
   
   //copy over to the class variable
   cur_state = temp_state;
+}
+
+
+void particleFilter2D::set_image(const typename PointCloudT::ConstPtr cloud)
+{
+  if(!cloud->empty()){
+
+    size_t rows= std::floor((r_max_.x-r_min_.x)/leaf_size_);
+    size_t cols= std::floor((r_max_.y-r_min_.y)/leaf_size_);
+
+    overlay_im_ = cv::Mat::zeros(rows, cols, CV_8UC3);
+
+    //assumes that min. depth of a point is zero
+    cv::Mat dep_im = cv::Mat::zeros(rows, cols, CV_32F);
+
+    for(size_t i=0; i<cloud->size(); ++i){
+      PointT pt = (*cloud)[i];
+      //check ranges and push to image if satisfied
+      if(pt.x>r_min_.x && pt.x<r_max_.x){
+  	if(pt.y>r_min_.y && pt.y<r_max_.y){
+  	  cv::Point p2;
+  	  p2.x = floor((pt.x-r_min_.x)/leaf_size_);
+  	  p2.y = floor((pt.y-r_min_.y)/leaf_size_);
+
+  	  if(p2.x>(rows-1))
+  	    p2.x = rows-1;
+  	  if(p2.y>(cols-1))
+  	    p2.y = cols-1;
+
+  	  if(pt.z>dep_im.at<float>(p2.x, p2.y)){
+	    uchar* temp_col = overlay_im_.ptr<uchar>(p2.x, p2.y);
+
+	    // temp_col[0] = static_cast<uchar>(std::floor(pt.b*255));
+	    // temp_col[1] = static_cast<uchar>(std::floor(pt.g*255));
+	    // temp_col[2] = static_cast<uchar>(std::floor(pt.r*255));
+
+	    temp_col[0] = pt.b;
+	    temp_col[1] = pt.g;
+	    temp_col[2] = pt.r;
+	      
+	    //debug
+	    cout << "From point = (" << pt.b << ',' << pt.g << ',' << pt.r
+		 << ')' << endl;
+	    cout << "I get = (" << temp_col[0] << ',' << temp_col[1] << ',' 
+		 << temp_col[2]
+		 << ')' << endl;
+
+	    dep_im.at<float>(p2.x, p2.y) = pt.z;
+  	  }
+  	}
+      }
+    }
+  }
+
+  cv::Mat disp_im;
+  cv::resize(overlay_im_, disp_im, cv::Size(0,0), 10., 10.);
+  imshow("To Overlay", disp_im); cv::waitKey(1);
+  return;
+}
+
+void particleFilter2D::set_range_gran(Eigen::Vector2f r_min, Eigen::Vector2f r_max, float leaf)
+{
+  r_max_ = cv::Point2f(r_max(0), r_max(1));
+  r_min_ = cv::Point2f(r_min(0), r_min(1));
+  leaf_size_ = leaf;
 }

@@ -157,6 +157,7 @@ ros::Time pub_time; //time-stamp associated with human estimation
 particleFilter2D human_tracker_;
 bool currently_filtering_; //does the particle filter need reinitialization?
   PersProp pers_obs_, pers_est_; //current person observation and the estimate
+  Eigen::Vector3f ws_max_, ws_min_; //max and min range for workspace
 
 //member functions
 void reset_vals(); //resets the variables for calculating anew
