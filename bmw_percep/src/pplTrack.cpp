@@ -157,13 +157,17 @@ void PplTrack::visualize(ros::Publisher pub)
   out_cyl_marker.id = 1;
 
   // Set the scale of the out_cyl_marker -- 1x1x1 here means 1m on a side
-  float scale_x = (std::max(std::fabs(per_stats.max(0)-out_cyl_marker.scale.x),
-			    std::fabs(-per_stats.min(0)+out_cyl_marker.scale.x)));
-  float scale_y = (std::max(std::fabs(per_stats.max(1)-out_cyl_marker.scale.y),
-			    std::fabs(-per_stats.min(1)+out_cyl_marker.scale.y)));
+  // float scale_x = (std::max(std::fabs(per_stats.max(0)-out_cyl_marker.scale.x),
+  // 			    std::fabs(-per_stats.min(0)+out_cyl_marker.scale.x)));
+  // float scale_y = (std::max(std::fabs(per_stats.max(1)-out_cyl_marker.scale.y),
+  // 			    std::fabs(-per_stats.min(1)+out_cyl_marker.scale.y)));
+  float scale_x = (std::max(std::fabs(per_stats.max(0)-out_cyl_marker.pose.position.x),
+  			    std::fabs(-per_stats.min(0)+out_cyl_marker.pose.position.x)));
+  float scale_y = (std::max(std::fabs(per_stats.max(1)-out_cyl_marker.pose.position.y),
+  			    std::fabs(-per_stats.min(1)+out_cyl_marker.pose.position.y)));
 
-  out_cyl_marker.scale.x = scale_x;
-  out_cyl_marker.scale.y = scale_y; 
+  out_cyl_marker.scale.x = 2*scale_x; //diameter
+  out_cyl_marker.scale.y = 2*scale_y;
   out_cyl_marker.scale.z = (per_stats.max(2)); // only distance from ground
 
   // Set the color -- be sure to set alpha to something non-zero!
@@ -179,6 +183,85 @@ void PplTrack::visualize(ros::Publisher pub)
   else // in case no people detected
     {//TODO:delete visualization from earlier?
     }
+}
+
+
+void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp person, string name_space)
+{
+  if(!(isnan(person.pos(0)) && isnan(person.pos(1)))){
+    //markers object
+    visualization_msgs::MarkerArray mark_arr;
+    mark_arr.markers.clear();
+
+    //Inner-cylinder marker
+    visualization_msgs::Marker inn_cyl_marker;
+    // Set the frame ID and timestamp.  
+    inn_cyl_marker.header.frame_id = viz_frame_;
+    inn_cyl_marker.header.stamp = pub_time;
+
+    // Set the namespace and id for this marker.  This serves to create a unique ID
+    // Any marker sent with the same namespace and id will overwrite the old one
+    inn_cyl_marker.ns = name_space;
+    //TODO: use enum and not these numbers
+    inn_cyl_marker.id = 0;
+
+    // Set the marker type to Cylinder
+    uint32_t cylinder = visualization_msgs::Marker::CYLINDER;
+    inn_cyl_marker.type = cylinder;
+
+    // Set the inn_cyl_marker action
+    inn_cyl_marker.action = visualization_msgs::Marker::ADD;
+
+    // Set the pose of the inn_cyl_marker.  This is a full 6DOF pose relative to the frame/time specified in the header
+    inn_cyl_marker.pose.position.x = person.pos(0);
+    inn_cyl_marker.pose.position.y = person.pos(1);
+    inn_cyl_marker.pose.position.z = person.height/2;
+
+    //the cylinder is oriented along z
+    inn_cyl_marker.pose.orientation.x = 0.0;
+    inn_cyl_marker.pose.orientation.y = 0.0;
+    inn_cyl_marker.pose.orientation.z = 0.0;
+    inn_cyl_marker.pose.orientation.w = 1.0;
+
+    // Set the scale of the inn_cyl_marker -- 1x1x1 here means 1m on a side
+    inn_cyl_marker.scale.x = person.inn_cyl(0);
+    inn_cyl_marker.scale.y = person.inn_cyl(1);
+    inn_cyl_marker.scale.z = person.height; // only distance from ground
+
+    // Set the color -- be sure to set alpha to something non-zero!
+    inn_cyl_marker.color.r = color(0);
+    inn_cyl_marker.color.g = color(1);
+    inn_cyl_marker.color.b = color(2);
+    inn_cyl_marker.color.a = 0.5;
+
+    inn_cyl_marker.lifetime = ros::Duration();
+    mark_arr.markers.push_back(inn_cyl_marker);
+
+    //add the outer human cylinder
+    visualization_msgs::Marker out_cyl_marker;
+    out_cyl_marker = inn_cyl_marker;
+
+    out_cyl_marker.id = 1;
+
+    // Set the scale of the out_cyl_marker -- 1x1x1 here means 1m on a side
+    out_cyl_marker.scale.x = person.out_cyl(0);
+    out_cyl_marker.scale.y = person.out_cyl(1);
+    //the z-scale remains the same
+
+    // Set the color -- be sure to set alpha to something non-zero!
+    out_cyl_marker.color.r = color(0);
+    out_cyl_marker.color.g = color(1);
+    out_cyl_marker.color.b = color(2);
+    out_cyl_marker.color.a = 0.5;
+
+    mark_arr.markers.push_back(out_cyl_marker);
+  
+    pub.publish(mark_arr);
+  }
+  else{
+    //No Publish if no observation
+    //TODO: delete the message
+  }
 }
 
 void PplTrack::estimate(PointCloudT::Ptr& cloud, 
@@ -229,12 +312,11 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     //remove clusters acc to rules
     rm_clusters_rules(cloud, cluster_indices);
 
-    cout << "Problem with assigning cluster if empty?" << endl;
     //assign person clusters to the private member
     assign_ppl_clusters(cloud, cluster_indices);
-    cout << "No its not, haha.." << endl;
-    //this is our guy/gal
-    person_id_ = getOneCluster(per_cs_);
+
+    //set the observation now that processing is done!
+    set_observation();
 
     if (per_cs_.size()>1)
       more_than_one_=true;
@@ -246,13 +328,58 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 
     //TODO:Publish people properties
     
-    // Track them
+    //Track them
+    if (person_id_>-1){ //current observation=true
+      if (!isnan(history_per_stats_.front().pos(0))){
+	if (currently_filtering_){
+	  human_tracker_.prop_part();
+	  cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
+	  cv::Point2f cur_pos, cur_vel;
+	  cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0), 
+					   history_per_stats_.front().pos(1));
+	  human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
+	
+	  //assign to the estimate
+	  pers_est_.pos = Eigen::Vector2f(cur_pos.x, cur_pos.y);
+	  pers_est_.vel = Eigen::Vector2f(cur_vel.x, cur_vel.y);
+	}
+	else{
+	  cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
+	  cv::Point2f cur_pos, cur_vel;
+	  cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0), 
+					     history_per_stats_.front().pos(1));
+	  
+	  human_tracker_.reinitialize(prev_pos, hum_pt, 
+				    (1.0/static_cast<double> (30)), 1000,
+				    10.0);
+	  
+	  human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
+	  currently_filtering_ = true;
+	}
+      }
+      else{ // no observation -- prev frame
+	currently_filtering_ = false;
+	pers_est_.pos = pers_obs_.pos;
+	pers_est_.vel = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
+				   numeric_limits<float>::quiet_NaN());
+      }
+    }
+    else{ //no observation
+      currently_filtering_ = false;
+      pers_est_.pos = pers_obs_.pos;
+      pers_est_.vel = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
+				     numeric_limits<float>::quiet_NaN());
+    }
     
-
+    //set estimate now that filtering is done
+    set_estimate();
+    
     //store history
-    if (history_per_stats_.size() < history_size_)
-      history_per_stats_.pop();
-    history_per_stats_.push(per_stats_);
+    if (history_per_stats_.size() > history_size_-1)
+      {
+	history_per_stats_.pop();
+      }
+    history_per_stats_.push(pers_est_);
     
     //debug
     // visualize by painting each PC another color
@@ -261,12 +388,12 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     cloud_filtered = cloud;
     viz_cloud->points.clear();
 
-    for (std::vector<pcl::PointIndices>::const_iterator 
+    for (vector<pcl::PointIndices>::const_iterator 
 	   it = cluster_indices.begin (); 
 	 it != cluster_indices.end (); ++it){
       uint8_t r(rand()%255), g(rand()%255), b(rand()%255);
 
-      for (std::vector<int>::const_iterator pit = it->indices.begin (); 
+      for (vector<int>::const_iterator pit = it->indices.begin (); 
 	   pit != it->indices.end (); pit++){
 	// create RGB point to push in
 	PointT new_pt;
@@ -461,12 +588,16 @@ void PplTrack::merge_floor_clusters(const PointCloudT::Ptr cloud,
   cluster_indices = output_indices;
 }
 
+
+//TODO: Get these statistics yourself, no BOOST
 void PplTrack::get_clusters_stats(PointCloudT::ConstPtr cloud, 
 				 const vector<pcl::PointIndices> cluster_indices,
 				 vector<ClusterStats>& clusters_stats)
 {
   //Get cluster statistics
   clusters_stats.clear();
+
+  float t_max=-100.0, t_min=100.0;
 
   //Go through cluster indices and take statistics
   for(vector<pcl::PointIndices>::const_iterator cit = cluster_indices.begin();
@@ -480,7 +611,16 @@ void PplTrack::get_clusters_stats(PointCloudT::ConstPtr cloud,
       x_acc(p.x);
       y_acc(p.y);
       z_acc(p.z);
+      
+      //debug
+      if(t_min>p.x)
+	t_min = p.x;
+      if(t_max<p.x)
+	t_max = p.x;
+
+      
     }
+
     ClusterStats cluster_stats; //Stats for one cluster
     cluster_stats.mean = ClusterPoint(boost::accumulators::mean(x_acc), boost::accumulators::mean(y_acc), boost::accumulators::mean(z_acc));
     cluster_stats.var = ClusterPoint(variance(x_acc), variance(y_acc), variance(z_acc));
@@ -488,13 +628,14 @@ void PplTrack::get_clusters_stats(PointCloudT::ConstPtr cloud,
     cluster_stats.max = ClusterPoint(boost::accumulators::max(x_acc), boost::accumulators::max(y_acc), boost::accumulators::max(z_acc));    
     cluster_stats.median = ClusterPoint(boost::accumulators::median(x_acc), boost::accumulators::median(y_acc), boost::accumulators::median(z_acc));    
 
-  //   //debug
-  //    cout << "Std Devs: (" << sqrt(cluster_stats.var(0)) << ',' <<
-  //     sqrt(cluster_stats.var(1)) << ',' << sqrt(cluster_stats.var(2)) << ")" << endl;
-  //   cout << "Diff ranges: (" << cluster_stats.max(0)-cluster_stats.min(0) << ',' <<
-  //     cluster_stats.max(1)-cluster_stats.min(1) << ',' << cluster_stats.max(2)-cluster_stats.min(2)
-  //      << ")" << endl;
-  // // string whadupp; cin>>whadupp;
+    // //debug
+    // if ((fabs(t_min-boost::accumulators::min(x_acc))>0.0001) || 
+    // 	(fabs(t_max-boost::accumulators::max(x_acc))>0.0001)){
+    // cout << "Accumulators : " << boost::accumulators::max(x_acc) << ", " << boost::accumulators::min(x_acc) << endl;
+    // cout << "ClusterStats : " << cluster_stats.max(0) << ", " << cluster_stats.min(0) << endl;
+    // cout << "Mine : " << t_max << ", " << t_min << endl;
+    // string what; cin>>what;
+    // }
 
     clusters_stats.push_back(cluster_stats);
   }
@@ -560,6 +701,47 @@ void PplTrack::reset_vals()
 
 void PplTrack::clear_history()
 {
-  queue<vector<ClusterStats> > empty_hist;
+  queue<PersProp> empty_hist;
   swap(history_per_stats_, empty_hist);
+}
+
+void PplTrack::set_observation()
+{
+  //this is our guy/gal
+  person_id_ = getOneCluster(per_cs_);
+
+  //set the position
+  if(person_id_>-1){ // in case observation made
+    pers_obs_.pos = Eigen::Vector2f(per_stats_[person_id_].median(0),
+				    per_stats_[person_id_].median(1));
+    
+    //assumption- one person only
+    ClusterStats per_stats = per_stats_[person_id_];
+    pers_obs_.inn_cyl = Eigen::Vector2f(sqrt(per_stats.var(0))*2.0, 
+					sqrt(per_stats.var(1))*2.0);
+    pers_obs_.height = (per_stats.max(2)); // only distance from ground
+    
+    float s_x = 2*std::max(std::fabs(pers_obs_.pos(0)-
+				     per_stats.min(0)), 
+			   std::fabs(-pers_obs_.pos(0)+
+				     per_stats.max(0)));
+    float s_y = 2*std::max(std::fabs(pers_obs_.pos(1)-
+				     per_stats.min(1)), 
+			   std::fabs(-pers_obs_.pos(1)+
+				     per_stats.max(1)));
+    pers_obs_.out_cyl = Eigen::Vector2f(s_x,s_y);
+  }
+  else{
+    pers_obs_.pos = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(), 
+				    numeric_limits<float>::quiet_NaN());
+  }
+}
+
+void PplTrack::set_estimate()
+{
+  //assumption- one person only
+  pers_est_.inn_cyl = pers_obs_.inn_cyl;
+  pers_est_.out_cyl = pers_obs_.out_cyl;
+  pers_est_.height = pers_obs_.height;
+  
 }

@@ -54,10 +54,11 @@ enum { COLS=640, ROWS=480};
 bool got_transform_;
   bool new_cloud_available_flag;
 
-  ros::Subscriber pc_sub;
-  ros::Subscriber pc_sub_;
-  ros::Publisher db_pc;
-  ros::Publisher pub_viz;
+ros::Subscriber pc_sub;
+ros::Subscriber pc_sub_;
+ros::Publisher db_pc;
+ros::Publisher pub_viz;
+ros::Publisher pub_raw_obs;
 
 protected:
   //Pointcloud callback
@@ -84,6 +85,7 @@ got_transform_ = false;
   // string sub_topic = live_bg_topic;
   string sub_topic = file_topic;
   string viz_topic = "/human/visuals";
+  string raw_obs_topic = "/human/observations";
   string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
   robo_frame = "base_link";
 
@@ -99,6 +101,7 @@ got_transform_ = false;
   db_pc = nh.advertise<pcl::PCLPointCloud2> (pub_topic, 1);
 //Publish visualizations for the human
   pub_viz = nh.advertise<visualization_msgs::MarkerArray> (viz_topic, 1);
+  pub_raw_obs = nh.advertise<visualization_msgs::MarkerArray> (raw_obs_topic, 1);
 
   // PointCloudT::Ptr cloud (new PointCloudT);
   PointCloudT::Ptr
@@ -164,7 +167,9 @@ got_transform_ = false;
   
     //debug
     cout << "Problem with visualize??" << endl;
-    ppl_tracker.visualize(pub_viz);
+    // ppl_tracker.visualize(pub_viz);
+    ppl_tracker.visualize_est(pub_viz);
+    ppl_tracker.visualize_obs(pub_raw_obs);
     cout << "No its not. Haha" << endl;
     // pcl::copyPointCloud(*cloud, *viz_cloud);
     if (cloud->points.size()>0){

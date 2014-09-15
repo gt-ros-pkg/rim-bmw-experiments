@@ -24,6 +24,7 @@
 #include <bmw_percep/particleFilter.hpp>
 #include <queue>
 #include <math.h>
+#include <opencv2/opencv.hpp>
 
 //ros-includes
 #include<ros/ros.h>
@@ -67,6 +68,16 @@ ClusterPoint median;
 };
 typedef struct ClusterStats ClusterStats;
 
+struct PersProp{ //properties of the person
+Eigen::Vector2f pos;
+Eigen::Vector2f vel;
+  Eigen::Vector2f inn_cyl;
+  Eigen::Vector2f out_cyl;
+  float height;
+};
+
+typedef struct PersProp PersProp;
+
 class PplTrack
 {
 public:
@@ -91,6 +102,8 @@ void estimate(PointCloudT::Ptr& cloud,
 		float leaf_size=0.06);
   
 void visualize(ros::Publisher pub);
+  void visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp person,
+		 string name_space);
 
 void set_viz_frame(string viz_frame)
 {viz_frame_ = viz_frame;}
@@ -118,6 +131,13 @@ void assign_ppl_clusters(PointCloudT::ConstPtr cloud,
 void get_clusters_stats(PointCloudT::ConstPtr cloud, 
 			  const vector<pcl::PointIndices> cluster_indices,
 			  vector<ClusterStats>& clusters_stats);
+  //Visualize the detected human position / observation for filter
+  void visualize_obs(ros::Publisher pub)
+  {visualize(pub, Eigen::Vector3f(0.0, 1.0, 0.0), pers_obs_, "human/observations");}
+
+  void visualize_est(ros::Publisher pub)
+  {visualize(pub, Eigen::Vector3f(1.0, 0.0, 0.0), pers_est_, "human/visuals");}
+
 
 private:
 bool table_link;
@@ -127,7 +147,7 @@ Eigen::Vector4f ground_coeffs_;
 string viz_frame_;
 vector<vector<ClusterPoint> > per_cs_; // person clusters
 vector<ClusterStats> per_stats_;
-queue<vector<ClusterStats> > history_per_stats_; //keeps history of person stats
+queue<PersProp> history_per_stats_; //keeps history of person stats
 int history_size_; // number of frames to keep in history
 vector<ClusterPoint> cur_pos_;
 float max_height_, min_height_, max_dist_gr_;
@@ -135,7 +155,8 @@ int max_c_size_, min_c_size_;
 bool more_than_one_;
 ros::Time pub_time; //time-stamp associated with human estimation
 particleFilter2D human_tracker_;
-
+bool currently_filtering_; //does the particle filter need reinitialization?
+  PersProp pers_obs_, pers_est_; //current person observation and the estimate
 
 //member functions
 void reset_vals(); //resets the variables for calculating anew
@@ -144,7 +165,8 @@ int getOneCluster(const vector<vector<ClusterPoint> > clusters);
 void merge_floor_clusters(const PointCloudT::Ptr cloud, 
 			    vector<pcl::PointIndices> &cluster_indices);
 void clear_history();
-
+  void set_observation(); //set observation from the clusters
+  void set_estimate(); // set size parameters from observation 
 
 };
 
