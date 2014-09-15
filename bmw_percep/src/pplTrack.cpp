@@ -256,7 +256,61 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
 
     mark_arr.markers.push_back(out_cyl_marker);
   
+
+    //visualize velocity if present
+    if(!isnan(person.vel(0))){
+      double frame_rate = 1./30.;
+      double delta_t = 1 * frame_rate; // 1 secs
+      double vel_mag = person.vel.norm();
+      double mark_scale = delta_t * vel_mag;
+      double vel_scale = 0.6;
+      
+      visualization_msgs::Marker vel_marker1, vel_marker2, vel_marker3;
+      //velocity markers
+      vel_marker1 = inn_cyl_marker;
+      vel_marker1.id += 5;
+      vel_marker1.pose.position.z = 0;
+
+      vel_marker1.pose.position.x = person.pos(0)+ delta_t * person.vel(0);
+      vel_marker1.pose.position.y = person.pos(1)+ delta_t * person.vel(1);
+
+      vel_marker1.scale.x = .5* vel_scale + delta_t * vel_mag + mark_scale;
+      vel_marker1.scale.y = .5*vel_scale + delta_t * vel_mag + mark_scale;
+      vel_marker1.scale.z = 0.01;
+    
+      vel_marker1.color.a = 0.5f;
+      vel_marker1.color.r = 0.75f;
+      vel_marker1.color.b = 0.f;
+      vel_marker1.color.g = 1.0f;
+
+      vel_marker2 = vel_marker1;
+      vel_marker3 = vel_marker2;
+
+      vel_marker2.id += 2;
+      vel_marker3.id += 3;
+  
+      vel_marker2.color.a *= (.5);
+      vel_marker3.color.a *= pow((.5),2);
+
+      vel_marker2.pose.position.x += delta_t * person.vel(0);
+      vel_marker2.pose.position.y += delta_t * person.vel(1);
+
+    vel_marker3.pose.position.x += 2 * delta_t * person.vel(0);
+    vel_marker3.pose.position.y += 2 * delta_t * person.vel(1);
+
+    vel_marker2.scale.x += mark_scale + vel_scale;
+    vel_marker2.scale.y += mark_scale + vel_scale;
+
+    vel_marker3.scale.x += 2 * mark_scale + 2*vel_scale;
+    vel_marker3.scale.y += 2 * mark_scale + 2*vel_scale;
+
+    mark_arr.markers.push_back(vel_marker1);
+    mark_arr.markers.push_back(vel_marker2);
+    mark_arr.markers.push_back(vel_marker3);
+    }
+
     pub.publish(mark_arr);
+
   }
   else{
     //No Publish if no observation
@@ -709,6 +763,9 @@ void PplTrack::set_observation()
 {
   //this is our guy/gal
   person_id_ = getOneCluster(per_cs_);
+
+  pers_obs_.vel =   Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
+				   numeric_limits<float>::quiet_NaN());
 
   //set the position
   if(person_id_>-1){ // in case observation made
