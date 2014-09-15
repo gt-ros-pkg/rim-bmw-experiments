@@ -490,7 +490,7 @@ PplTrack::PplTrack(float z){
   max_c_size_=1800; min_c_size_=100;
 
   history_size_ = 10;
-
+  currently_filtering_ = false;
   clear_history();
 }
 
