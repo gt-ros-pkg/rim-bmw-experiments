@@ -35,6 +35,7 @@ void KalmanFilter::correct(Eigen::Vector2f z_k){
   x_k_n_ = x_k_p_ + K_* (z_k - H_ * x_k_p_);
 
   //Update error cov
-  I = Eigen::Matrix4f::Identity();
+  Eigen::Matrix4f I = Eigen::Matrix4f::Identity();
     P_k_n_ = ( I - (K_ * H_)) * P_k_p_;
 }
+
