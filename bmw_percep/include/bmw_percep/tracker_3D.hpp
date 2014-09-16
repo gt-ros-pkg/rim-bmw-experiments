@@ -9,6 +9,7 @@
 #include<bmw_percep/shr_cv_utils.hpp>
 // #include<bmw_percep/ppl_detection.hpp>
 #include<bmw_percep/groundPlane.hpp>
+#include<bmw_percep/kalmanFilter.hpp>
 #include<bmw_percep/pplTrack.hpp>
 #include <boost/timer.hpp>
 
