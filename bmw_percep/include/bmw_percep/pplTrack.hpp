@@ -22,6 +22,7 @@
 #include <bmw_percep/ppl_detection.hpp>
 #include <bmw_percep/shr_cv_utils.hpp>
 #include <bmw_percep/particleFilter.hpp>
+#include <bmw_percep/kalmanFilter.hpp>
 #include <queue>
 #include <math.h>
 #include <opencv2/opencv.hpp>
@@ -155,6 +156,7 @@ int max_c_size_, min_c_size_;
 bool more_than_one_;
 ros::Time pub_time; //time-stamp associated with human estimation
 particleFilter2D human_tracker_;
+  KalmanFilter kf_tracker_;
 bool currently_filtering_; //does the particle filter need reinitialization?
   PersProp pers_obs_, pers_est_; //current person observation and the estimate
   Eigen::Vector3f ws_max_, ws_min_; //max and min range for workspace

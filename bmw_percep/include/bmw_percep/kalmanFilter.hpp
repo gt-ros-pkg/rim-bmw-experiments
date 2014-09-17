@@ -1,3 +1,6 @@
+#ifndef KALMAN_FILTER
+#define KALMAN_FILTER
+
 #include <iostream>
 #include <Eigen/Dense>
 
@@ -25,6 +28,9 @@ public:
 		    float delta_t,
 		    Eigen::Matrix4f init_cov = 
 		    Eigen::Matrix4f::Zero());
+  
+  //estimate new state vector given observation
+  void estimate(Eigen::Vector2f obs, float delta_t);
 
 private:
   Eigen::Vector4f x_k_p_, x_k_n_; //previous and next Xk s
@@ -40,3 +46,4 @@ private:
   //Modifies the variables associated with change in delta-t
   void delta_change();
 };
+#endif

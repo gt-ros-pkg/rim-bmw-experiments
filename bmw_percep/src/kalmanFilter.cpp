@@ -86,3 +86,11 @@ void KalmanFilter::delta_change()
     
     Q_ = G * sigma_acc_ * G.transpose();  
 }
+
+void KalmanFilter::estimate(Eigen::Vector2f obs, float delta_t)
+{
+  //previous estimate is k-1th estimate now
+  x_k1_ = x_k_n_;
+  predict(delta_t);
+  correct(obs);
+}
