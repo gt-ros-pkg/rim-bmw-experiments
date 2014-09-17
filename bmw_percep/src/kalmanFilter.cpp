@@ -50,7 +50,7 @@ void KalmanFilter::reinitialize(Eigen::Vector2f acc_std,
 				Eigen::Matrix4f init_cov
 				/*=Eigen::Matrix4f::Zero()*/)
 {
-  x_k1_ =  x_k1; //Initialize to zero
+  x_k_n_ =  x_k1; //Initialize to 
   P_k1_ = init_cov;
 
   H_.fill(0.);
@@ -67,7 +67,6 @@ void KalmanFilter::reinitialize(Eigen::Vector2f acc_std,
 
   delta_t_ = delta_t;
   delta_change();
-  
 }
 
 void KalmanFilter::delta_change()

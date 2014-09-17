@@ -259,8 +259,8 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
 
     //visualize velocity if present
     if(!isnan(person.vel(0))){
-      double frame_rate = 30.;
-      double delta_t = 1 * frame_rate; // 1 secs
+      double frame_rate = 10.;
+      double delta_t = 1 / frame_rate; // 1 secs
       double vel_mag = person.vel.norm();
       double mark_scale = delta_t * vel_mag;
       double vel_scale = 0.6;
@@ -385,69 +385,85 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     
     //Track them
     if (person_id_>-1){ //current observation=true
-      if (!isnan(history_per_stats_.front().pos(0))){
-	if (currently_filtering_){
-	  Eigen::Vector4f kf_est;
-	  kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))
-			       , 0.1, kf_est);
-	  human_tracker_.prop_part();
-	  cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
-	  cv::Point2f cur_pos, cur_vel;
-	  cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0), 
-					   history_per_stats_.front().pos(1));
-	  human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
+      if (history_per_stats_.size()>0){
+	if (!isnan(history_per_stats_.front().pos(0))){
+	  if (currently_filtering_){
+	    Eigen::Vector4f kf_est;
+	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))
+				 , 0.1, kf_est);
+	    human_tracker_.prop_part();
+	    cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
+	    cv::Point2f cur_pos, cur_vel;
+	    cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0), 
+					       history_per_stats_.front().pos(1));
+	    human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
 	
-	  //assign to the estimate
-	  // pers_est_.pos = Eigen::Vector2f(cur_pos.x, cur_pos.y);
-	  // pers_est_.vel = Eigen::Vector2f(cur_vel.x, cur_vel.y);
+	    //assign to the estimate
+	    // pers_est_.pos = Eigen::Vector2f(cur_pos.x, cur_pos.y);
+	    // pers_est_.vel = Eigen::Vector2f(cur_vel.x, cur_vel.y);
 
-	  pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
-	  pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
+	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
+	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
 
-	  //debug
-	  cout << "Velocity = " << cur_vel << endl;
+	    //debug
+	    cout << "Velocity = " << cur_vel << endl;
+	  }
+	  else{
+
+	    cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
+	    cv::Point2f cur_pos, cur_vel;
+	    cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0), 
+					       history_per_stats_.front().pos(1));
+	  
+	    cout << "Previous position = " << prev_pos << endl;
+
+	    human_tracker_.reinitialize(prev_pos, hum_pt, 
+					(1.0/static_cast<double> (30)), 1000,
+					10.0);
+	  
+	    human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
+
+	    cv::Point2f vel_ = hum_pt - prev_pos;
+
+	    //kalman
+	    Eigen::Vector2f acc_std(1.,1.);
+	    Eigen::Vector2f measur_std(0.5,0.5);
+	    float delta_t = 0.1;
+	    Eigen::Vector4f x_k1(prev_pos.x, prev_pos.y, vel_.x, vel_.y);
+
+	    kf_tracker_.reinitialize(acc_std, measur_std, delta_t, x_k1);
+	    Eigen::Vector4f kf_est;
+	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))
+				 , 0.1, kf_est);
+
+	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
+	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
+
+	    // //debug
+	    // cout << "Xk1" << x_k1 << endl;
+	    // cout << "Xkn" << kf_est << endl;
+	    // cout << "Observed = " << pers_obs_.pos(0) << ',' << 
+	    //   pers_obs_.pos(1) << endl;
+	    // cout << "Estimated = " << pers_est_.pos(0) << ',' << 
+	    //   pers_est_.pos(1) << endl;
+	    // string what; cin>>what;
+	  
+	    currently_filtering_ = true;
+	  }
 	}
-	else{
-
-	  cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
-	  cv::Point2f cur_pos, cur_vel;
-	  cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0), 
-					     history_per_stats_.front().pos(1));
-	  
-	  human_tracker_.reinitialize(prev_pos, hum_pt, 
-				    (1.0/static_cast<double> (30)), 1000,
-				    10.0);
-	  
-	  human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
-
-	  cv::Point2f vel_ = hum_pt - prev_pos;
-
-	  //kalman
-	  Eigen::Vector2f acc_std(1.,1.);
-	  Eigen::Vector2f measur_std(0.5,0.5);
-	  float delta_t = 0.1;
-	  Eigen::Vector4f x_k1(prev_pos.x, prev_pos.y, vel_.x, vel_.y);
-
-	  kf_tracker_.reinitialize(acc_std, measur_std, delta_t, x_k1);
-	  Eigen::Vector4f kf_est;
-	  kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))
-			       , 0.1, kf_est);
-	  pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
-	  pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
-	  
-	  currently_filtering_ = true;
+	else{ // no observation -- prev frame
+	  cout << "FIRST HERE, then **********" << endl;
+	  currently_filtering_ = false;
+	  pers_est_.pos = pers_obs_.pos;
+	  pers_est_.vel = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
+					  numeric_limits<float>::quiet_NaN());
 	}
-      }
-      else{ // no observation -- prev frame
-	currently_filtering_ = false;
-	pers_est_.pos = pers_obs_.pos;
-	pers_est_.vel = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
-				   numeric_limits<float>::quiet_NaN());
       }
     }
     else{ //no observation
       currently_filtering_ = false;
-      pers_est_.pos = pers_obs_.pos;
+      pers_est_.pos = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
+				     numeric_limits<float>::quiet_NaN());
       pers_est_.vel = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
 				     numeric_limits<float>::quiet_NaN());
     }
