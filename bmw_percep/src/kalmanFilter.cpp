@@ -46,10 +46,11 @@ KalmanFilter::KalmanFilter(){}
 void KalmanFilter::reinitialize(Eigen::Vector2f acc_std, 
 				Eigen::Vector2f measur_std,
 				float delta_t,
+				Eigen::Vector4f x_k1,
 				Eigen::Matrix4f init_cov
 				/*=Eigen::Matrix4f::Zero()*/)
 {
-  x_k1_ = Eigen::Vector4f::Zero(); //Initialize to zero
+  x_k1_ =  x_k1; //Initialize to zero
   P_k1_ = init_cov;
 
   H_.fill(0.);
@@ -87,10 +88,13 @@ void KalmanFilter::delta_change()
     Q_ = G * sigma_acc_ * G.transpose();  
 }
 
-void KalmanFilter::estimate(Eigen::Vector2f obs, float delta_t)
+void KalmanFilter::estimate(Eigen::Vector2f obs, float delta_t, Eigen::Vector4f &est)
 {
   //previous estimate is k-1th estimate now
   x_k1_ = x_k_n_;
   predict(delta_t);
   correct(obs);
+
+  est = x_k_n_;
+  return;
 }

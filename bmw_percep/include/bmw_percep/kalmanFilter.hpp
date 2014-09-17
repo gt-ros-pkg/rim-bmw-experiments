@@ -23,14 +23,15 @@ public:
   
   void correct(Eigen::Vector2f z_k);
 
-  void reinitialize(Eigen::Vector2f acc_std, 
+  void reinitialize(Eigen::Vector2f acc_std,
 		    Eigen::Vector2f measur_std,
 		    float delta_t,
+		    Eigen::Vector4f x_k1,
 		    Eigen::Matrix4f init_cov = 
 		    Eigen::Matrix4f::Zero());
   
   //estimate new state vector given observation
-  void estimate(Eigen::Vector2f obs, float delta_t);
+  void estimate(Eigen::Vector2f obs, float delta_t, Eigen::Vector4f &est);
 
 private:
   Eigen::Vector4f x_k_p_, x_k_n_; //previous and next Xk s

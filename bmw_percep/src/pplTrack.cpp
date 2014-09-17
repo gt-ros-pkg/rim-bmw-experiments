@@ -387,6 +387,9 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     if (person_id_>-1){ //current observation=true
       if (!isnan(history_per_stats_.front().pos(0))){
 	if (currently_filtering_){
+	  Eigen::Vector4f kf_est;
+	  kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))
+			       , 0.1, kf_est);
 	  human_tracker_.prop_part();
 	  cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
 	  cv::Point2f cur_pos, cur_vel;
@@ -395,14 +398,17 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	  human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
 	
 	  //assign to the estimate
-	  pers_est_.pos = Eigen::Vector2f(cur_pos.x, cur_pos.y);
-	  pers_est_.vel = Eigen::Vector2f(cur_vel.x, cur_vel.y);
-	  // pers_est_.vel = Eigen::Vector2f(1., 1.);
-	  
+	  // pers_est_.pos = Eigen::Vector2f(cur_pos.x, cur_pos.y);
+	  // pers_est_.vel = Eigen::Vector2f(cur_vel.x, cur_vel.y);
+
+	  pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
+	  pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
+
 	  //debug
 	  cout << "Velocity = " << cur_vel << endl;
 	}
 	else{
+
 	  cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
 	  cv::Point2f cur_pos, cur_vel;
 	  cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0), 
@@ -413,6 +419,22 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 				    10.0);
 	  
 	  human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
+
+	  cv::Point2f vel_ = hum_pt - prev_pos;
+
+	  //kalman
+	  Eigen::Vector2f acc_std(1.,1.);
+	  Eigen::Vector2f measur_std(0.5,0.5);
+	  float delta_t = 0.1;
+	  Eigen::Vector4f x_k1(prev_pos.x, prev_pos.y, vel_.x, vel_.y);
+
+	  kf_tracker_.reinitialize(acc_std, measur_std, delta_t, x_k1);
+	  Eigen::Vector4f kf_est;
+	  kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))
+			       , 0.1, kf_est);
+	  pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
+	  pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
+	  
 	  currently_filtering_ = true;
 	}
       }
