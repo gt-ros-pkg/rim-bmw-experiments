@@ -115,15 +115,16 @@ void BackgroundSubtract::backgroundSub(const PCRGB::ConstPtr& pc, pcl::PointIndi
     float pt_z = pc->at(i).z;
     // bool push=false;
 
-    if(isnan(pt_z))
-      continue;
-    possible_z.insert(pt_z);
-    if(!isnan(p_max_z))
-      if(!isnan(p_min_z))
-        //if(pt_z > p_min_z && pt_z < p_max_z)
-        if(pt_z >= p_min_z)
-          continue;
-    inds->indices.push_back(i);
+    // if(isnan(pt_z))
+    //   continue;
+    // // possible_z.insert(pt_z);
+    // if(!isnan(p_max_z))
+    //   if(!isnan(p_min_z))
+    //     //if(pt_z > p_min_z && pt_z < p_max_z)
+    //     if(pt_z >= p_min_z)
+    //       continue;
+    if(!isnan(pt_z) && (isnan(p_min_z) || (pt_z < p_min_z)))
+      inds->indices.push_back(i);
     //if(isnan(pt_z) && ((isnan(p_max_z) || pt_z > p_max_z) || (isnan(p_min_z) || pt_z < p_min_z)))
   }
 #ifdef BG_DEBUG
