@@ -1,0 +1,8 @@
+<launch>
+  <node name="background_store_front" pkg="exp_max_person_filter" type="background_store" output="screen">
+    <param name="bg_frames" value="10" />
+    <param name="min_file" value="$(find exp_max_person_filter)/data/kinect_front/min_bg.pcd" />
+    <param name="max_file" value="$(find exp_max_person_filter)/data/kinect_front/max_bg.pcd" />
+    <remap from="/pc_in" to="/kinect_front/depth_registered/points" />
+  </node>
+</launch>

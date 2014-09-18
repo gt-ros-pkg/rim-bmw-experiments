@@ -1,0 +1,12 @@
+<launch>
+  <node name="background_sub_front" pkg="exp_max_person_filter" type="background_sub" output="screen">
+    <param name="min_file" value="$(find exp_max_person_filter)/data/kinect_front/min_bg.pcd" />
+    <param name="max_file" value="$(find exp_max_person_filter)/data/kinect_front/max_bg.pcd" />
+    <remap from="/pc_in" to="/kinect_front/depth_registered/points" />
+  </node>
+  <node name="background_sub_back" pkg="exp_max_person_filter" type="background_sub" output="screen">
+    <remap from="pc_in" to="/kinect_back/depth_registered/points" />
+    <param name="min_file" value="$(find exp_max_person_filter)/data/kinect_back/min_bg.pcd" />
+    <param name="max_file" value="$(find exp_max_person_filter)/data/kinect_back/max_bg.pcd" />
+  </node>
+</launch>
