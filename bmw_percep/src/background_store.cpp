@@ -115,7 +115,7 @@ void BackgroundStore::take_bg_stats()
 
 int main( int argc, char** argv )
 {
-    ros::init(argc, argv, "pc_cylinder_test");
+    ros::init(argc, argv, "bg_store");
     ros::NodeHandle nh_priv("~");
     BackgroundStore bg_store(nh_priv);
     ros::spin();
