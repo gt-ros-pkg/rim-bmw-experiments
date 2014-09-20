@@ -27,6 +27,7 @@
    new Point Cloud.
 **/
 
+#define COLOR_DIFF true //specifies if the two point clouds to be published with different colors
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloudSM;
 typedef sensor_msgs::PointCloud2 PCMsg;
 
@@ -146,9 +147,29 @@ void callback(const PCMsg::ConstPtr& front_pc_, const PCMsg::ConstPtr& back_pc_ 
   			   back_transform.rotation);
 
 
+  if(COLOR_DIFF) //change PC colors
+    {
+      for(size_t i=0; i<pub_pc->size(); ++i)
+	{
+	  pub_pc->at(i).r = uint8_t(255);
+	  pub_pc->at(i).g = uint8_t(0);	  
+	  pub_pc->at(i).b = uint8_t(0);
+
+	}
+      for(size_t i=0; i<new_b_pc->size(); ++i)
+	{
+	  new_b_pc->at(i).r = uint8_t(0);
+	  new_b_pc->at(i).g = uint8_t(255);	  
+	  new_b_pc->at(i).b = uint8_t(0);
+	}
+    }
+
   *pub_pc += *new_b_pc;
   
   pub_pc->header.frame_id = new_frame;
+  
+
+  
   pc_pub.publish(*pub_pc);
 
 }
