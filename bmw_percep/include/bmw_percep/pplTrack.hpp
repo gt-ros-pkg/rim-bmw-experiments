@@ -3,7 +3,10 @@
 
 #include <pcl/point_types.h>
 #include <pcl/conversions.h>
+
 #include <opencv2/opencv.hpp>
+
+#include <fstream>
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -19,6 +22,7 @@
 #include <pcl/common/common_headers.h>
 #include <pcl/sample_consensus/sac_model_plane.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/filters/random_sample.h>
 #include <bmw_percep/ppl_detection.hpp>
 #include <bmw_percep/shr_cv_utils.hpp>
 #include <bmw_percep/particleFilter.hpp>
@@ -35,6 +39,7 @@
 #include<std_msgs/Bool.h>
 #include<geometry_msgs/PoseStamped.h>
 
+#include <boost/lexical_cast.hpp>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
@@ -44,6 +49,7 @@
 #include <boost/accumulators/statistics/min.hpp>
 #include <boost/accumulators/statistics/median.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
+#include <boost/timer.hpp>
 
 #define RANDOM_COLORS false
 
@@ -160,8 +166,10 @@ particleFilter2D human_tracker_;
 bool currently_filtering_; //does the particle filter need reinitialization?
   PersProp pers_obs_, pers_est_; //current person observation and the estimate
   Eigen::Vector3f ws_max_, ws_min_; //max and min range for workspace
+  int file_no_;
 
 //member functions
+  void write_clusters_disk();
 void reset_vals(); //resets the variables for calculating anew
 void estimate(vector<ClusterPoint> cluster);
 int getOneCluster(const vector<vector<ClusterPoint> > clusters);

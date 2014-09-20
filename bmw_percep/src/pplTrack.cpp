@@ -344,13 +344,41 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     if (got_tf_robot) // in case the robots location is known
       robot_remove(cloud, robo_loc);
 
-    int max_cluster_size = 800;
-    int min_cluster_size = 100;
+    // int max_cluster_size = 800;
+    // int min_cluster_size = 100;
+    
+    pcl::copyPointCloud(*cloud, *viz_cloud);
 
+    // pcl::RandomSample<PointT> ransam;
+    // ransam.setInputCloud(viz_cloud);
+    // ransam.setSample(1000);
+    // ransam.setSeed(rand());
+    // ransam.filter(*cloud);
+    
+    float voxel_size=0.03;
+
+    pcl::copyPointCloud(*cloud, *viz_cloud);
+
+    cout << "No. of points before voxel = " << cloud->size() << endl;
+    boost::timer voxel_timer;
+    //Voxelize the space
+    pcl::VoxelGrid<pcl::PointXYZRGB> vg;
+    //PointCloudSM::Ptr cloud_filtered(new PointCloudSM);
+    vg.setInputCloud(viz_cloud);
+    vg.setLeafSize(voxel_size, voxel_size, voxel_size);
+    vg.filter(*cloud);
+    
+    cout << "Time to Voxel = " << voxel_timer.elapsed() << endl;
+
+    cout << "No. of points = " << cloud->size() << endl;
+    
     // Creating the KdTree object for the search method of the extraction
+    boost::timer kd;
     pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
     tree->setInputCloud (cloud);
-
+    cout << "KD Tree takes = " << kd.elapsed() << "s" << endl;
+     
+    boost::timer clusterize;
     vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<PointT> ec;
     ec.setClusterTolerance (2* leaf_size); // 2cm
@@ -360,6 +388,8 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     ec.setSearchMethod (tree);
     ec.setInputCloud (cloud);
     ec.extract (cluster_indices);
+
+    cout << "Clustering takes = " << clusterize.elapsed() << "s" << endl;
 
     //merge
     merge_floor_clusters(cloud, cluster_indices);
@@ -385,6 +415,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     
     //Track them
     if (person_id_>-1){ //current observation=true
+      write_clusters_disk();
       if (history_per_stats_.size()>0){
 	if (!isnan(history_per_stats_.front().pos(0))){
 	  if (currently_filtering_){
@@ -461,6 +492,10 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
       }
     }
     else{ //no observation
+      
+      cout<< "Woah, no observation. " << endl;
+      string whut; cin>>whut;
+      
       currently_filtering_ = false;
       pers_est_.pos = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
 				     numeric_limits<float>::quiet_NaN());
@@ -584,8 +619,9 @@ PplTrack::PplTrack(float z){
   table_link = true;
 
   max_height_=2.3; min_height_=1.0; max_dist_gr_=0.4;
-  max_c_size_=1800; min_c_size_=100;
-  
+  max_c_size_=18000; min_c_size_=100;
+  file_no_=0;
+
   ws_min_ = Eigen::Vector3f(.05, .84, -ground_coeffs_(3));
   ws_max_ = Eigen::Vector3f(4.3, 4.0, 5.0);
   human_tracker_.set_range_gran(Eigen::Vector2f(ws_min_(0), ws_min_(1)), 
@@ -771,6 +807,29 @@ void PplTrack::rm_clusters_rules(const PointCloudT::Ptr &cloud,
     }
   }
   cs_indices = cs_new;
+}
+
+void PplTrack::write_clusters_disk()
+{
+  //do something
+  system("mkdir data/temp-clusters/");
+  string path = "data/temp-clusters/";
+  ofstream pts_file;
+  string file_ext=".txt";
+  string file_name = path + boost::lexical_cast<string>(file_no_) + file_ext;
+  file_no_++;
+
+  pts_file.open(file_name.c_str());
+
+  for(vector<vector<ClusterPoint> >::iterator cit=per_cs_.begin(); 
+      cit!=per_cs_.end(); ++cit ){
+    for(vector<ClusterPoint>::iterator pit=cit->begin(); pit!=cit->end(); ++pit){
+      ClusterPoint p = (*pit);
+      pts_file << p(0) << ',' << p(1) << endl;
+     }
+  }
+  
+  pts_file.close();
 }
 
 void PplTrack::assign_ppl_clusters(PointCloudT::ConstPtr cloud, 
