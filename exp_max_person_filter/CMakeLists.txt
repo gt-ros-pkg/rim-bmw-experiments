@@ -7,9 +7,20 @@ project(exp_max_person_filter)
 find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   urdf
+  image_transport
+  cv_bridge
+  image_geometry
+  tf
+  tf_conversions
 )
 
 find_package(PCL REQUIRED)
+
+# Opencv
+find_package(OpenCV REQUIRED)
+if (OPENCV_FOUND)
+  message("-- Found OpenCV version ${OPENCV_VERSION}: ${OPENCV_INCLUDE_DIRS}")
+endif (OPENCV_FOUND)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -118,6 +129,15 @@ add_executable(background_sub
 )
 target_link_libraries(background_sub
   ${PCL_INCLUDE_DIRS}
+  ${catkin_LIBRARIES}
+)
+
+add_executable(exp_max_person_filter
+  src/exp_max_filter.cpp
+)
+target_link_libraries(exp_max_person_filter
+  ${PCL_INCLUDE_DIRS}
+  ${OpenCV_LIBRARIES}
   ${catkin_LIBRARIES}
 )
 
