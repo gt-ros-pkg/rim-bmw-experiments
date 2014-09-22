@@ -1,0 +1,29 @@
+<launch>
+  <node name="exp_max_filter" pkg="exp_max_person_filter" type="exp_max_person_filter" output="screen">
+    <rosparam>
+      sim_cam_x: 2.0
+      sim_cam_y: 2.5
+      sim_cam_z: 100.0
+      base_link: /table_link
+      sim_image_width: 1000
+      sim_image_height: 1000
+      sim_image_span_width: 7.0
+      sim_image_span_height: 7.0
+      kinect_1_frame: /kinect_front_rgb_optical_frame
+      kinect_2_frame: /kinect_back_rgb_optical_frame
+
+      ell_width: 1.0
+      ell_depth: 0.5
+      ell_surf_sigma: 0.1
+
+      num_particles: 100
+      momodel_x_mean: 0.0
+      momodel_x_sigma: 0.000001
+      momodel_y_mean: 0.0
+      momodel_y_sigma: 0.000001
+      momodel_r_mean: 0.0
+      momodel_r_sigma: 0.03
+    </rosparam>
+    <remap from="/pc_in" to="/kinect_both/depth_registered/points" />
+  </node>
+</launch>

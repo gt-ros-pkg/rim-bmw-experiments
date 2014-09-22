@@ -1,8 +1,11 @@
 function [is_between] = vector_between_fun(vA, vB, vC)
 % returns true if vC is between vA and vB
 AxBgcmp = vA(1)*vB(2)   >   vA(2)*vB(1);
+% (-vA(2))*vB(1)   +  vA(1)*vB(2)  > 0
 AxCgcmp = vA(1)*vC(2,:) > vA(2)*vC(1,:);
+% AxCgcmp = (-vA(2))*vC(1,:) + (vA(1))*vC(2,:) > 0
 CxBgcmp = vC(1,:)*vB(2) > vC(2,:)*vB(1);
+% CxBgcmp = vC(1,:)*vB(2) + vC(2,:)*(-vB(1)) > 0
 is_between = zeros(1,size(vC,2));
 if AxBgcmp
     is_between = AxCgcmp & CxBgcmp;

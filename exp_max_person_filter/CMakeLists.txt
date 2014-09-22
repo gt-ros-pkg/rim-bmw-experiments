@@ -22,6 +22,12 @@ if (OPENCV_FOUND)
   message("-- Found OpenCV version ${OPENCV_VERSION}: ${OPENCV_INCLUDE_DIRS}")
 endif (OPENCV_FOUND)
 
+# Eigen
+find_package(Eigen REQUIRED)
+if (EIGEN_FOUND)
+  message("-- Found Eigen version ${EIGEN_VERSION}: ${EIGEN_INCLUDE_DIRS}")
+endif (EIGEN_FOUND)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -108,6 +114,7 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
+  ${EIGEN_INCLUDE_DIRS} 
 )
 
 ## Declare a cpp library
@@ -139,6 +146,7 @@ target_link_libraries(exp_max_person_filter
   ${PCL_INCLUDE_DIRS}
   ${OpenCV_LIBRARIES}
   ${catkin_LIBRARIES}
+  ${EIGEN_LIBRARIES}
 )
 
 ## Add cmake target dependencies of the executable/library
