@@ -224,8 +224,8 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
     inn_cyl_marker.pose.orientation.w = 1.0;
 
     // Set the scale of the inn_cyl_marker -- 1x1x1 here means 1m on a side
-    inn_cyl_marker.scale.x = .25;//person.inn_cyl(0);
-    inn_cyl_marker.scale.y = .25;//person.inn_cyl(1);
+    inn_cyl_marker.scale.x = .5;//person.inn_cyl(0);
+    inn_cyl_marker.scale.y = .5;//person.inn_cyl(1);
     inn_cyl_marker.scale.z = person.height; // only distance from ground
 
     // Set the color -- be sure to set alpha to something non-zero!
@@ -415,7 +415,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     
     //Track them
     if (person_id_>-1){ //current observation=true
-      write_clusters_disk();
+      // write_clusters_disk();
       if (history_per_stats_.size()>0){
 	if (!isnan(history_per_stats_.front().pos(0))){
 	  if (currently_filtering_){
@@ -916,6 +916,9 @@ void PplTrack::set_observation()
 
 void PplTrack::set_estimate()
 {
+  pers_est_.pos = Eigen::Vector2f(per_stats_[person_id_].median(0),
+				  per_stats_[person_id_].median(1));
+
   //assumption- one person only
   pers_est_.inn_cyl = pers_obs_.inn_cyl;
   pers_est_.out_cyl = pers_obs_.out_cyl;
@@ -926,8 +929,8 @@ void PplTrack::set_estimate()
 void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
 {
   vector<vector <HMapEl> > hmap;
-  float dist_from_top = 0.3;
-  float head_span = 0.5;
+  float dist_from_top = 0.2;
+  float head_span = 1.;
   int tbx=50, tby=50;
   // float gran = 0.05; // granularity
 
@@ -960,7 +963,6 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
   float max_ht = 0.0;
   Index2D max_ht_ind;
 
-  cout << "Bad allocing" << endl;
   //update map with cluster points
   for(size_t i=0; i<per_cs_[c_ind].size(); ++i){
     ClusterPoint t_cl = per_cs_[c_ind][i];
@@ -988,8 +990,6 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
     }
   }
 
-  cout << "After here?" << endl;
-  
   //set flags of pixels that are in range to true
   for(size_t i=0; i<hmap.size(); ++i){
     for(size_t j=0; j<hmap[i].size(); ++j){
@@ -999,43 +999,49 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
     }
   }
 
-  cout << "After setting pixels" << endl;
 
   //find the cluster with points in range
   int h_x_span = floor(head_span/granx); int h_y_span = floor(head_span/grany);
   vector<Index2D> head_ind;
 
-  //debug-- check if hmap alright
-  bool h_checks=true;
-  if(hmap.size()!= 20){
-    cout << "Hmap Ysize = " << hmap.size() << endl;
-    h_checks=false;
-  }
-  for(int i=0; i<hmap.size(); ++i){
-    if(hmap[i].size()!=20){
-      cout << "Hmap Xsize = " << hmap[i].size() << endl;
-      h_checks=false;
-    }
-  }
+  // //debug-- check if hmap alright
+  // bool h_checks=true;
+  // if(hmap.size()!= 20){
+  //   cout << "Hmap Ysize = " << hmap.size() << endl;
+  //   h_checks=false;
+  // }
+  // for(int i=0; i<hmap.size(); ++i){
+  //   if(hmap[i].size()!=20){
+  //     cout << "Hmap Xsize = " << hmap[i].size() << endl;
+  //     h_checks=false;
+  //   }
+  // }
   
-  if(h_checks)
-    cout << "HMap checks Out!!!!!!" << endl;
+  // if(h_checks)
+  //   cout << "HMap checks Out!!!!!!" << endl;
 
   cluster_head(hmap, max_ht_ind(0), max_ht_ind(1), h_x_span, h_y_span, head_ind);
 
-  cout << "After head clustering??" << endl;
 
   //TODO: Check if any clusters are being repeated
   //get the centroid from connected clusters
+  Eigen::Vector2f temp_loc(0.,0.);
   Eigen::Vector2f temp;
   accumulator_set< float, stats<tag::mean> > x_acc, y_acc;
-  cout << "**********HEAD INDICES**********" << endl;
-  cout << "MAXES " << tbx << ',' << tby << endl;
+  // cout << "**********HEAD INDICES**********" << endl;
+  // cout << "MAXES " << tbx << ',' << tby << endl;
+  int n_bins=0;
   for(size_t i=0; i<head_ind.size(); i++){
-    cout << "(" << head_ind[i](0) << ',' << head_ind[i](1) << ')' << endl;
+    // cout << "(" << head_ind[i](0) << ',' << head_ind[i](1) << ')' << endl;
   // vector<Eigen::Vector2f> cur_pts = hmap[head_ind[i](1)][head_ind[i](0)].p_ind;
     size_t tmpx = static_cast<size_t>(head_ind[i](0));
     size_t tmpy = static_cast<size_t>(head_ind[i](1));
+    
+    // cout << "(" << hmap[tmpy][tmpx].loc(0) << ',' << hmap[tmpy][tmpx].loc(1) << endl;
+    
+    temp_loc += hmap[tmpy][tmpx].loc;
+    n_bins++;
+
     for(size_t j=0;
     	j < hmap[tmpy][tmpx].p_ind.size();
     	++j){
@@ -1045,34 +1051,19 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
     }
   }
 
-  cout << "After even this..." << endl;
+  // cout << "After even this..." << endl;
   
   h_center = Eigen::Vector2f(mean(x_acc), mean(y_acc));
+  // cout << "Locaion= ("<<temp_loc(0) << ',' << temp_loc(1)<< '). Nbins='
+  //      << n_bins << endl;
+  h_center = temp_loc/static_cast<float>(n_bins);
+  // cout << "Head center " << h_center(0) << ','<<h_center(1) << endl;
 }
 
 void PplTrack::cluster_head(vector<vector<HMapEl> > hmap, size_t x, size_t y, 
 			    int h_x_span, int h_y_span, 
 			    vector<Index2D> &i_list)
 {
-  //debug
-  cout << "**********CLUSTER HEAD**********" << endl;
-  //debug-- check if hmap alright
-  bool h_checks=true;
-  if(hmap.size()!= 20){
-    cout << "Hmap Ysize = " << hmap.size() << endl;
-    h_checks=false;
-  }
-  for(int i=0; i<hmap.size(); ++i){
-    if(hmap[i].size()!=20){
-      cout << "Hmap Xsize = " << hmap[i].size() << endl;
-      h_checks=false;
-    }
-  }
-  
-  if(h_checks)
-    cout << "HMap checks Out!!!!!!" << endl;
-
-
   int cur_x, cur_y;
   for(int i=-h_y_span; i<=h_y_span; ++i){
     cur_y = y + i;
@@ -1084,10 +1075,6 @@ void PplTrack::cluster_head(vector<vector<HMapEl> > hmap, size_t x, size_t y,
 	  if (hmap[cur_y][cur_x].in_h_range){
 	    i_list.push_back(Index2D(static_cast<int>(cur_x), 
 				     static_cast<int>(cur_y)));
-	    if(cur_x>19 || cur_y>19){
-	      cout << "X, Y = " << cur_x << ',' << cur_y << endl;
-	      cout << "MaxX, MaxY = " << hmap[cur_y].size() << ',' << hmap.size() << endl;
-	    }
 	    //TODO: Recurse smartly
 	    // vector<Index2D> temp_list;
 	    // temp_list.push_back(Index2D(cur_x, cur_y));
