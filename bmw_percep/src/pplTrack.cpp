@@ -224,8 +224,8 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
     inn_cyl_marker.pose.orientation.w = 1.0;
 
     // Set the scale of the inn_cyl_marker -- 1x1x1 here means 1m on a side
-    inn_cyl_marker.scale.x = person.inn_cyl(0);
-    inn_cyl_marker.scale.y = person.inn_cyl(1);
+    inn_cyl_marker.scale.x = .25;//person.inn_cyl(0);
+    inn_cyl_marker.scale.y = .25;//person.inn_cyl(1);
     inn_cyl_marker.scale.z = person.height; // only distance from ground
 
     // Set the color -- be sure to set alpha to something non-zero!
@@ -928,7 +928,7 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
   vector<vector <HMapEl> > hmap;
   float dist_from_top = 0.3;
   float head_span = 0.5;
-  int tbx=20, tby=20;
+  int tbx=50, tby=50;
   // float gran = 0.05; // granularity
 
   Eigen::Vector2f xlims(per_stats_[c_ind].min(0), per_stats_[c_ind].max(0));
@@ -1004,6 +1004,23 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
   //find the cluster with points in range
   int h_x_span = floor(head_span/granx); int h_y_span = floor(head_span/grany);
   vector<Index2D> head_ind;
+
+  //debug-- check if hmap alright
+  bool h_checks=true;
+  if(hmap.size()!= 20){
+    cout << "Hmap Ysize = " << hmap.size() << endl;
+    h_checks=false;
+  }
+  for(int i=0; i<hmap.size(); ++i){
+    if(hmap[i].size()!=20){
+      cout << "Hmap Xsize = " << hmap[i].size() << endl;
+      h_checks=false;
+    }
+  }
+  
+  if(h_checks)
+    cout << "HMap checks Out!!!!!!" << endl;
+
   cluster_head(hmap, max_ht_ind(0), max_ht_ind(1), h_x_span, h_y_span, head_ind);
 
   cout << "After head clustering??" << endl;
@@ -1012,12 +1029,17 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
   //get the centroid from connected clusters
   Eigen::Vector2f temp;
   accumulator_set< float, stats<tag::mean> > x_acc, y_acc;
+  cout << "**********HEAD INDICES**********" << endl;
+  cout << "MAXES " << tbx << ',' << tby << endl;
   for(size_t i=0; i<head_ind.size(); i++){
-    vector<Eigen::Vector2f> *cur_pts = &hmap[head_ind[i](1)][head_ind[i](0)].p_ind;
+    cout << "(" << head_ind[i](0) << ',' << head_ind[i](1) << ')' << endl;
+  // vector<Eigen::Vector2f> cur_pts = hmap[head_ind[i](1)][head_ind[i](0)].p_ind;
+    size_t tmpx = static_cast<size_t>(head_ind[i](0));
+    size_t tmpy = static_cast<size_t>(head_ind[i](1));
     for(size_t j=0;
-	j < cur_pts->size();
-	++j){
-      temp = cur_pts->at(j);
+    	j < hmap[tmpy][tmpx].p_ind.size();
+    	++j){
+      temp = hmap[tmpy][tmpx].p_ind[j];
       x_acc(temp(0));
       y_acc(temp(1));
     }
@@ -1032,16 +1054,40 @@ void PplTrack::cluster_head(vector<vector<HMapEl> > hmap, size_t x, size_t y,
 			    int h_x_span, int h_y_span, 
 			    vector<Index2D> &i_list)
 {
+  //debug
+  cout << "**********CLUSTER HEAD**********" << endl;
+  //debug-- check if hmap alright
+  bool h_checks=true;
+  if(hmap.size()!= 20){
+    cout << "Hmap Ysize = " << hmap.size() << endl;
+    h_checks=false;
+  }
+  for(int i=0; i<hmap.size(); ++i){
+    if(hmap[i].size()!=20){
+      cout << "Hmap Xsize = " << hmap[i].size() << endl;
+      h_checks=false;
+    }
+  }
+  
+  if(h_checks)
+    cout << "HMap checks Out!!!!!!" << endl;
+
+
   int cur_x, cur_y;
   for(int i=-h_y_span; i<=h_y_span; ++i){
     cur_y = y + i;
-    if (cur_y>0 && cur_y<hmap.size()){
+    if (cur_y>=0 && cur_y<hmap.size()){
+
       for(int j=-h_y_span; j<=h_y_span; ++j){
 	cur_x = x + j;
-	if (cur_x>0 && cur_x<hmap[j].size()){
+	if (cur_x>=0 && cur_x<hmap[cur_y].size()){
 	  if (hmap[cur_y][cur_x].in_h_range){
 	    i_list.push_back(Index2D(static_cast<int>(cur_x), 
 				     static_cast<int>(cur_y)));
+	    if(cur_x>19 || cur_y>19){
+	      cout << "X, Y = " << cur_x << ',' << cur_y << endl;
+	      cout << "MaxX, MaxY = " << hmap[cur_y].size() << ',' << hmap.size() << endl;
+	    }
 	    //TODO: Recurse smartly
 	    // vector<Index2D> temp_list;
 	    // temp_list.push_back(Index2D(cur_x, cur_y));
