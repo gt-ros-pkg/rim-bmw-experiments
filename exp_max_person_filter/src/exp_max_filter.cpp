@@ -10,6 +10,7 @@
 #include <pcl/conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/filters/random_sample.h>
 #include <pcl/kdtree/kdtree_flann.h>
 
 #define EIGEN_YES_I_KNOW_SPARSE_MODULE_IS_NOT_STABLE_YET
@@ -22,6 +23,10 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
+
+#include <geometry_msgs/PoseArray.h>
+#include <geometry_msgs/Pose.h>
+#include <geometry_msgs/PoseStamped.h>
 
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
@@ -53,7 +58,7 @@ typedef pcl::PointCloud<PXYZ> PCXYZ;
 typedef pcl::PointXYZRGB PRGB;
 typedef pcl::PointCloud<PRGB> PCRGB;
 
-typedef Eigen::Array<bool, 1, Eigen::Dynamic> VectorXBool;
+typedef Eigen::Array<bool, 1, Eigen::Dynamic> ArrayXBool;
 typedef Eigen::Triplet<uint8_t> TripUInt8;
 typedef Eigen::SparseMatrix<uint8_t> SMatUInt8;
 typedef std::vector<Eigen::Affine2f> AffineList;
@@ -62,7 +67,7 @@ inline bool
 getEllipseTangentPoints(float a, float b, const Eigen::Vector2f& cam_pt, 
                         Eigen::Vector2f& t1, Eigen::Vector2f& t2);
 
-inline VectorXBool
+inline ArrayXBool
 checkPointsBetweenVectors(const Eigen::Vector2f& t1, const Eigen::Vector2f& t2, 
                           const Eigen::MatrixXf& pts);
 
@@ -70,13 +75,16 @@ inline void
 stocasticUniversalSampling(boost::mt19937& randng, Eigen::ArrayXf& weights, 
                            std::vector<int>& samples);
 
+inline void 
+averageParticles(AffineList& affs, AffineList& weights, Eigen::Affine2f& center_aff);
+
 class ExpMaxPersonFilter
 {
 public:
   ExpMaxPersonFilter(ros::NodeHandle& nh, ros::NodeHandle& nh_priv);
 
 protected:
-  void recvPCCallback(const PCRGB::ConstPtr& msg);
+  void recvPCCallback(const PCRGB::ConstPtr& pc_combo);
   void pubImages();
   inline void circleCameras(cv::Mat& img, cv::Scalar scalar);
   void convertTripletsToDense(std::vector<TripUInt8>& trip_list, Eigen::VectorXf& pc_proj_hist,
@@ -85,10 +93,15 @@ protected:
   float evalEllipse(Eigen::Affine2f& ell_affine, Eigen::VectorXf& pts_hist, 
                     Eigen::MatrixXf& pts, Eigen::Vector2f& kin_pt);
   void sampleMotionModel(AffineList& affs_in, AffineList& affs_out);
+  void sampleParticles(AffineList& affs_in, Eigen::ArrayXf& weights, AffineList& affs_out);
+  inline void pubParticles(ros::Publisher& pub, AffineList& affs);
+  inline void pubParticle(ros::Publisher& pub, Eigen::Affine2f& aff);
+  inline void affineToPose(Eigen::Affine2f& aff, geometry_msgs::Pose& pose);
 
   ros::Subscriber pc_sub_;
   ros::Publisher pc1_pub_;
   ros::Publisher pc2_pub_;
+
   image_transport::ImageTransport it_;
   std::vector<image_transport::CameraPublisher> cam_pubs_;
   std::vector<cv_bridge::CvImagePtr> img_cv_ptrs_;
@@ -112,12 +125,21 @@ protected:
 
   double ell_width_, ell_depth_, ell_surf_sigma_;
 
+  int num_pc_sample_;
+
   boost::mt19937 randng_;
-  AffineList particle_affs_;
+  AffineList particles_;
   Eigen::ArrayXf particle_weights_;
   double momodel_x_mean_, momodel_x_sigma_;
   double momodel_y_mean_, momodel_y_sigma_;
   double momodel_r_mean_, momodel_r_sigma_;
+  double sensor_null_val_;
+  double best_ptile_;
+  double prob_person_;
+
+  ros::Publisher particles_pub_;
+  ros::Publisher best_particles_pub_;
+  ros::Publisher best_particles_center_pub_;
 };
 
 ExpMaxPersonFilter::
@@ -214,17 +236,21 @@ ExpMaxPersonFilter(ros::NodeHandle& nh, ros::NodeHandle& nh_priv)
   boost::uniform_real<> rot_range(0, 2*M_PI);
   particle_weights_.resize(num_particles);
   for(int i = 0; i < num_particles; i++) {
-    particle_affs_.push_back(
+    particles_.push_back(
         Eigen::Translation2f(width_range(randng_), height_range(randng_)) * 
         Eigen::Rotation2D<float>(rot_range(randng_)));
     particle_weights_(i) = 1.0 / ((float) num_particles);
   }
+  nh_priv.getParam("num_pc_sample", num_pc_sample_);
   nh_priv.getParam("momodel_x_mean", momodel_x_mean_);
   nh_priv.getParam("momodel_x_sigma", momodel_x_sigma_);
   nh_priv.getParam("momodel_y_mean", momodel_y_mean_);
   nh_priv.getParam("momodel_y_sigma", momodel_y_sigma_);
   nh_priv.getParam("momodel_r_mean", momodel_r_mean_);
   nh_priv.getParam("momodel_r_sigma", momodel_r_sigma_);
+  nh_priv.getParam("sensor_null_val", sensor_null_val_);
+  nh_priv.getParam("best_ptile", best_ptile_);
+  nh_priv.getParam("prob_person", prob_person_);
   ///////////////////////////////////////////////////
 
   // initialize ros topics
@@ -233,6 +259,10 @@ ExpMaxPersonFilter(ros::NodeHandle& nh, ros::NodeHandle& nh_priv)
   for(int i = 0; i < num_cams; i++)
     cam_pubs_.push_back(it_.advertiseCamera("cam_pub_" + boost::lexical_cast<std::string>(i+1), 1));
   pc_sub_ = nh.subscribe<PCRGB>("pc_in", 1, &ExpMaxPersonFilter::recvPCCallback, this);
+  particles_pub_ = nh_priv.advertise<geometry_msgs::PoseArray>("particles", 1);
+  best_particles_pub_ = nh_priv.advertise<geometry_msgs::PoseArray>("best_particles", 1);
+  best_particles_center_pub_ = 
+    nh_priv.advertise<geometry_msgs::PoseStamped>("best_particles_center", 1);
   ///////////////////////////////////////////////////
 }
 
@@ -241,11 +271,13 @@ void ExpMaxPersonFilter::pubImages()
   cam_header_.stamp = ros::Time::now();
   cam_info_->header = cam_header_;
 
+#if 1
   for(int i = 0; i < img_cv_ptrs_.size(); i++) {
     sensor_msgs::ImagePtr img_msg = img_cv_ptrs_[i]->toImageMsg();
     img_msg->header = cam_header_;
     cam_pubs_[i].publish(img_msg, cam_info_);
   }
+#endif
   cam_stamped_tf_.stamp_ = cam_header_.stamp;
   tf_bcast_.sendTransform(cam_stamped_tf_);
   cam_header_.seq++;
@@ -301,6 +333,61 @@ inline void ExpMaxPersonFilter::drawParticles(cv::Mat& img, cv::Scalar scalar, A
   }
 }
 
+inline void ExpMaxPersonFilter::affineToPose(Eigen::Affine2f& aff, geometry_msgs::Pose& pose)
+{
+  pose.position.x = aff.translation()(0);
+  pose.position.y = aff.translation()(1);
+  pose.position.z = cam_offset_.z();
+
+  Eigen::Matrix2f rot_mat = aff.rotation();
+  tf::Matrix3x3 tfmat(rot_mat(0,1), rot_mat(0,0),  0.0,
+                      rot_mat(1,1), rot_mat(1,0),  0.0,
+                               0.0,          0.0, -1.0);
+  tf::Quaternion quat;
+  tfmat.getRotation(quat);
+  pose.orientation.x = quat.x();
+  pose.orientation.y = quat.y();
+  pose.orientation.z = quat.z();
+  pose.orientation.w = quat.w();
+}
+
+inline void ExpMaxPersonFilter::pubParticles(ros::Publisher& pub, AffineList& affs)
+{
+  geometry_msgs::PoseArray pose_arr;
+  pose_arr.header.frame_id = cam_header_.frame_id;
+  pose_arr.header.stamp = ros::Time::now();
+  pose_arr.poses.resize(affs.size());
+  for(int i = 0; i < affs.size(); i++)
+    affineToPose(affs[i], pose_arr.poses[i]);
+  pub.publish(pose_arr);
+}
+
+inline void ExpMaxPersonFilter::pubParticle(ros::Publisher& pub, Eigen::Affine2f& aff)
+{
+  geometry_msgs::PoseStamped pose;
+  pose.header.frame_id = cam_header_.frame_id;
+  pose.header.stamp = ros::Time::now();
+  affineToPose(aff, pose.pose);
+  pub.publish(pose);
+}
+
+inline void 
+averageParticles(AffineList& affs, Eigen::ArrayXf& weights, Eigen::Affine2f& center_aff)
+{
+  double sum_x = 0.0, sum_y = 0.0;
+  double sum_vx = 0.0, sum_vy = 0.0;
+  for(int i = 0; i < affs.size(); i++) {
+    Eigen::Matrix2f rot_mat = affs[i].rotation();
+    sum_x += weights(i)*(affs[i].translation()(0));
+    sum_y += weights(i)*(affs[i].translation()(1));
+    sum_vx += weights(i)*rot_mat(0, 0);
+    sum_vy += weights(i)*rot_mat(1, 0);
+  }
+  double weight_sum = weights.sum();
+  center_aff = Eigen::Translation2f(sum_x/weight_sum, sum_y/weight_sum) *
+               Eigen::Rotation2D<float>(std::atan2(sum_vy, sum_vx));
+}
+
 inline bool 
 getEllipseTangentPoints(float a, float b, const Eigen::Vector2f& cam_pt, 
                         Eigen::Vector2f& t1, Eigen::Vector2f& t2)
@@ -335,7 +422,7 @@ getEllipseTangentPoints(float a, float b, const Eigen::Vector2f& cam_pt,
   return true;
 }
 
-inline VectorXBool
+inline ArrayXBool
 checkPointsBetweenVectors(const Eigen::Vector2f& t1, const Eigen::Vector2f& t2, 
                           const Eigen::MatrixXf& pts)
 {
@@ -396,16 +483,25 @@ evalEllipse(Eigen::Affine2f& ell_affine, Eigen::VectorXf& pts_hist,
   if(!getEllipseTangentPoints(ell_a, ell_b, kin_pt, kin_tang1, kin_tang2)) 
     return 0.0;
 
-  Eigen::MatrixXf pts_trans = ell_affine*pts.colwise().homogeneous();
+  Eigen::MatrixXf pts_trans = ell_affine.inverse()*pts.colwise().homogeneous();
   Eigen::MatrixXf pts_trans_scaled = Eigen::AlignedScaling2f(1/ell_a, 1/ell_b)*pts_trans;
-  // something on this \/ line is really slow. probably the array transform
-  Eigen::ArrayXf dists = (pts_trans_scaled.colwise().squaredNorm().array() - 1).square();
-  Eigen::ArrayXf weights = (dists/(-ell_surf_sigma_*ell_surf_sigma_)).exp();
+  Eigen::ArrayXf dists = (pts_trans_scaled.colwise().squaredNorm().array() - 1).abs();
 
-  VectorXBool pts_visible = checkPointsBetweenVectors(kin_tang1, kin_tang2, pts_trans);
-  weights = weights*pts_visible.cast<float>().transpose();
+  ArrayXBool pts_visible = checkPointsBetweenVectors(kin_tang1, kin_tang2, pts_trans);
+  double exp_norm_factor = 1.0/(std::sqrt(2*M_PI)*ell_surf_sigma_);
+  double exp_mult = 1.0/(-2.0*ell_surf_sigma_*ell_surf_sigma_);
+  Eigen::ArrayXf log_prob_pts = 
+    ((prob_person_*exp_norm_factor)*(exp_mult*dists).exp()*pts_visible.cast<float>().transpose() + 
+     ((1.0 - prob_person_))).log();
+  return log_prob_pts.matrix().dot(pts_hist);
+
+  // Eigen::ArrayXf dists = (pts_trans_scaled.colwise().squaredNorm().array() - 1).square();
+  // Eigen::ArrayXf weights = (dists/(-ell_surf_sigma_*ell_surf_sigma_)).exp();
+
+  // ArrayXBool pts_visible = checkPointsBetweenVectors(kin_tang1, kin_tang2, pts_trans);
+  // weights = weights*pts_visible.cast<float>().transpose();
   // float max_weight = weights.maxCoeff();
-  return weights.matrix().dot(pts_hist);
+  // return weights.matrix().dot(pts_hist);
 }
 
 inline void stocasticUniversalSampling(boost::mt19937& randng, Eigen::ArrayXf& weights, 
@@ -436,6 +532,16 @@ inline void stocasticUniversalSampling(boost::mt19937& randng, Eigen::ArrayXf& w
 }
 
 void ExpMaxPersonFilter::
+sampleParticles(AffineList& affs_in, Eigen::ArrayXf& weights, AffineList& affs_out)
+{
+  std::vector<int> sample_inds;
+  stocasticUniversalSampling(randng_, weights, sample_inds);
+  std::vector<int>::iterator samp_it;
+  for(samp_it = sample_inds.begin(); samp_it != sample_inds.end(); ++samp_it)
+    affs_out.push_back(affs_in[*samp_it]);
+}
+
+void ExpMaxPersonFilter::
 sampleMotionModel(AffineList& affs_in, AffineList& affs_out)
 {
   boost::normal_distribution<> x_distrib(momodel_x_mean_, momodel_x_sigma_);
@@ -456,51 +562,104 @@ sampleMotionModel(AffineList& affs_in, AffineList& affs_out)
   }
 }
 
-void ExpMaxPersonFilter::recvPCCallback(const PCRGB::ConstPtr& msg)
+void ExpMaxPersonFilter::recvPCCallback(const PCRGB::ConstPtr& pc_combo)
 {
   static ros::Duration sum_time;
   static int num_times = 0;
   ros::Time start_time = ros::Time::now();
   cv::Rect img_rect(cv::Point(), img_proj_.size());
-  // img_proj_.setTo(cv::Scalar(0));
+  img_proj_.setTo(cv::Scalar(0));
+
+  // randomly downsample the cloud
+  pcl::RandomSample<PRGB> rand_samp;
+  rand_samp.setInputCloud(pc_combo);
+  rand_samp.setSample(num_pc_sample_);
+  std::vector<int> rand_samp_inds;
+  rand_samp.filter(rand_samp_inds);
 
   // convert to histogram on ground plane
-  // uint32_t color_red = 0x00ff0000;
-  // float color_red_float = *reinterpret_cast<float*>(&color_red); 
+  uint32_t color_red = 0x00ff0000;
+  float color_red_float = *reinterpret_cast<float*>(&color_red); 
   // PCRGB::const_iterator pt_it;
-  // for(pt_it = msg->begin(); pt_it != msg->end(); ++pt_it) {
-  //   // these points are projected into the simulated camera's frame
-  //   cv::Point2d pt2d = cam_model_.project3dToPixel(
-  //           cv::Point3d(pt_it->x-cam_offset_.x(), cam_offset_.y()-pt_it->y, cam_offset_.z()));
-  //   if(img_rect.contains(pt2d))
-  //     trip_lists_[pt_it->rgb == color_red_float].push_back(TripUInt8(pt2d.y, pt2d.x, 1));
-  //     // img_proj_.at<uint8_t>(pt2d.y, pt2d.x) += 1; 
-  // }
-  // ROS_INFO_THROTTLE(1.0, "trip_lists_ sizes: %d %d", trip_lists_[0].size(), trip_lists_[1].size());
+  // for(pt_it = pc_combo->begin(); pt_it != pc_combo->end(); ++pt_it) {
+  std::vector<int>::iterator inds_it;
+  for(inds_it = rand_samp_inds.begin(); inds_it != rand_samp_inds.end(); ++inds_it) {
+    // these points are projected into the simulated camera's frame
+    cv::Point2d pt2d = cam_model_.project3dToPixel(
+            cv::Point3d(pc_combo->at(*inds_it).x-cam_offset_.x(), 
+                        cam_offset_.y()-pc_combo->at(*inds_it).y, cam_offset_.z()));
+    //        cv::Point3d(pt_it->x-cam_offset_.x(), cam_offset_.y()-pt_it->y, cam_offset_.z()));
+    if(img_rect.contains(pt2d))
+      trip_lists_[pc_combo->at(*inds_it).rgb == color_red_float].push_back(
+          TripUInt8(pt2d.y, pt2d.x, 1));
+      // img_proj_.at<uint8_t>(pt2d.y, pt2d.x) += 1; 
+  }
+  ROS_INFO_THROTTLE(1.0, "trip_lists_ sizes: %d %d", trip_lists_[0].size(), trip_lists_[1].size());
 
-  // Eigen::VectorXf pc_proj_hists[NUM_KIN];
-  // Eigen::MatrixXf proj_pts[NUM_KIN];
-  // for(int kin_ind = 0; kin_ind < NUM_KIN; ++kin_ind)
-  //   convertTripletsToDense(trip_lists_[kin_ind], pc_proj_hists[kin_ind], proj_pts[kin_ind]);
-  //////////////////////////////////////////////////
+  Eigen::VectorXf pc_proj_hists[NUM_KIN];
+  Eigen::MatrixXf proj_pts[NUM_KIN];
+  for(int kin_ind = 0; kin_ind < NUM_KIN; ++kin_ind)
+    convertTripletsToDense(trip_lists_[kin_ind], pc_proj_hists[kin_ind], proj_pts[kin_ind]);
+  ///////////////////////////////////////////////
 
-  // Eigen::Vector2f kin_pts[NUM_KIN];
-  // kin_pts[0] = Eigen::Vector2f(kin1_pt_cam_.x(), kin1_pt_cam_.y());
-  // kin_pts[1] = Eigen::Vector2f(kin2_pt_cam_.x(), kin2_pt_cam_.y());
+  Eigen::Vector2f kin_pts[NUM_KIN];
+  kin_pts[0] = Eigen::Vector2f(kin1_pt_cam_.x(), kin1_pt_cam_.y());
+  kin_pts[1] = Eigen::Vector2f(kin2_pt_cam_.x(), kin2_pt_cam_.y());
 
-  AffineList affs_moved;
-  sampleMotionModel(particle_affs_, affs_moved);
-  particle_affs_ = affs_moved;
+  AffineList particle_samples, particles_moved;
+  sampleParticles(particles_, particle_weights_, particle_samples);
+  sampleMotionModel(particle_samples, particles_moved);
+
+#if 1
+  // update weights
+  AffineList::iterator part_it;
+  int w = 0;
+  for(part_it = particles_moved.begin(); part_it != particles_moved.end(); ++part_it) {
+    particle_weights_(w) = sensor_null_val_;
+    for(int kin_ind = 0; kin_ind < NUM_KIN; ++kin_ind) {
+      particle_weights_(w) += evalEllipse(*part_it, pc_proj_hists[kin_ind], 
+                                          proj_pts[kin_ind], kin_pts[kin_ind]);
+    }
+    w++;
+  }
+  particle_weights_ = particle_weights_.exp();
+  particle_weights_ = particle_weights_ / particle_weights_.sum();
+#endif
+
+#if 1
+  particles_ = particles_moved;
+  pubParticles(particles_pub_, particles_);
+
+  Eigen::ArrayXf weights_sorted = particle_weights_;
+  std::sort(weights_sorted.data(), weights_sorted.data()+weights_sorted.size());
+  int ptile_ind = (int) (best_ptile_*weights_sorted.size());
+  int best_particles_num = weights_sorted.size() - ptile_ind;
+  float ptile_weight = weights_sorted(ptile_ind);
+  AffineList best_particles(best_particles_num);
+  Eigen::ArrayXf best_particle_weights(best_particles_num);
+  int bp_ind = 0;
+  for(int i = 0; i < particles_.size(); i++) {
+    if(particle_weights_(i) >= ptile_weight) {
+      best_particles[bp_ind] = particles_[i];
+      best_particle_weights(bp_ind) = particle_weights_(i);
+      bp_ind++;
+      if(bp_ind == best_particles_num)
+        break;
+    }
+  }
+  pubParticles(best_particles_pub_, best_particles);
+  Eigen::Affine2f best_particles_center;
+  averageParticles(best_particles, best_particle_weights, best_particles_center);
+  pubParticle(best_particles_center_pub_, best_particles_center);
+
+  sum_time += ros::Time::now() - start_time; num_times++;
+  ROS_INFO_THROTTLE(1.0, "avg time: %fms", 1000.0*sum_time.toSec()/num_times);
+
   img_sensor_mdl_.setTo(cv::Scalar(0.0));
-  drawParticles(img_sensor_mdl_, cv::Scalar(1.0), particle_affs_);
+  drawParticles(img_sensor_mdl_, cv::Scalar(1.0), particles_);
   pubImages();
+#endif
 
-  // Eigen::Affine2f ell_affine = Eigen::Rotation2D<float>(0.3) * Eigen::Translation2f(0.0, 1.0);
-  // for(int i = 0; i < 100; ++i) 
-  //   for(int kin_ind = 0; kin_ind < NUM_KIN; ++kin_ind)
-  //     evalEllipse(ell_affine, pc_proj_hists[kin_ind], proj_pts[kin_ind], kin_pts[kin_ind]);
-  sum_time += ros::Time::now() - start_time;
-  ROS_INFO_THROTTLE(1.0, "avg time: %f", sum_time.toSec()/++num_times);
 #if 0
   Eigen::MatrixXf all_proj_pts(2, 1000*1000);
   for(int i = 0; i < 1000; ++i) {
@@ -544,21 +703,15 @@ void ExpMaxPersonFilter::recvPCCallback(const PCRGB::ConstPtr& msg)
   }
   circleCameras(img_sensor_mdl_, cv::Scalar(max_weight));
 
-  VectorXBool pts_visible1 = checkPointsBetweenVectors(kin2_tang1, kin2_tang2, all_proj_pts_trans);
+  ArrayXBool pts_visible1 = checkPointsBetweenVectors(kin2_tang1, kin2_tang2, all_proj_pts_trans);
   // weights = weights*pts_visible1.cast<float>().transpose();
 
   int weight_ind = 0;
   for(int j = 0; j < 1000; ++j)
     for(int i = 0; i < 1000; ++i)
       img_sensor_mdl_.at<float>(j, i) = weights(weight_ind++);
-  
-  // AffineList::iterator aff_it;
-  // for(aff_it = particle_affs_.begin(); aff_it != particle_affs_.end(); ++aff_it) {
-  //   (*aff_it)*proj_pts.colwise().homogeneous();
-  // }
-  
 
-  // ROS_INFO_THROTTLE(1.0, "PC size: %d", msg->size());
+  // ROS_INFO_THROTTLE(1.0, "PC size: %d", pc_combo->size());
   // ROS_INFO_THROTTLE(1.0, "NNZ: %d", cv::countNonZero(img_proj_));
   // printMinMax(img_proj_);
   // circleCameras(img_proj_);

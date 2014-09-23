@@ -5,24 +5,29 @@
       sim_cam_y: 2.5
       sim_cam_z: 100.0
       base_link: /table_link
-      sim_image_width: 1000
-      sim_image_height: 1000
+      sim_image_width: 500
+      sim_image_height: 500
       sim_image_span_width: 7.0
       sim_image_span_height: 7.0
       kinect_1_frame: /kinect_front_rgb_optical_frame
       kinect_2_frame: /kinect_back_rgb_optical_frame
 
-      ell_width: 1.0
-      ell_depth: 0.5
-      ell_surf_sigma: 0.1
+      ell_width: 0.5
+      ell_depth: 0.36
+      ell_surf_sigma: 0.15
+
+      num_pc_sample: 400
 
       num_particles: 100
       momodel_x_mean: 0.0
-      momodel_x_sigma: 0.000001
-      momodel_y_mean: 0.0
-      momodel_y_sigma: 0.000001
+      momodel_x_sigma: 0.05
+      momodel_y_mean: 0.04
+      momodel_y_sigma: 0.15
       momodel_r_mean: 0.0
-      momodel_r_sigma: 0.03
+      momodel_r_sigma: 0.5
+      sensor_null_val: 0.0
+      best_ptile: 0.4
+      prob_person: 0.1
     </rosparam>
     <remap from="/pc_in" to="/kinect_both/depth_registered/points" />
   </node>
