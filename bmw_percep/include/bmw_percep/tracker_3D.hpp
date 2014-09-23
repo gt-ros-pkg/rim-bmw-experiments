@@ -41,6 +41,7 @@ class Tracker3d{
 private:
   ros::NodeHandle nh_;
   // Globals
+  ros::Time cur_pc_time;
   string hum_frame, robo_frame;
   int frame_rate;
 enum { COLS=640, ROWS=480};
@@ -159,7 +160,8 @@ got_transform_ = false;
     ppl_tracker.estimate(cloud, 
 			 clusters,
 			 ground_coeffs,
-			 robo_loc, got_transform_);
+			 robo_loc, got_transform_,
+			 cur_pc_time);
 
     // set frame-id if first frame
     if(!ppl_frame_set){
@@ -198,6 +200,10 @@ void Tracker3d::pc_call(const PointCloudT::ConstPtr& temp_cloud)
   // cout << "Frame = " << temp_cloud->header.frame_id << endl;
   
   pcl::copyPointCloud(*temp_cloud, *cloud);
+
+  std_msgs::Header tmp_head = pcl_conversions::fromPCL(cloud->header);
+  cur_pc_time = tmp_head.stamp; //ros::Time::now();
+
 
   new_cloud_available_flag = true;
   

@@ -115,7 +115,7 @@ void estimate(PointCloudT::Ptr& cloud,
 		vector<vector<ClusterPoint> > &clusters,
 		const Eigen::VectorXf ground_coeffs,
 		const Eigen::Vector3f robo_loc,
-		bool got_tf_robot,
+	      bool got_tf_robot, ros::Time pc_time,
 		float leaf_size=0.06);
   
 void visualize(ros::Publisher pub);
@@ -169,7 +169,8 @@ vector<ClusterPoint> cur_pos_;
 float max_height_, min_height_, max_dist_gr_;
 int max_c_size_, min_c_size_;
 bool more_than_one_;
-ros::Time pub_time; //time-stamp associated with human estimation
+ros::Time pub_time_; //time-stamp associated with human estimation
+  ros::Time prev_time_;
 particleFilter2D human_tracker_;
   KalmanFilter kf_tracker_;
 bool currently_filtering_; //does the particle filter need reinitialization?

@@ -93,7 +93,7 @@ void PplTrack::visualize(ros::Publisher pub)
   
   // //debug
   // cout << "Frame is " << viz_frame_ << endl;
-  inn_cyl_marker.header.stamp = pub_time;
+  inn_cyl_marker.header.stamp = pub_time_;
 
   // Set the namespace and id for this marker.  This serves to create a unique ID
   // Any marker sent with the same namespace and id will overwrite the old one
@@ -197,7 +197,7 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
     visualization_msgs::Marker inn_cyl_marker;
     // Set the frame ID and timestamp.  
     inn_cyl_marker.header.frame_id = viz_frame_;
-    inn_cyl_marker.header.stamp = pub_time;
+    inn_cyl_marker.header.stamp = pub_time_;
 
     // Set the namespace and id for this marker.  This serves to create a unique ID
     // Any marker sent with the same namespace and id will overwrite the old one
@@ -254,7 +254,7 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
     out_cyl_marker.color.b = color(2);
     out_cyl_marker.color.a = 0.5;
 
-    // mark_arr.markers.push_back(out_cyl_marker);
+    mark_arr.markers.push_back(out_cyl_marker);
   
 
     //visualize velocity if present
@@ -322,10 +322,12 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 			vector<vector<ClusterPoint> > &clusters,
 			const Eigen::VectorXf ground_coeffs,
 			const Eigen::Vector3f robo_loc,
-			bool got_tf_robot,
+			bool got_tf_robot, ros::Time pc_time,
 			float leaf_size/*=0.06*/)
 {
   reset_vals();
+  
+  pub_time_ = pc_time;
   
   if (!table_link){
     PointCloudT::Ptr viz_cloud(new PointCloudT);
@@ -368,15 +370,15 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     vg.setLeafSize(voxel_size, voxel_size, voxel_size);
     vg.filter(*cloud);
     
-    cout << "Time to Voxel = " << voxel_timer.elapsed() << endl;
+    // cout << "Time to Voxel = " << voxel_timer.elapsed() << endl;
 
-    cout << "No. of points = " << cloud->size() << endl;
+    // cout << "No. of points = " << cloud->size() << endl;
     
     // Creating the KdTree object for the search method of the extraction
     boost::timer kd;
     pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
     tree->setInputCloud (cloud);
-    cout << "KD Tree takes = " << kd.elapsed() << "s" << endl;
+    // cout << "KD Tree takes = " << kd.elapsed() << "s" << endl;
      
     boost::timer clusterize;
     vector<pcl::PointIndices> cluster_indices;
@@ -389,7 +391,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     ec.setInputCloud (cloud);
     ec.extract (cluster_indices);
 
-    cout << "Clustering takes = " << clusterize.elapsed() << "s" << endl;
+    // cout << "Clustering takes = " << clusterize.elapsed() << "s" << endl;
 
     //merge
     merge_floor_clusters(cloud, cluster_indices);
@@ -409,25 +411,24 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
       more_than_one_=false;
     
     //TODO: May be publish the timestamp of PointCloud instead
-    pub_time = ros::Time::now();
 
     //TODO:Publish people properties
     
     //Track them
     if (person_id_>-1){ //current observation=true
-      // write_clusters_disk();
       if (history_per_stats_.size()>0){
 	if (!isnan(history_per_stats_.front().pos(0))){
 	  if (currently_filtering_){
+	    float dt = static_cast<float>((pub_time_-prev_time_).toSec());
 	    Eigen::Vector4f kf_est;
-	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))
-				 , 0.1, kf_est);
-	    human_tracker_.prop_part();
+	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), 
+						 pers_obs_.pos(1)), 0.1, kf_est);
+	    // human_tracker_.prop_part();
 	    cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
 	    cv::Point2f cur_pos, cur_vel;
 	    cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0), 
 					       history_per_stats_.front().pos(1));
-	    human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
+	    // human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
 	
 	    //assign to the estimate
 	    // pers_est_.pos = Eigen::Vector2f(cur_pos.x, cur_pos.y);
@@ -437,7 +438,10 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
 
 	    //debug
-	    cout << "Velocity = " << cur_vel << endl;
+	    // cout << "Velocity = " << cur_vel << endl;
+
+	    write_clusters_disk();
+	    
 	  }
 	  else{
 
@@ -448,21 +452,23 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	  
 	    cout << "Previous position = " << prev_pos << endl;
 
-	    human_tracker_.reinitialize(prev_pos, hum_pt, 
-					(1.0/static_cast<double> (30)), 1000,
-					10.0);
+	    // human_tracker_.reinitialize(prev_pos, hum_pt, 
+	    // 				(1.0/static_cast<double> (30)), 1000,
+	    // 				10.0);
 	  
-	    human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
-
-	    cv::Point2f vel_ = hum_pt - prev_pos;
+	    // human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
 
 	    //kalman
-	    Eigen::Vector2f acc_std(1.,1.);
-	    Eigen::Vector2f measur_std(0.5,0.5);
-	    float delta_t = 0.1;
-	    Eigen::Vector4f x_k1(prev_pos.x, prev_pos.y, vel_.x, vel_.y);
+	    Eigen::Vector2f acc_std(0.05,0.05);
+	    Eigen::Vector2f measur_std(0.05,0.05);
+	    float delta_t = 1./15.;
 
-	    kf_tracker_.reinitialize(acc_std, measur_std, delta_t, x_k1);
+	    cv::Point2f vel_ = (hum_pt - prev_pos);
+
+	    // Eigen::Vector4f x_k1(prev_pos.x, prev_pos.y, vel_.x, vel_.y);
+	    Eigen::Vector4f x_k1(hum_pt.x, hum_pt.y, 0., 0.);
+	    Eigen::Matrix4f init_cov = 10000*Eigen::Matrix4f::Identity();
+	    kf_tracker_.reinitialize(acc_std, measur_std, delta_t, x_k1, init_cov);
 	    Eigen::Vector4f kf_est;
 	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))				 , 0.1, kf_est);
 
@@ -511,7 +517,10 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	history_per_stats_.pop();
       }
     history_per_stats_.push(pers_est_);
-    
+
+    //remember previous time
+    prev_time_ = pub_time_;
+
     //debug
     // visualize by painting each PC another color
     // pcl::copyPointCloud(*no_ground_cloud, *cloud_filtered);
@@ -623,9 +632,9 @@ PplTrack::PplTrack(float z){
 
   ws_min_ = Eigen::Vector3f(.05, .84, -ground_coeffs_(3));
   ws_max_ = Eigen::Vector3f(4.3, 4.0, 5.0);
-  human_tracker_.set_range_gran(Eigen::Vector2f(ws_min_(0), ws_min_(1)), 
-				Eigen::Vector2f(ws_max_(0), ws_max_(1)),
-				0.06);
+  // human_tracker_.set_range_gran(Eigen::Vector2f(ws_min_(0), ws_min_(1)), 
+  // 				Eigen::Vector2f(ws_max_(0), ws_max_(1)),
+  // 				0.06);
 
   history_size_ = 10;
   currently_filtering_ = false;
@@ -818,23 +827,27 @@ void PplTrack::write_clusters_disk()
   string file_name = path + boost::lexical_cast<string>(file_no_) + file_ext;
   file_no_++;
 
-  pts_file.open(file_name.c_str());
 
-  for(vector<vector<ClusterPoint> >::iterator cit=per_cs_.begin(); 
-      cit!=per_cs_.end(); ++cit ){
-    for(vector<ClusterPoint>::iterator pit=cit->begin(); pit!=cit->end(); ++pit){
-      ClusterPoint p = (*pit);
-      pts_file << p(0) << ',' << p(1) << endl;
-     }
-  }
+  // pts_file.open(file_name.c_str());
+
+  // for(vector<vector<ClusterPoint> >::iterator cit=per_cs_.begin(); 
+  //     cit!=per_cs_.end(); ++cit ){
+  //   for(vector<ClusterPoint>::iterator pit=cit->begin(); pit!=cit->end(); ++pit){
+  //     ClusterPoint p = (*pit);
+  //     pts_file << p(0) << ',' << p(1) << endl;
+  //    }
+  // }
   
-  pts_file.close();
+  // pts_file.close();
   
   //Centroid File
   ofstream cen_file;
+  float dt = static_cast<float>((pub_time_-prev_time_).toSec());
   string fn_centroid = path+"median"+file_ext;
   cen_file.open(fn_centroid.c_str(), ios::app);
-  cen_file << pers_obs_.pos(0) << ',' << pers_obs_.pos(1) << endl;
+  cen_file << pers_obs_.pos(0) << ',' << pers_obs_.pos(1) << ',' << 
+    pers_est_.pos(0) << ',' << pers_est_.pos(1) << ',' << pers_est_.vel(0)
+	   << ',' <<  pers_est_.vel(1) << ',' <<  dt << endl;
   cen_file.close();
 }
 
@@ -890,7 +903,7 @@ void PplTrack::set_observation()
     get_head_center(person_id_, pers_obs_.pos);
     
     //debug 
-    cout << " Head Center" << pers_obs_.pos << endl;
+    // cout << " Head Center" << pers_obs_.pos << endl;
     
     //assumption- one person only
     ClusterStats per_stats = per_stats_[person_id_];
@@ -916,8 +929,8 @@ void PplTrack::set_observation()
 
 void PplTrack::set_estimate()
 {
-  pers_est_.pos = Eigen::Vector2f(per_stats_[person_id_].median(0),
-				  per_stats_[person_id_].median(1));
+  // pers_est_.pos = Eigen::Vector2f(per_stats_[person_id_].median(0),
+  // 				  per_stats_[person_id_].median(1));
 
   //assumption- one person only
   pers_est_.inn_cyl = pers_obs_.inn_cyl;

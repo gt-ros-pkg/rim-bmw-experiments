@@ -27,7 +27,9 @@ void KalmanFilter::predict(float delta_t){
 }
 
 //Check if things are way off and reinitialize?
+//TODO: Check if thing are way off
 void KalmanFilter::correct(Eigen::Vector2f z_k){
+
   //Compute Kalman gain
   K_ = P_k_p_ * H_.transpose() * (H_ * P_k_p_ * H_.transpose() 
 				  + R_).inverse();
@@ -37,6 +39,14 @@ void KalmanFilter::correct(Eigen::Vector2f z_k){
   //Update error cov
   Eigen::Matrix4f I = Eigen::Matrix4f::Identity();
     P_k_n_ = ( I - (K_ * H_)) * P_k_p_;
+
+  //debug
+  cout << "Prediction --- \n" << x_k_p_ << endl;
+  cout << "Observation --- \n" << z_k << endl;
+  cout << "Corrected --- \n" << x_k_n_ << endl;
+  cout << "Error Cov --- \n" << P_k_n_ << endl;
+  
+
 }
 
 //Dummy constructor
@@ -79,21 +89,26 @@ void KalmanFilter::delta_change()
     //Recompute Q
     float dt2 = (pow(delta_t_,2))/2;
     Eigen::Matrix<float, 4, 2>  G;
-      G << dt2, 0.,
-      0., dt2,
+    //Process noise in the highest order term
+      G << 0., 0.,
+      0., 0.,
       delta_t_, 0.,
       0., delta_t_;
     
     Q_ = G * sigma_acc_ * G.transpose();  
 }
 
-void KalmanFilter::estimate(Eigen::Vector2f obs, float delta_t, Eigen::Vector4f &est)
+void KalmanFilter::estimate(Eigen::Vector2f obs, float delta_t, 
+			    Eigen::Vector4f &est)
 {
   //previous estimate is k-1th estimate now
   x_k1_ = x_k_n_;
+  P_k1_ = P_k_n_;
+
   predict(delta_t);
   correct(obs);
 
   est = x_k_n_;
+
   return;
 }
