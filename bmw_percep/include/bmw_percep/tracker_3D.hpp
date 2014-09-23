@@ -166,12 +166,9 @@ got_transform_ = false;
       ppl_tracker.set_viz_frame(hum_frame);
       ppl_frame_set=true;}
   
-    //debug
-    cout << "Problem with visualize??" << endl;
     // ppl_tracker.visualize(pub_viz);
     ppl_tracker.visualize_est(pub_viz);
     ppl_tracker.visualize_obs(pub_raw_obs);
-    cout << "No its not. Haha" << endl;
     // pcl::copyPointCloud(*cloud, *viz_cloud);
     if (cloud->points.size()>0){
       pcl::copyPointCloud(*cloud, *tcloud);
@@ -179,7 +176,7 @@ got_transform_ = false;
       pub_pc.header.frame_id = hum_frame;
       db_pc.publish(pub_pc);
     }
-    int useless;
+    // int useless;
     //cin >> useless;
     // cv_utils::pc_to_img(cloud, rgb_im, depth_im, valid_depth);
     // cv::imshow("rgb", rgb_im);

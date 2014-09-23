@@ -74,6 +74,16 @@ ClusterPoint max; //all these stats are taken independent in the dimensions
 ClusterPoint median;
 };
 typedef struct ClusterStats ClusterStats;
+typedef Eigen::Matrix<int, 2, 1> Index2D;
+
+//element of the height map
+struct HMapEl{
+  float height; // max height
+  Eigen::Vector2f loc;
+  vector<Eigen::Vector2f> p_ind; // point cloud indices
+  bool in_h_range;
+};
+typedef struct HMapEl HMapEl;
 
 struct PersProp{ //properties of the person
 Eigen::Vector2f pos;
@@ -145,7 +155,6 @@ void get_clusters_stats(PointCloudT::ConstPtr cloud,
   void visualize_est(ros::Publisher pub)
   {visualize(pub, Eigen::Vector3f(1.0, 0.0, 0.0), pers_est_, "human/visuals");}
 
-
 private:
 bool table_link;
 int person_id_; // the index of the person from the person clusters
@@ -169,6 +178,17 @@ bool currently_filtering_; //does the particle filter need reinitialization?
   int file_no_;
 
 //member functions
+  void cluster_head(vector<vector<HMapEl> > hmap, size_t x, size_t y, 
+		    int h_x_span, int h_y_span, 
+		    vector<Index2D> &i_list);
+  void get_head_center(int c_ind, Eigen::Vector2f &h_center);
+
+  // //find 2D center for the head
+  // void find_head_center(int c_ind);
+
+  // //create a 2D map for heights in a cluster
+  // void create_height_map(int c_ind, vector<HMapEl> &hmap);
+
   void write_clusters_disk();
 void reset_vals(); //resets the variables for calculating anew
 void estimate(vector<ClusterPoint> cluster);

@@ -254,7 +254,7 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
     out_cyl_marker.color.b = color(2);
     out_cyl_marker.color.a = 0.5;
 
-    mark_arr.markers.push_back(out_cyl_marker);
+    // mark_arr.markers.push_back(out_cyl_marker);
   
 
     //visualize velocity if present
@@ -464,8 +464,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 
 	    kf_tracker_.reinitialize(acc_std, measur_std, delta_t, x_k1);
 	    Eigen::Vector4f kf_est;
-	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))
-				 , 0.1, kf_est);
+	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))				 , 0.1, kf_est);
 
 	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
 	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
@@ -830,6 +829,13 @@ void PplTrack::write_clusters_disk()
   }
   
   pts_file.close();
+  
+  //Centroid File
+  ofstream cen_file;
+  string fn_centroid = path+"median"+file_ext;
+  cen_file.open(fn_centroid.c_str(), ios::app);
+  cen_file << pers_obs_.pos(0) << ',' << pers_obs_.pos(1) << endl;
+  cen_file.close();
 }
 
 void PplTrack::assign_ppl_clusters(PointCloudT::ConstPtr cloud, 
@@ -879,7 +885,12 @@ void PplTrack::set_observation()
   //set the position
   if(person_id_>-1){ // in case observation made
     pers_obs_.pos = Eigen::Vector2f(per_stats_[person_id_].median(0),
-				    per_stats_[person_id_].median(1));
+    				    per_stats_[person_id_].median(1));
+
+    get_head_center(person_id_, pers_obs_.pos);
+    
+    //debug 
+    cout << " Head Center" << pers_obs_.pos << endl;
     
     //assumption- one person only
     ClusterStats per_stats = per_stats_[person_id_];
@@ -910,4 +921,136 @@ void PplTrack::set_estimate()
   pers_est_.out_cyl = pers_obs_.out_cyl;
   pers_est_.height = pers_obs_.height;
   
+}
+
+void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
+{
+  vector<vector <HMapEl> > hmap;
+  float dist_from_top = 0.3;
+  float head_span = 0.5;
+  int tbx=20, tby=20;
+  // float gran = 0.05; // granularity
+
+  Eigen::Vector2f xlims(per_stats_[c_ind].min(0), per_stats_[c_ind].max(0));
+  Eigen::Vector2f ylims(per_stats_[c_ind].min(1), per_stats_[c_ind].max(1));
+
+  float granx = (xlims(1)-xlims(0))/static_cast<float>(tbx) ;
+  float grany = (ylims(1)-ylims(0))/static_cast<float>(tby) ;
+
+  // float delta = gran/5.;
+
+  // int total_bins_x = ceil((xlims(1) - xlims(0))/gran);
+  // int total_bins_y = ceil((ylims(1) - ylims(0) )/gran);
+  // int tbx=total_bins_x, tby=total_bins_y;
+
+  hmap.resize(tby);
+
+  //initialize map
+  for(size_t i=0; i<hmap.size(); ++i){
+    hmap[i].resize(tbx);
+    for(size_t j=0; j<hmap[i].size(); ++j){
+      hmap[i][j].loc = Eigen::Vector2f(granx * static_cast<float>(j) + xlims(0), 
+				       grany * static_cast<float>(i) + ylims(0));
+      hmap[i][j].height = 0.0;
+      hmap[i][j].in_h_range = false;
+      hmap[i][j].p_ind.clear();
+    }
+  }
+
+  float max_ht = 0.0;
+  Index2D max_ht_ind;
+
+  cout << "Bad allocing" << endl;
+  //update map with cluster points
+  for(size_t i=0; i<per_cs_[c_ind].size(); ++i){
+    ClusterPoint t_cl = per_cs_[c_ind][i];
+    size_t h_i_x = floor((t_cl(0)-xlims(0)) / granx);
+    size_t h_i_y = floor((t_cl(1)-ylims(0)) / grany);
+    if (h_i_x<0 || h_i_y<0)
+      {cout << "My height map index negative " << endl;
+	string whut; cin>>whut;}
+    if (h_i_x>tbx-1)
+      h_i_x = tbx-1;
+    if (h_i_y>tby-1)
+      h_i_y = tby-1;
+
+    //push point into height map square
+    hmap[h_i_y][h_i_x].p_ind.push_back(Eigen::Vector2f(t_cl(0), t_cl(1)));
+
+    if (hmap[h_i_y][h_i_x].height<t_cl(2)){
+      hmap[h_i_y][h_i_x].height = t_cl(2);
+    }
+
+    if (max_ht < t_cl(2)) {
+      max_ht = t_cl(2); 
+      max_ht_ind(0) = h_i_x;
+      max_ht_ind(1) = h_i_y;
+    }
+  }
+
+  cout << "After here?" << endl;
+  
+  //set flags of pixels that are in range to true
+  for(size_t i=0; i<hmap.size(); ++i){
+    for(size_t j=0; j<hmap[i].size(); ++j){
+      if (hmap[i][j].height > (max_ht-dist_from_top)){
+	hmap[i][j].in_h_range = true;
+      }
+    }
+  }
+
+  cout << "After setting pixels" << endl;
+
+  //find the cluster with points in range
+  int h_x_span = floor(head_span/granx); int h_y_span = floor(head_span/grany);
+  vector<Index2D> head_ind;
+  cluster_head(hmap, max_ht_ind(0), max_ht_ind(1), h_x_span, h_y_span, head_ind);
+
+  cout << "After head clustering??" << endl;
+
+  //TODO: Check if any clusters are being repeated
+  //get the centroid from connected clusters
+  Eigen::Vector2f temp;
+  accumulator_set< float, stats<tag::mean> > x_acc, y_acc;
+  for(size_t i=0; i<head_ind.size(); i++){
+    vector<Eigen::Vector2f> *cur_pts = &hmap[head_ind[i](1)][head_ind[i](0)].p_ind;
+    for(size_t j=0;
+	j < cur_pts->size();
+	++j){
+      temp = cur_pts->at(j);
+      x_acc(temp(0));
+      y_acc(temp(1));
+    }
+  }
+
+  cout << "After even this..." << endl;
+  
+  h_center = Eigen::Vector2f(mean(x_acc), mean(y_acc));
+}
+
+void PplTrack::cluster_head(vector<vector<HMapEl> > hmap, size_t x, size_t y, 
+			    int h_x_span, int h_y_span, 
+			    vector<Index2D> &i_list)
+{
+  int cur_x, cur_y;
+  for(int i=-h_y_span; i<=h_y_span; ++i){
+    cur_y = y + i;
+    if (cur_y>0 && cur_y<hmap.size()){
+      for(int j=-h_y_span; j<=h_y_span; ++j){
+	cur_x = x + j;
+	if (cur_x>0 && cur_x<hmap[j].size()){
+	  if (hmap[cur_y][cur_x].in_h_range){
+	    i_list.push_back(Index2D(static_cast<int>(cur_x), 
+				     static_cast<int>(cur_y)));
+	    //TODO: Recurse smartly
+	    // vector<Index2D> temp_list;
+	    // temp_list.push_back(Index2D(cur_x, cur_y));
+	    // cluster_head(hmap, static_cast<size_t>(cur_x), 
+	    // 		 static_cast<size_t>(cur_y), temp_list);
+	    
+	  }
+	}
+      }
+    }
+  }
 }
