@@ -119,6 +119,7 @@ got_transform_ = false;
   while(ros::ok()){
     // //debug
     // cout << "Got to the while? " << endl;
+    new_cloud_available_flag=false;
     ros::spinOnce();
     // cout << "Spun" << endl;
     if (new_cloud_available_flag)
