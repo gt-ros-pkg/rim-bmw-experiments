@@ -775,7 +775,7 @@ void PplTrack::write_clusters_disk()
   system("mkdir data/temp-clusters/");
   string path = "data/temp-clusters/";
   ofstream pts_file;
-  string file_ext=".txt";
+  string file_ext=".csv";
   string file_name = path + boost::lexical_cast<string>(file_no_) + file_ext;
   file_no_++;
 
@@ -795,7 +795,7 @@ void PplTrack::write_clusters_disk()
   //Centroid File
   ofstream cen_file;
   float dt = static_cast<float>((pub_time_-prev_time_).toSec());
-  string fn_centroid = path+"median"+file_ext;
+  string fn_centroid = path+"observations"+file_ext;
   cen_file.open(fn_centroid.c_str(), ios::app);
 
   // cen_file << pers_obs_.pos(0) << ',' << pers_obs_.pos(1) << ',' << 
