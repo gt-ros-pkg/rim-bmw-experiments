@@ -91,36 +91,23 @@ got_transform_ = false;
   string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
   robo_frame = "base_link";
 
-  //ros
-  // ros::init(argc, argv, "sample_tracker");
-  // ros::NodeHandle nh;
-  // subscribe to input Point Cloud
   pc_sub = nh.subscribe<PointCloudT> 
     (sub_topic, 1, &Tracker3d::pc_call, this);
-  // pc_sub_ = nh.subscribe<PCRGB>(sub_topic, 5, &Tracker3d::recvPCCallback, this);
 
-//Publish the human clusters
+  //Publish the human clusters
   db_pc = nh.advertise<pcl::PCLPointCloud2> (pub_topic, 1);
-//Publish visualizations for the human
+  //Publish visualizations for the human
   pub_viz = nh.advertise<visualization_msgs::MarkerArray> (viz_topic, 1);
   pub_raw_obs = nh.advertise<visualization_msgs::MarkerArray> (raw_obs_topic, 1);
 
-  // PointCloudT::Ptr cloud (new PointCloudT);
   PointCloudT::Ptr
     tcloud (new PointCloudT);
   pcl::PCLPointCloud2 pub_pc;
-  // cv::Mat rgb_im, depth_im, valid_depth, foreMask, back_im, disp_im, box_mask, box_mask2, box_mask_inliers;
-
-  //ground-plane
-  Eigen::VectorXf ground_coeffs;
-  //read ground plane parameters from file
-  string gr_file_name = pkg_dir + "data/ground_coeffs.txt";
-  GroundPlane ground_obj(gr_file_name);
-  ground_obj.get_ground_coeffs(ground_coeffs);
 
   //People Tracker
+  float ground_coeffs=.25;
   // PplTrack ppl_tracker(ground_coeffs);
-  PplTrack ppl_tracker(0.25);
+  PplTrack ppl_tracker(ground_coeffs);
   bool ppl_frame_set = false;
   int n_frames=0;
   
@@ -141,25 +128,12 @@ got_transform_ = false;
 
     vector<vector<Eigen::Vector3f> > clusters;
     
-    // ppl_detection::find_euclid_blobs(cloud, viz_cloud,  
-    //     				clusters,
-    //     				ground_coeffs);
-
-
-    // //debug
-    // if(viz_cloud->points.size()>0){
-    // cout << "The numbero peeps is " << clusters.size();
-    // string whap;
-    // cin >> whap;
-    // }
-
     //check if cloud empty
     if (cloud->points.size()<1)
       continue;
     //track
     ppl_tracker.estimate(cloud, 
 			 clusters,
-			 ground_coeffs,
 			 robo_loc, got_transform_,
 			 cur_pc_time);
 

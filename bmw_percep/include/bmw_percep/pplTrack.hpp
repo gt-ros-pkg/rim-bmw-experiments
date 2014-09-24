@@ -25,7 +25,7 @@
 #include <pcl/filters/random_sample.h>
 #include <bmw_percep/ppl_detection.hpp>
 #include <bmw_percep/shr_cv_utils.hpp>
-#include <bmw_percep/particleFilter.hpp>
+//#include <bmw_percep/particleFilter.hpp>
 #include <bmw_percep/kalmanFilterAcc.hpp>
 #include <queue>
 #include <math.h>
@@ -113,7 +113,6 @@ void estimate(vector<vector<ClusterPoint> > clusters);
 // person or people
 void estimate(PointCloudT::Ptr& cloud, 
 		vector<vector<ClusterPoint> > &clusters,
-		const Eigen::VectorXf ground_coeffs,
 		const Eigen::Vector3f robo_loc,
 	      bool got_tf_robot, ros::Time pc_time,
 		float leaf_size=0.06);
@@ -171,7 +170,7 @@ int max_c_size_, min_c_size_;
 bool more_than_one_;
 ros::Time pub_time_; //time-stamp associated with human estimation
   ros::Time prev_time_;
-particleFilter2D human_tracker_;
+
   KalmanFilterAcc kf_tracker_;
 bool currently_filtering_; //does the particle filter need reinitialization?
   PersProp pers_obs_, pers_est_; //current person observation and the estimate

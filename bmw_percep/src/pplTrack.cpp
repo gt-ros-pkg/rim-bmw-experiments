@@ -320,7 +320,6 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
 
 void PplTrack::estimate(PointCloudT::Ptr& cloud, 
 			vector<vector<ClusterPoint> > &clusters,
-			const Eigen::VectorXf ground_coeffs,
 			const Eigen::Vector3f robo_loc,
 			bool got_tf_robot, ros::Time pc_time,
 			float leaf_size/*=0.06*/)
@@ -330,12 +329,8 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
   pub_time_ = pc_time;
   
   if (!table_link){
-    PointCloudT::Ptr viz_cloud(new PointCloudT);
-    //workspace_limit(cloud);
-    ppl_detection::find_euclid_blobs(cloud, viz_cloud,  
-				     clusters,
-				     ground_coeffs, leaf_size);
-    estimate(clusters);
+    cout << "Everything expected in Table link frames. PROBLEM PROBLEM PROBLEM!!"
+	 << endl;
   }
   else{
     
@@ -346,9 +341,6 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     if (got_tf_robot) // in case the robots location is known
       robot_remove(cloud, robo_loc);
 
-    // int max_cluster_size = 800;
-    // int min_cluster_size = 100;
-    
     pcl::copyPointCloud(*cloud, *viz_cloud);
 
     // pcl::RandomSample<PointT> ransam;
@@ -427,55 +419,39 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
 	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
 
-	    //debug
-	    // cout << "Velocity = " << cur_vel << endl;
-
-	    write_clusters_disk();
-	    
+	    //write to disk
+	    // write_clusters_disk();
 	  }
 	  else{
 
-	    cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0), 
+	    cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0),
 					       history_per_stats_.front().pos(1));
-	  
 	    //kalman
 	    Eigen::Vector2f jerk_std(0.8,0.8);
 	    Eigen::Vector2f measur_std(0.05,0.05);
 	    float delta_t = 1./15.;
-
-	    // cv::Point2f vel_ = (hum_pt - prev_pos);
-
-	    // Eigen::Vector4f x_k1(prev_pos.x, prev_pos.y, vel_.x, vel_.y);
 	    Eigen::Matrix<float, 6, 1> x_k1;
 	    x_k1.fill(0.);
 	    x_k1(0,0)=pers_obs_.pos(0); x_k1(1,0)=pers_obs_.pos(1);
-
 	    Eigen::Matrix<float, 6, 6> init_cov 
 	      = 10000*Eigen::MatrixXf::Identity(6,6);
 	    
-	    cout << "**********Initial Covariance " << init_cov << endl;
-	    
-	    kf_tracker_.reinitialize(jerk_std, measur_std, delta_t, x_k1, init_cov);
-	    Eigen::Matrix<float, 6, 1> kf_est;
-	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))				 , delta_t, kf_est);
+	    kf_tracker_.reinitialize(jerk_std, measur_std, 
+				     delta_t, x_k1, init_cov);
 
+	    Eigen::Matrix<float, 6, 1> kf_est;
+	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), 
+						 pers_obs_.pos(1)), 
+				 delta_t, kf_est);
+	    
 	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
 	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
 
-	    // //debug
-	    // cout << "Xk1" << x_k1 << endl;
-	    // cout << "Xkn" << kf_est << endl;
-	    // cout << "Observed = " << pers_obs_.pos(0) << ',' << 
-	    //   pers_obs_.pos(1) << endl;
-	    // cout << "Estimated = " << pers_est_.pos(0) << ',' << 
-	    //   pers_est_.pos(1) << endl;
-	    // string what; cin>>what;
-	  
 	    currently_filtering_ = true;
 	  }
 	}
 	else{ // no observation -- prev frame
-	  cout << "FIRST HERE, then **********" << endl;
+
 	  currently_filtering_ = false;
 	  pers_est_.pos = pers_obs_.pos;
 	  pers_est_.vel = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
@@ -485,8 +461,8 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     }
     else{ //no observation
       
-      cout<< "Woah, no observation. " << endl;
-      string whut; cin>>whut;
+      // cout<< "Woah, no observation. " << endl;
+      // string whut; cin>>whut;
       
       currently_filtering_ = false;
       pers_est_.pos = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
@@ -508,9 +484,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     //remember previous time
     prev_time_ = pub_time_;
 
-    //debug
     // visualize by painting each PC another color
-    // pcl::copyPointCloud(*no_ground_cloud, *cloud_filtered);
     PointCloudT::Ptr cloud_filtered;
     cloud_filtered = cloud;
     viz_cloud->points.clear();
@@ -539,12 +513,6 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	// new_pt.a = 1.0;
 	viz_cloud->points.push_back (new_pt); //*
       }
-      //
-      
-    //std::cout << "PointCloud representing the Cluster: " << viz_cloud->points.size () << " data points." << std::endl;
-    //writer.write<pcl::PointXYZ> (ss.str (), *cloud_cluster, false); //*
-    //j++;
-
     }
 
     viz_cloud->width = viz_cloud->points.size ();
@@ -552,9 +520,6 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     viz_cloud->is_dense = true;
 
     cloud = viz_cloud;
-    
-    
-    
   }
 }
 
