@@ -138,6 +138,7 @@ add_executable(tracker_3D
   src/ppl_detection.cpp
   src/particleFilter.cpp
   src/kalmanFilter.cpp
+  src/kalmanFilterAcc.cpp
   src/tracker_3D.cpp)
 
 add_executable(pub_pcd

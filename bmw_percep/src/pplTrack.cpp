@@ -420,19 +420,9 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	if (!isnan(history_per_stats_.front().pos(0))){
 	  if (currently_filtering_){
 	    float dt = static_cast<float>((pub_time_-prev_time_).toSec());
-	    Eigen::Vector4f kf_est;
+	    Eigen::Matrix<float, 6, 1> kf_est;
 	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), 
-						 pers_obs_.pos(1)), 0.1, kf_est);
-	    // human_tracker_.prop_part();
-	    cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
-	    cv::Point2f cur_pos, cur_vel;
-	    cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0), 
-					       history_per_stats_.front().pos(1));
-	    // human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
-	
-	    //assign to the estimate
-	    // pers_est_.pos = Eigen::Vector2f(cur_pos.x, cur_pos.y);
-	    // pers_est_.vel = Eigen::Vector2f(cur_vel.x, cur_vel.y);
+						 pers_obs_.pos(1)), dt, kf_est);
 
 	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
 	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
@@ -445,32 +435,29 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	  }
 	  else{
 
-	    cv::Point2f hum_pt = cv::Point2f(pers_obs_.pos(0), pers_obs_.pos(1));
-	    cv::Point2f cur_pos, cur_vel;
 	    cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0), 
 					       history_per_stats_.front().pos(1));
 	  
-	    cout << "Previous position = " << prev_pos << endl;
-
-	    // human_tracker_.reinitialize(prev_pos, hum_pt, 
-	    // 				(1.0/static_cast<double> (30)), 1000,
-	    // 				10.0);
-	  
-	    // human_tracker_.estimate(hum_pt, hum_pt-prev_pos, cur_pos, cur_vel);
-
 	    //kalman
-	    Eigen::Vector2f acc_std(0.05,0.05);
+	    Eigen::Vector2f jerk_std(0.8,0.8);
 	    Eigen::Vector2f measur_std(0.05,0.05);
 	    float delta_t = 1./15.;
 
-	    cv::Point2f vel_ = (hum_pt - prev_pos);
+	    // cv::Point2f vel_ = (hum_pt - prev_pos);
 
 	    // Eigen::Vector4f x_k1(prev_pos.x, prev_pos.y, vel_.x, vel_.y);
-	    Eigen::Vector4f x_k1(hum_pt.x, hum_pt.y, 0., 0.);
-	    Eigen::Matrix4f init_cov = 10000*Eigen::Matrix4f::Identity();
-	    kf_tracker_.reinitialize(acc_std, measur_std, delta_t, x_k1, init_cov);
-	    Eigen::Vector4f kf_est;
-	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))				 , 0.1, kf_est);
+	    Eigen::Matrix<float, 6, 1> x_k1;
+	    x_k1.fill(0.);
+	    x_k1(0,0)=pers_obs_.pos(0); x_k1(1,0)=pers_obs_.pos(1);
+
+	    Eigen::Matrix<float, 6, 6> init_cov 
+	      = 10000*Eigen::MatrixXf::Identity(6,6);
+	    
+	    cout << "**********Initial Covariance " << init_cov << endl;
+	    
+	    kf_tracker_.reinitialize(jerk_std, measur_std, delta_t, x_k1, init_cov);
+	    Eigen::Matrix<float, 6, 1> kf_est;
+	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), pers_obs_.pos(1))				 , delta_t, kf_est);
 
 	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
 	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
