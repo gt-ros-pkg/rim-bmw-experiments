@@ -420,7 +420,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
 
 	    //write to disk
-	    // write_clusters_disk();
+	    write_clusters_disk();
 	  }
 	  else{
 
@@ -797,9 +797,13 @@ void PplTrack::write_clusters_disk()
   float dt = static_cast<float>((pub_time_-prev_time_).toSec());
   string fn_centroid = path+"median"+file_ext;
   cen_file.open(fn_centroid.c_str(), ios::app);
-  cen_file << pers_obs_.pos(0) << ',' << pers_obs_.pos(1) << ',' << 
-    pers_est_.pos(0) << ',' << pers_est_.pos(1) << ',' << pers_est_.vel(0)
-	   << ',' <<  pers_est_.vel(1) << ',' <<  dt << endl;
+
+  // cen_file << pers_obs_.pos(0) << ',' << pers_obs_.pos(1) << ',' << 
+  //   pers_est_.pos(0) << ',' << pers_est_.pos(1) << ',' << pers_est_.vel(0)
+  // 	   << ',' <<  pers_est_.vel(1) << ',' <<  dt << endl;
+
+  cen_file << pers_obs_.pos(0) << ',' << pers_obs_.pos(1) << ',' <<  dt << endl;
+
   cen_file.close();
 }
 

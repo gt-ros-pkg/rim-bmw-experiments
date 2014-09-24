@@ -141,6 +141,9 @@ add_executable(tracker_3D
   src/kalmanFilterAcc.cpp
   src/tracker_3D.cpp)
 
+add_executable(kf_param
+  src/kalmanFilter.cpp
+  src/kf_param.cpp)
 add_executable(pub_pcd
   src/pub_pcd.cpp)
 
@@ -165,6 +168,7 @@ target_link_libraries(tracker_3D ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(pub_pcd ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 target_link_libraries(background_store  ${catkin_LIBRARIES})
 target_link_libraries(background_sub  ${catkin_LIBRARIES})
+target_link_libraries(kf_param  ${catkin_LIBRARIES})
 
 #############
 ## Install ##
