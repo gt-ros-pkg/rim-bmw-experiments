@@ -90,7 +90,7 @@ int main(int argc, char** argv)
     jerk = MIN_JERK + static_cast<float>(i) * JERK_STEP;
     kf_fname = path + boost::lexical_cast<string>(i) + ext;
     run_kf(kf_fname, jerk, observations, time_diffs);
-    cout << (num_iter/i+1)*100. << "% Done!" << endl;
+    cout << (static_cast<float>(i+1)/static_cast<float>(num_iter))*100. << "% Done!" << endl;
   }
 
   return 0;
