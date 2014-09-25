@@ -72,118 +72,118 @@ int PplTrack::getOneCluster(const vector<vector<ClusterPoint> > clusters)
   else{return -1;}
 }
 
-//Only points to the person's position yet
-//Also publishes a cylinder enclosing the trunk
-void PplTrack::visualize(ros::Publisher pub)
-{
-  //debug
-  cout << "Person ID: " << person_id_ << endl;
-  if(person_id_>-1){
-  //markers object
-  visualization_msgs::MarkerArray mark_arr;
-  mark_arr.markers.clear();
+// //Only points to the person's position yet
+// //Also publishes a cylinder enclosing the trunk
+// void PplTrack::visualize(ros::Publisher pub)
+// {
+//   //debug
+//   cout << "Person ID: " << person_id_ << endl;
+//   if(person_id_>-1){
+//   //markers object
+//   visualization_msgs::MarkerArray mark_arr;
+//   mark_arr.markers.clear();
 
-  //assumption- one person only
-  ClusterStats per_stats = per_stats_[person_id_];
+//   //assumption- one person only
+//   ClusterStats per_stats = per_stats_[person_id_];
 
-  //Inner-cylinder marker
-  visualization_msgs::Marker inn_cyl_marker;
-  // Set the frame ID and timestamp.  
-  inn_cyl_marker.header.frame_id = viz_frame_;
+//   //Inner-cylinder marker
+//   visualization_msgs::Marker inn_cyl_marker;
+//   // Set the frame ID and timestamp.  
+//   inn_cyl_marker.header.frame_id = viz_frame_;
   
-  // //debug
-  // cout << "Frame is " << viz_frame_ << endl;
-  inn_cyl_marker.header.stamp = pub_time_;
+//   // //debug
+//   // cout << "Frame is " << viz_frame_ << endl;
+//   inn_cyl_marker.header.stamp = pub_time_;
 
-  // Set the namespace and id for this marker.  This serves to create a unique ID
-  // Any marker sent with the same namespace and id will overwrite the old one
-  inn_cyl_marker.ns = "human";
-  //TODO: use enum and not these numbers
-  inn_cyl_marker.id = 0;
+//   // Set the namespace and id for this marker.  This serves to create a unique ID
+//   // Any marker sent with the same namespace and id will overwrite the old one
+//   inn_cyl_marker.ns = "human";
+//   //TODO: use enum and not these numbers
+//   inn_cyl_marker.id = 0;
 
-  // Set the marker type to Cylinder
-  uint32_t cylinder = visualization_msgs::Marker::CYLINDER;
-  uint32_t sphere = visualization_msgs::Marker::SPHERE;
-  inn_cyl_marker.type = cylinder;
+//   // Set the marker type to Cylinder
+//   uint32_t cylinder = visualization_msgs::Marker::CYLINDER;
+//   uint32_t sphere = visualization_msgs::Marker::SPHERE;
+//   inn_cyl_marker.type = cylinder;
 
-  // Set the inn_cyl_marker action
-  inn_cyl_marker.action = visualization_msgs::Marker::ADD;
+//   // Set the inn_cyl_marker action
+//   inn_cyl_marker.action = visualization_msgs::Marker::ADD;
 
 
-  // inn_cyl_marker.scale.x = (per_stats.max(0)-per_stats.min(0));
-  // inn_cyl_marker.scale.y = (per_stats.max(1)-per_stats.min(1));
-  // inn_cyl_marker.scale.z = (per_stats.max(2)); // only distance from ground
+//   // inn_cyl_marker.scale.x = (per_stats.max(0)-per_stats.min(0));
+//   // inn_cyl_marker.scale.y = (per_stats.max(1)-per_stats.min(1));
+//   // inn_cyl_marker.scale.z = (per_stats.max(2)); // only distance from ground
 
-  // Set the pose of the inn_cyl_marker.  This is a full 6DOF pose relative to the frame/time specified in the header
-  inn_cyl_marker.pose.position.x = per_stats.median(0);//(per_stats.max(0)+per_stats.min(0))/2;
-  inn_cyl_marker.pose.position.y = per_stats.median(1);//(per_stats.max(1)+per_stats.min(1))/2;
-  inn_cyl_marker.pose.position.z = (per_stats.max(2))/2; // only distance from ground
+//   // Set the pose of the inn_cyl_marker.  This is a full 6DOF pose relative to the frame/time specified in the header
+//   inn_cyl_marker.pose.position.x = per_stats.median(0);//(per_stats.max(0)+per_stats.min(0))/2;
+//   inn_cyl_marker.pose.position.y = per_stats.median(1);//(per_stats.max(1)+per_stats.min(1))/2;
+//   inn_cyl_marker.pose.position.z = (per_stats.max(2))/2; // only distance from ground
 
-  //the cylinder is oriented along z
-  inn_cyl_marker.pose.orientation.x = 0.0;
-  inn_cyl_marker.pose.orientation.y = 0.0;
-  inn_cyl_marker.pose.orientation.z = 0.0;
-  inn_cyl_marker.pose.orientation.w = 1.0;
+//   //the cylinder is oriented along z
+//   inn_cyl_marker.pose.orientation.x = 0.0;
+//   inn_cyl_marker.pose.orientation.y = 0.0;
+//   inn_cyl_marker.pose.orientation.z = 0.0;
+//   inn_cyl_marker.pose.orientation.w = 1.0;
 
-  // Set the scale of the inn_cyl_marker -- 1x1x1 here means 1m on a side
-  inn_cyl_marker.scale.x = sqrt(per_stats.var(0))*2.0;
-  inn_cyl_marker.scale.y = sqrt(per_stats.var(1))*2.0; 
-  inn_cyl_marker.scale.z = (per_stats.max(2)); // only distance from ground
+//   // Set the scale of the inn_cyl_marker -- 1x1x1 here means 1m on a side
+//   inn_cyl_marker.scale.x = sqrt(per_stats.var(0))*2.0;
+//   inn_cyl_marker.scale.y = sqrt(per_stats.var(1))*2.0; 
+//   inn_cyl_marker.scale.z = (per_stats.max(2)); // only distance from ground
 
   
-  //debug
-  cout << "Positions set.. " << endl;
+//   //debug
+//   cout << "Positions set.. " << endl;
   
   
-  // Set the color -- be sure to set alpha to something non-zero!
-  inn_cyl_marker.color.r = 0.0f;
-  inn_cyl_marker.color.g = 0.0f;
-  inn_cyl_marker.color.b = 1.0f;
-  inn_cyl_marker.color.a = 1.0;
+//   // Set the color -- be sure to set alpha to something non-zero!
+//   inn_cyl_marker.color.r = 0.0f;
+//   inn_cyl_marker.color.g = 0.0f;
+//   inn_cyl_marker.color.b = 1.0f;
+//   inn_cyl_marker.color.a = 1.0;
 
-  //debug
-  cout << "Colors set.. " << endl;
+//   //debug
+//   cout << "Colors set.. " << endl;
 
-  // inn_cyl_marker.pose.position.z += inn_cyl_marker.scale.z/2;
+//   // inn_cyl_marker.pose.position.z += inn_cyl_marker.scale.z/2;
   
-  inn_cyl_marker.lifetime = ros::Duration();
+//   inn_cyl_marker.lifetime = ros::Duration();
 
-  mark_arr.markers.push_back(inn_cyl_marker);
+//   mark_arr.markers.push_back(inn_cyl_marker);
 
-  //add the outer human cylinder
-  visualization_msgs::Marker out_cyl_marker;
-  out_cyl_marker = inn_cyl_marker;
+//   //add the outer human cylinder
+//   visualization_msgs::Marker out_cyl_marker;
+//   out_cyl_marker = inn_cyl_marker;
 
-  out_cyl_marker.id = 1;
+//   out_cyl_marker.id = 1;
 
-  // Set the scale of the out_cyl_marker -- 1x1x1 here means 1m on a side
-  // float scale_x = (std::max(std::fabs(per_stats.max(0)-out_cyl_marker.scale.x),
-  // 			    std::fabs(-per_stats.min(0)+out_cyl_marker.scale.x)));
-  // float scale_y = (std::max(std::fabs(per_stats.max(1)-out_cyl_marker.scale.y),
-  // 			    std::fabs(-per_stats.min(1)+out_cyl_marker.scale.y)));
-  float scale_x = (std::max(std::fabs(per_stats.max(0)-out_cyl_marker.pose.position.x),
-  			    std::fabs(-per_stats.min(0)+out_cyl_marker.pose.position.x)));
-  float scale_y = (std::max(std::fabs(per_stats.max(1)-out_cyl_marker.pose.position.y),
-  			    std::fabs(-per_stats.min(1)+out_cyl_marker.pose.position.y)));
+//   // Set the scale of the out_cyl_marker -- 1x1x1 here means 1m on a side
+//   // float scale_x = (std::max(std::fabs(per_stats.max(0)-out_cyl_marker.scale.x),
+//   // 			    std::fabs(-per_stats.min(0)+out_cyl_marker.scale.x)));
+//   // float scale_y = (std::max(std::fabs(per_stats.max(1)-out_cyl_marker.scale.y),
+//   // 			    std::fabs(-per_stats.min(1)+out_cyl_marker.scale.y)));
+//   float scale_x = (std::max(std::fabs(per_stats.max(0)-out_cyl_marker.pose.position.x),
+//   			    std::fabs(-per_stats.min(0)+out_cyl_marker.pose.position.x)));
+//   float scale_y = (std::max(std::fabs(per_stats.max(1)-out_cyl_marker.pose.position.y),
+//   			    std::fabs(-per_stats.min(1)+out_cyl_marker.pose.position.y)));
 
-  out_cyl_marker.scale.x = 2*scale_x; //diameter
-  out_cyl_marker.scale.y = 2*scale_y;
-  out_cyl_marker.scale.z = (per_stats.max(2)); // only distance from ground
+//   out_cyl_marker.scale.x = 2*scale_x; //diameter
+//   out_cyl_marker.scale.y = 2*scale_y;
+//   out_cyl_marker.scale.z = (per_stats.max(2)); // only distance from ground
 
-  // Set the color -- be sure to set alpha to something non-zero!
-  out_cyl_marker.color.r = 1.0f;
-  out_cyl_marker.color.g = 0.0f;
-  out_cyl_marker.color.b = 0.0f;
-  out_cyl_marker.color.a = 0.5;
+//   // Set the color -- be sure to set alpha to something non-zero!
+//   out_cyl_marker.color.r = 1.0f;
+//   out_cyl_marker.color.g = 0.0f;
+//   out_cyl_marker.color.b = 0.0f;
+//   out_cyl_marker.color.a = 0.5;
 
-  mark_arr.markers.push_back(out_cyl_marker);
+//   mark_arr.markers.push_back(out_cyl_marker);
   
-  pub.publish(mark_arr);
-  }
-  else // in case no people detected
-    {//TODO:delete visualization from earlier?
-    }
-}
+//   pub.publish(mark_arr);
+//   }
+//   else // in case no people detected
+//     {//TODO:delete visualization from earlier?
+//     }
+// }
 
 
 void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp person, string name_space)
@@ -243,7 +243,6 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
 
     out_cyl_marker.id = 1;
 
-    // Set the scale of the out_cyl_marker -- 1x1x1 here means 1m on a side
     out_cyl_marker.scale.x = person.out_cyl(0);
     out_cyl_marker.scale.y = person.out_cyl(1);
     //the z-scale remains the same
@@ -259,13 +258,14 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
 
     //visualize velocity if present
     if(!isnan(person.vel(0))){
-      double frame_rate = 10.;
-      double delta_t = 1 / frame_rate; // 1 secs
+      // double frame_rate = 10.;
+      double delta_t = .3; // 1 secs
       double vel_mag = person.vel.norm();
       double mark_scale = delta_t * vel_mag;
-      double vel_scale = 0.6;
+      double vel_scale = 0.5;
       
       visualization_msgs::Marker vel_marker1, vel_marker2, vel_marker3;
+
       //velocity markers
       vel_marker1 = inn_cyl_marker;
       vel_marker1.id += 5;
@@ -274,8 +274,8 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
       vel_marker1.pose.position.x = person.pos(0)+ delta_t * person.vel(0);
       vel_marker1.pose.position.y = person.pos(1)+ delta_t * person.vel(1);
 
-      vel_marker1.scale.x = .5* vel_scale + delta_t * vel_mag + mark_scale;
-      vel_marker1.scale.y = .5*vel_scale + delta_t * vel_mag + mark_scale;
+      vel_marker1.scale.x =  vel_scale + delta_t * vel_mag + mark_scale;
+      vel_marker1.scale.y = vel_scale + delta_t * vel_mag + mark_scale;
       vel_marker1.scale.z = 0.01;
     
       vel_marker1.color.a = 0.5f;
@@ -295,18 +295,18 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
       vel_marker2.pose.position.x += delta_t * person.vel(0);
       vel_marker2.pose.position.y += delta_t * person.vel(1);
 
-    vel_marker3.pose.position.x += 2 * delta_t * person.vel(0);
-    vel_marker3.pose.position.y += 2 * delta_t * person.vel(1);
-
-    vel_marker2.scale.x += mark_scale + vel_scale;
-    vel_marker2.scale.y += mark_scale + vel_scale;
-
-    vel_marker3.scale.x += 2 * mark_scale + 2*vel_scale;
-    vel_marker3.scale.y += 2 * mark_scale + 2*vel_scale;
-
-    mark_arr.markers.push_back(vel_marker1);
-    mark_arr.markers.push_back(vel_marker2);
-    mark_arr.markers.push_back(vel_marker3);
+      vel_marker3.pose.position.x += 2 * delta_t * person.vel(0);
+      vel_marker3.pose.position.y += 2 * delta_t * person.vel(1);
+      
+      vel_marker2.scale.x += mark_scale ;//+ vel_scale;
+      vel_marker2.scale.y += mark_scale ;//+ vel_scale;
+      
+      vel_marker3.scale.x += 2 * mark_scale ;//+ 2*vel_scale;
+      vel_marker3.scale.y += 2 * mark_scale; //+ 2*vel_scale;
+      
+      mark_arr.markers.push_back(vel_marker1);
+      mark_arr.markers.push_back(vel_marker2);
+      mark_arr.markers.push_back(vel_marker3);
     }
 
     pub.publish(mark_arr);
@@ -1056,4 +1056,41 @@ void PplTrack::cluster_head(vector<vector<HMapEl> > hmap, size_t x, size_t y,
       }
     }
   }
+}
+
+
+void PplTrack::pub_obs_est(ros::Publisher pub_o, ros::Publisher pub_e_p, 
+			   ros::Publisher pub_e_v )
+{
+  geometry_msgs::PoseStamped obs_p, est_p, est_v;
+  obs_p.header.stamp = pub_time_;
+  obs_p.header.frame_id = viz_frame_;
+
+  //No orientation info
+  obs_p.pose.orientation.x = 0.;
+  obs_p.pose.orientation.y = 0.;
+  obs_p.pose.orientation.z = 0.;
+  obs_p.pose.orientation.w = 0.;
+
+  est_p = obs_p;
+  est_v = obs_p;
+
+  //position
+  obs_p.pose.position.x = pers_obs_.pos(0);
+  obs_p.pose.position.y = pers_obs_.pos(1);
+  obs_p.pose.position.z = 0.;  
+
+  est_p.pose.position.x = pers_est_.pos(0);
+  est_p.pose.position.y = pers_est_.pos(1);
+  est_p.pose.position.z = 0.;  
+
+  est_v.pose.position.x = pers_est_.vel(0);
+  est_v.pose.position.y = pers_est_.vel(1);
+  est_v.pose.position.z = 0.;  
+
+  pub_o.publish(obs_p);
+  pub_e_p.publish(est_p);
+  pub_e_v.publish(est_v);
+
+  return;
 }

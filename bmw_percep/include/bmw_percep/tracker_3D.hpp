@@ -61,6 +61,9 @@ ros::Subscriber pc_sub_;
 ros::Publisher db_pc;
 ros::Publisher pub_viz;
 ros::Publisher pub_raw_obs;
+  ros::Publisher  pub_obs_pos;
+  ros::Publisher pub_est_pos;
+  ros::Publisher pub_est_vel;
 
 protected:
   //Pointcloud callback
@@ -87,9 +90,12 @@ got_transform_ = false;
   string sub_topic = live_topic;
   // string sub_topic = file_topic;
   string viz_topic = "/human/visuals";
-  string raw_obs_topic = "/human/observations";
+  string raw_obs_topic = "/human/observations/visuals";
   string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
   robo_frame = "base_link";
+  string obs_pose_topic = "/human/observations/position";
+  string est_pose_topic = "/human/estimated/position";
+  string est_vel_topic = "/human/estimated/velocity";
 
   pc_sub = nh.subscribe<PointCloudT> 
     (sub_topic, 1, &Tracker3d::pc_call, this);
@@ -99,6 +105,9 @@ got_transform_ = false;
   //Publish visualizations for the human
   pub_viz = nh.advertise<visualization_msgs::MarkerArray> (viz_topic, 1);
   pub_raw_obs = nh.advertise<visualization_msgs::MarkerArray> (raw_obs_topic, 1);
+  pub_obs_pos = nh.advertise<geometry_msgs::PoseStamped> (obs_pose_topic, 1);
+  pub_est_pos = nh.advertise<geometry_msgs::PoseStamped> (est_pose_topic, 1);
+  pub_est_vel = nh.advertise<geometry_msgs::PoseStamped> (est_vel_topic, 1);
 
   PointCloudT::Ptr
     tcloud (new PointCloudT);
@@ -146,6 +155,8 @@ got_transform_ = false;
     // ppl_tracker.visualize(pub_viz);
     ppl_tracker.visualize_est(pub_viz);
     ppl_tracker.visualize_obs(pub_raw_obs);
+
+    ppl_tracker.pub_obs_est(pub_obs_pos, pub_est_pos, pub_est_vel);
     // pcl::copyPointCloud(*cloud, *viz_cloud);
     if (cloud->points.size()>0){
       pcl::copyPointCloud(*cloud, *tcloud);

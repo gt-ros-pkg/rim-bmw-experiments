@@ -117,7 +117,8 @@ void estimate(PointCloudT::Ptr& cloud,
 	      bool got_tf_robot, ros::Time pc_time,
 		float leaf_size=0.06);
   
-void visualize(ros::Publisher pub);
+  // void visualize(ros::Publisher pub);
+
   void visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp person,
 		 string name_space);
 
@@ -153,6 +154,11 @@ void get_clusters_stats(PointCloudT::ConstPtr cloud,
 
   void visualize_est(ros::Publisher pub)
   {visualize(pub, Eigen::Vector3f(1.0, 0.0, 0.0), pers_est_, "human/visuals");}
+
+  //Publishes the position of the observation, position and velocity of the
+  //filtered belief of the human
+  void pub_obs_est(ros::Publisher pub_o, ros::Publisher pub_e_p, 
+		   ros::Publisher pub_e_v );
 
 private:
 bool table_link;
