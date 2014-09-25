@@ -338,6 +338,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     PointCloudT::Ptr viz_cloud(new PointCloudT);
 
     workspace_limit(cloud);
+
     if (got_tf_robot) // in case the robots location is known
       robot_remove(cloud, robo_loc);
 
@@ -549,8 +550,10 @@ void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
 	      if(pit->x<2.9 || pit->y>2.0)//back table
 		if(pit->y<4.0) // Side range
 		  //clipping the front table
+		  if(!(pit->y<1.10 && pit->z<1.2) ){
 		  if(!(pit->x<1.10 && pit->z<0.98 && pit->y<2.3) )
 		  {cloud_f->points.push_back(*pit);}
+		  }
   }
 
   cloud_f->width = cloud_f->points.size ();

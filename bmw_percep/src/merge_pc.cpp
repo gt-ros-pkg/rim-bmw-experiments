@@ -27,7 +27,7 @@
    new Point Cloud.
 **/
 
-#define COLOR_DIFF true //specifies if the two point clouds to be published with different colors
+#define COLOR_DIFF false //specifies if the two point clouds to be published with different colors
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloudSM;
 typedef sensor_msgs::PointCloud2 PCMsg;
 
