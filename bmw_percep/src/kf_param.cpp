@@ -68,7 +68,7 @@ istream& operator>>(istream& str,CSVRow& data)
 int main(int argc, char** argv)
 {
 
-  string path="data/kf_params/normal1/";
+  string path="data/kf_params/normal2/";
   string filename = path+"observations.csv";
   ifstream file(filename.c_str());
   
