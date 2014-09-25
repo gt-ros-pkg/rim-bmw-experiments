@@ -38,6 +38,8 @@
 #include<std_msgs/UInt8.h>
 #include<std_msgs/Bool.h>
 #include<geometry_msgs/PoseStamped.h>
+#include<geometry_msgs/PoseArray.h>
+#include<geometry_msgs/Pose.h>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/accumulators/accumulators.hpp>
@@ -157,8 +159,7 @@ void get_clusters_stats(PointCloudT::ConstPtr cloud,
 
   //Publishes the position of the observation, position and velocity of the
   //filtered belief of the human
-  void pub_obs_est(ros::Publisher pub_o, ros::Publisher pub_e_p, 
-		   ros::Publisher pub_e_v );
+  void pub_obs_est(ros::Publisher pub_o, ros::Publisher pub_e_p);
 
 private:
 bool table_link;

@@ -20,6 +20,7 @@
 #include<std_msgs/UInt8.h>
 #include<std_msgs/Bool.h>
 #include<geometry_msgs/PoseStamped.h>
+#include<geometry_msgs/PoseArray.h>
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
 
@@ -63,7 +64,6 @@ ros::Publisher pub_viz;
 ros::Publisher pub_raw_obs;
   ros::Publisher  pub_obs_pos;
   ros::Publisher pub_est_pos;
-  ros::Publisher pub_est_vel;
 
 protected:
   //Pointcloud callback
@@ -95,7 +95,6 @@ got_transform_ = false;
   robo_frame = "base_link";
   string obs_pose_topic = "/human/observations/position";
   string est_pose_topic = "/human/estimated/position";
-  string est_vel_topic = "/human/estimated/velocity";
 
   pc_sub = nh.subscribe<PointCloudT> 
     (sub_topic, 1, &Tracker3d::pc_call, this);
@@ -105,9 +104,8 @@ got_transform_ = false;
   //Publish visualizations for the human
   pub_viz = nh.advertise<visualization_msgs::MarkerArray> (viz_topic, 1);
   pub_raw_obs = nh.advertise<visualization_msgs::MarkerArray> (raw_obs_topic, 1);
-  pub_obs_pos = nh.advertise<geometry_msgs::PoseStamped> (obs_pose_topic, 1);
-  pub_est_pos = nh.advertise<geometry_msgs::PoseStamped> (est_pose_topic, 1);
-  pub_est_vel = nh.advertise<geometry_msgs::PoseStamped> (est_vel_topic, 1);
+  pub_obs_pos = nh.advertise<geometry_msgs::PoseArray> (obs_pose_topic, 1);
+  pub_est_pos = nh.advertise<geometry_msgs::PoseArray> (est_pose_topic, 1);
 
   PointCloudT::Ptr
     tcloud (new PointCloudT);
@@ -156,7 +154,7 @@ got_transform_ = false;
     ppl_tracker.visualize_est(pub_viz);
     ppl_tracker.visualize_obs(pub_raw_obs);
 
-    ppl_tracker.pub_obs_est(pub_obs_pos, pub_est_pos, pub_est_vel);
+    ppl_tracker.pub_obs_est(pub_obs_pos, pub_est_pos);
     // pcl::copyPointCloud(*cloud, *viz_cloud);
     if (cloud->points.size()>0){
       pcl::copyPointCloud(*cloud, *tcloud);

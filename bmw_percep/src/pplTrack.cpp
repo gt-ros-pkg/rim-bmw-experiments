@@ -1062,38 +1062,47 @@ void PplTrack::cluster_head(vector<vector<HMapEl> > hmap, size_t x, size_t y,
 }
 
 
-void PplTrack::pub_obs_est(ros::Publisher pub_o, ros::Publisher pub_e_p, 
-			   ros::Publisher pub_e_v )
+void PplTrack::pub_obs_est(ros::Publisher pub_o, ros::Publisher pub_e_p)
 {
-  geometry_msgs::PoseStamped obs_p, est_p, est_v;
-  obs_p.header.stamp = pub_time_;
-  obs_p.header.frame_id = viz_frame_;
+  std_msgs::Header common_header;
+  geometry_msgs::Pose obs_p, est_p, est_v;
+  geometry_msgs::PoseArray obs_pA, est_pA;
+
+  common_header.stamp = pub_time_;
+  common_header.frame_id = viz_frame_;
 
   //No orientation info
-  obs_p.pose.orientation.x = 0.;
-  obs_p.pose.orientation.y = 0.;
-  obs_p.pose.orientation.z = 0.;
-  obs_p.pose.orientation.w = 0.;
+  obs_p.orientation.x = 0.;
+  obs_p.orientation.y = 0.;
+  obs_p.orientation.z = 0.;
+  obs_p.orientation.w = 0.;
 
   est_p = obs_p;
   est_v = obs_p;
 
   //position
-  obs_p.pose.position.x = pers_obs_.pos(0);
-  obs_p.pose.position.y = pers_obs_.pos(1);
-  obs_p.pose.position.z = 0.;  
+  obs_p.position.x = pers_obs_.pos(0);
+  obs_p.position.y = pers_obs_.pos(1);
+  obs_p.position.z = 0.;  
 
-  est_p.pose.position.x = pers_est_.pos(0);
-  est_p.pose.position.y = pers_est_.pos(1);
-  est_p.pose.position.z = 0.;  
+  est_p.position.x = pers_est_.pos(0);
+  est_p.position.y = pers_est_.pos(1);
+  est_p.position.z = 0.;  
 
-  est_v.pose.position.x = pers_est_.vel(0);
-  est_v.pose.position.y = pers_est_.vel(1);
-  est_v.pose.position.z = 0.;  
+  est_v.position.x = pers_est_.vel(0);
+  est_v.position.y = pers_est_.vel(1);
+  est_v.position.z = 0.;  
 
-  pub_o.publish(obs_p);
-  pub_e_p.publish(est_p);
-  pub_e_v.publish(est_v);
+  obs_pA.header = common_header;
+  est_pA.header = common_header;
+
+  obs_pA.poses.push_back(obs_p);
+
+  est_pA.poses.push_back(est_p);
+  est_pA.poses.push_back(est_v);
+
+  pub_o.publish(obs_pA);
+  pub_e_p.publish(est_pA);
 
   return;
-}
+ }
