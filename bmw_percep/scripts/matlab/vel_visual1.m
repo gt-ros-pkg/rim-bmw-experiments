@@ -1,11 +1,11 @@
 %% Visualize the predictive capability of velocities
 
-path = '../../data/centroid_estimate/';
+path = '../../data/kf_params/normal1/';
 file1 = 'shr_normal1_kf_vel_05.txt';
 file2 = 'shr_normal1_kf_vel_01.txt';
 file3 = 'shr_normal1_acc_05.txt';
 file4 = 'shr_normal_acc_5.txt';
-file = 'median_8.txt';
+file = '1.csv';
 ws_min = [.05, .84];
 ws_max = [4.3, 4.0];
 
@@ -16,11 +16,12 @@ total_frames = size(raw_data,1);
 obs_pos = raw_data(:,1:2);
 est_pos = raw_data(:,3:4);
 est_vel = raw_data(:, 5:6);
+est_acc = raw_data(:,7:8);
 
 frame_times = zeros(total_frames, 1);
 
 for i=2:total_frames %first frame is zero
-    frame_times(i) = frame_times(i-1) + raw_data(i,7);
+    frame_times(i) = frame_times(i-1) + raw_data(i,end);
 end
 
 prediction0 = .25;
@@ -43,8 +44,7 @@ for i=1:total_frames
     %current
     cur_obs_p = obs_pos(i,:);
     cur_est_p = est_pos(i,:);
-    plot(cur_obs_p(1), cur_obs_p(2), 'r+', 'MarkerSize', 12);    
-    plot(cur_est_p(1), cur_est_p(2), 'g+', 'MarkerSize', 12);
+    
     cur_err = [cur_err; cur_obs_p-cur_est_p]; 
     cur_time = frame_times(i);
     
@@ -86,13 +86,18 @@ for i=1:total_frames
     p0_obs = obs_pos(p0_frame,:);
     
     cur_est_v = est_vel(i,:);
+    cur_est_acc = est_acc(i,:);
+    
     p1_time = frame_times(p1_frame) - frame_times(i);
     p2_time = frame_times(p2_frame) - frame_times(i);
     p0_time = frame_times(p0_frame) - frame_times(i);
     
-    p1_est = cur_est_p + p1_time * cur_est_v;
-    p2_est = cur_est_p + p2_time * cur_est_v;
-    p0_est = cur_est_p + p0_time * cur_est_v;
+    p1_est = cur_est_p + p1_time * cur_est_v + (p1_time^2)/2 * cur_est_acc;
+    p2_est = cur_est_p + p2_time * cur_est_v + (p2_time^2)/2 * cur_est_acc;
+    p0_est = cur_est_p + p0_time * cur_est_v + (p0_time^2)/2 * cur_est_acc;
+    
+    plot(cur_obs_p(1), cur_obs_p(2), 'r+', 'MarkerSize', 12);    
+    plot(cur_est_p(1), cur_est_p(2), 'g+', 'MarkerSize', 12);
     
     plot(p1_obs(1), p1_obs(2), 'r*', 'MarkerSize', 12);    
     plot(p1_est(1), p1_est(2), 'g*', 'MarkerSize', 12);

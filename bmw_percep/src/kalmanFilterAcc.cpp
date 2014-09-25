@@ -40,13 +40,6 @@ void KalmanFilterAcc::correct(Eigen::Vector2f z_k){
   Eigen::Matrix<float, 6, 6> I = Eigen::MatrixXf::Identity(6,6);
   P_k_n_ = ( I - (K_ * H_)) * P_k_p_;
 
-  //debug
-  // cout << "Prediction --- \n" << x_k_p_ << endl;
-  // cout << "Observation --- \n" << z_k << endl;
-  // cout << "Corrected --- \n" << x_k_n_ << endl;
-  // cout << "Error Cov --- \n" << P_k_n_ << endl;
-  
-
 }
 
 //Dummy constructor
@@ -108,10 +101,6 @@ void KalmanFilterAcc::estimate(Eigen::Vector2f obs, float delta_t,
   //previous estimate is k-1th estimate now
   x_k1_ = x_k_n_;
   P_k1_ = P_k_n_;
-
-  cout << "**********P MAT**********" << endl;
-  cout << P_k1_ << endl;
-  // string whut; cin>>whut;
 
   predict(delta_t);
   correct(obs);
