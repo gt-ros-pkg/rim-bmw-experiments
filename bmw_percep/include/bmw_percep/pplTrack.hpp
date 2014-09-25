@@ -170,7 +170,7 @@ int max_c_size_, min_c_size_;
 bool more_than_one_;
 ros::Time pub_time_; //time-stamp associated with human estimation
   ros::Time prev_time_;
-
+  float jerk_std_;
   KalmanFilterAcc kf_tracker_;
 bool currently_filtering_; //does the particle filter need reinitialization?
   PersProp pers_obs_, pers_est_; //current person observation and the estimate

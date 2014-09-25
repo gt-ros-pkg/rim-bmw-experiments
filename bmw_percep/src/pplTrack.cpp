@@ -419,15 +419,15 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
 	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
 
-	    //write to disk
-	    write_clusters_disk();
+	    // //write to disk
+	    // write_clusters_disk();
 	  }
 	  else{
 
 	    cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0),
 					       history_per_stats_.front().pos(1));
 	    //kalman
-	    Eigen::Vector2f jerk_std(0.8,0.8);
+	    Eigen::Vector2f jerk_std(jerk_std_,jerk_std_);
 	    Eigen::Vector2f measur_std(0.05,0.05);
 	    float delta_t = 1./15.;
 	    Eigen::Matrix<float, 6, 1> x_k1;
@@ -580,6 +580,7 @@ PplTrack::PplTrack(float z){
 
   max_height_=2.3; min_height_=1.0; max_dist_gr_=0.4;
   max_c_size_=18000; min_c_size_=100;
+  jerk_std_=0.65;
   file_no_=0;
 
   ws_min_ = Eigen::Vector3f(.05, .84, -ground_coeffs_(3));

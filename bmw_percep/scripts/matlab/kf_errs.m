@@ -91,6 +91,10 @@ for i=1:total_frames
     p2_est = cur_est_p + p2_time * cur_est_v + (p2_time^2)/2 * cur_est_acc;
     p0_est = cur_est_p + p0_time * cur_est_v + (p0_time^2)/2 * cur_est_acc;
     
+    p1_err = [p1_err; p1_obs-p1_est];
+    p2_err = [p2_err; p2_obs-p2_est];
+    p0_err = [p0_err; p0_obs-p0_est];
+    
     if (visual==1)
         clf
         xlim([ws_min(1) ws_max(1)]);
@@ -109,9 +113,7 @@ for i=1:total_frames
         plot(p0_obs(1), p0_obs(2), 'rx', 'MarkerSize', 12);
         plot(p0_est(1), p0_est(2), 'gx', 'MarkerSize', 12);
         
-        p1_err = [p1_err; p1_obs-p1_est];
-        p2_err = [p2_err; p2_obs-p2_est];
-        p0_err = [p0_err; p0_obs-p0_est];
+        
         pause(0.05);
         hold off
     end
