@@ -94,7 +94,7 @@ got_transform_ = false;
   string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
   robo_frame = "base_link";
   string obs_pose_topic = "/human/observations/position";
-  string est_pose_topic = "/human/estimated/position";
+  string est_pose_topic = "/human/estimated/pose";
 
   pc_sub = nh.subscribe<PointCloudT> 
     (sub_topic, 1, &Tracker3d::pc_call, this);
