@@ -9,6 +9,7 @@
    (x,y,vx,vy) and measurement (x,y)
 **/
 
+typedef Eigen::Matrix<float, 6, 1> State;
 using namespace std;
 
 
@@ -20,6 +21,9 @@ public:
 
   //if delta-t not known pass 0
   void predict(float delta_t);
+
+  //incase only prediction is required and not update of everything
+  void predict(State &s, float delta_t);
   
   void correct(Eigen::Vector2f z_k);
 

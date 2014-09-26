@@ -26,6 +26,34 @@ void KalmanFilterAcc::predict(float delta_t){
   
 }
 
+void KalmanFilterAcc::predict(State &s, float delta_t)
+{
+
+  float dt2_2 = (pow(delta_t,2))/2;
+  //Recompute A
+
+  Eigen::MatrixXf A;
+  A << 1., 0., delta_t, 0., dt2_2, 0.,
+    0., 1., 0., delta_t, 0., dt2_2,
+    0., 0., 1., 0., delta_t, 0.,
+    0., 0., 0., 1., 0., delta_t,
+    0., 0., 0., 0., 1., 0.,
+    0., 0., 0., 0., 0., 1.;
+     
+  //Recompute Q
+
+  Eigen::Matrix<float, 6, 2>  G;
+  G.fill(0.);
+  //Process noise only in the highest order term
+  G(4,0) = delta_t;
+  G(5,1) = delta_t;
+  Eigen::MatrixXf Q = G * sigma_jerk_ * G.transpose();  
+  //project the state ahead
+  Eigen::MatrixXf s_n = A*s;
+  
+  s = s_n;
+}
+
 //Check if things are way off and reinitialize?
 //TODO: Check if thing are way off
 void KalmanFilterAcc::correct(Eigen::Vector2f z_k){
