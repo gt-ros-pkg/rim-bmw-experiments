@@ -1,20 +1,38 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(dmtx_barcode_scan)
 
-find_library(DMTX_LIBRARY dmtx PATH /usr/local/lib)
+SET (PROJECT_CMAKE_DIR ${PROJECT_SOURCE_DIR}/cmake)
+SET (CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${PROJECT_CMAKE_DIR}")
+#SET (DMTX_DIR ${PROJECT_SOURCE_DIR}/cmake)
 
-if( DMTX_LIBRARY_FOUND )
+#find_package (DMTX)
 
+#find_library(DMTX_LIBRARY dmtx PATH /usr/lib/)
+
+#if( DMTX_FOUND )
+find_package (DMTX)
   ## Find catkin macros and libraries
   ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
   ## is used, also find other catkin packages
   find_package(catkin REQUIRED COMPONENTS
     cv_bridge
     image_transport
+    message_generation
   )
   
   find_package(OpenCV REQUIRED)
-  
+
+# Generate messages in the 'msg' folder
+ add_message_files(
+   FILES
+   Scan.msg
+#   Message2.msg
+ )
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
   ###################################
   ## catkin specific configuration ##
   ###################################
@@ -25,9 +43,9 @@ if( DMTX_LIBRARY_FOUND )
   ## CATKIN_DEPENDS: catkin_packages dependent projects also need
   ## DEPENDS: system dependencies of this project that dependent projects also need
   catkin_package(
-  #  INCLUDE_DIRS include
+ INCLUDE_DIRS include
   #  LIBRARIES dmtx_barcode_scan
-  #  CATKIN_DEPENDS cv_bridge image_transport opencv2
+  CATKIN_DEPENDS cv_bridge image_transport opencv2 message_runtime
   #  DEPENDS system_lib
   )
   
@@ -39,17 +57,28 @@ if( DMTX_LIBRARY_FOUND )
   ## Your package locations should be listed before other locations
   # include_directories(include)
   include_directories(
+    include
+   ${DMTX_INCLUDE_DIRS}
     ${catkin_INCLUDE_DIRS}
   )
   
   add_executable(barcode_scan_node src/barcode_scan_node.cpp)
+
+  add_executable(barcodeScan src/barcodeScan.cpp)
   
   target_link_libraries(barcode_scan_node
     ${catkin_LIBRARIES}
     ${OpenCV_LIBRARIES}
-    ${DMTX_LIBRARY}
+    ${DMTX_LIBRARIES}
   )
-endif()
+
+  target_link_libraries(barcodeScan
+    ${catkin_LIBRARIES}
+    ${OpenCV_LIBRARIES}
+    ${DMTX_LIBRARIES}
+  )
+
+#endif()
 
 #############
 ## Install ##
