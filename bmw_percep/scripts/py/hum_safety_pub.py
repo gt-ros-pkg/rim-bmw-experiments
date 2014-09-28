@@ -7,6 +7,7 @@ roslib.load_manifest('bmw_percep')
 
 import rospy
 import tf
+import matplotlib.pyplot
 
 from geometry_msgs.msg import PoseArray, Pose
 from std_msgs.msg import Bool as BoolMsg
@@ -32,7 +33,7 @@ class HumanSafetyPub:
                                               MarkerArray, queue_size=1)
         
         self.robo_frame = "base_link"
-        self.slope = .5
+        self.slope = 5.
 
         #initialize to don't stop human
         self.stop_human = False
@@ -93,6 +94,7 @@ class HumanSafetyPub:
             return True
         #velocity and distance
         evals = self.vel_mag - self.slope * (self.dist - min_dist)
+
         if (evals>0):
             return True
         else:
@@ -100,7 +102,7 @@ class HumanSafetyPub:
     
     def should_stop(self):
         #distance threshold
-        min_dist = 1.5
+        min_dist = 1.
         if (self.dist<min_dist):
             return True
         elif (self.dist>4.):

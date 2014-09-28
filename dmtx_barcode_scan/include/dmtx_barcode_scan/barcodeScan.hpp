@@ -1,3 +1,5 @@
+#ifndef BARCODE_SCAN
+#define BARCODE_SCAN
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <opencv/cv.h>
@@ -22,7 +24,8 @@ public:
   BarcodeScan(ros::NodeHandle& nh): nh_(nh), it(nh)
   {
     
-    sub = it.subscribe("/scan_barcode_cam/image_raw", 1, &BarcodeScan::imageCallback, this);
+    sub = it.subscribe("/scan_barcode_cam/image_raw", 1, 
+		       &BarcodeScan::imageCallback, this);
     
     process_im_ = false; // process images 
     currently_process_ = false; // currently processing an image?
@@ -83,8 +86,6 @@ bool BarcodeScan::find_tag(string tag_name, float timeout/*=2.*/)
 	    
 	    //debug
 	    cout << "Message Found:" << endl;
-	    string a, cin >> a;
-	    
 	    break;
 	  }
 	} else {
@@ -118,3 +119,5 @@ void BarcodeScan::imageCallback(const sensor_msgs::ImageConstPtr& msg)
   }
   return;
 }
+
+#endif
