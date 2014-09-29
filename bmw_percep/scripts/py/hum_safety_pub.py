@@ -44,7 +44,7 @@ class HumanSafetyPub:
         self.started_plot = False
         
         self.in_hysterisis = False
-        self.hys_reset = 30.
+        self.hys_reset = 10.
 
         self.robo_frame = "base_link"
         self.robo_ee_frame = "wrist_3_link"
