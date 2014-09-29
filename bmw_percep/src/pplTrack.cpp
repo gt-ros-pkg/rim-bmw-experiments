@@ -583,7 +583,7 @@ PplTrack::PplTrack(float z){
 
   max_height_=2.3; min_height_=1.0; max_dist_gr_=0.4;
   max_c_size_=18000; min_c_size_=100;
-  jerk_std_=0.65;
+  jerk_std_=2.5;//0.65;
   file_no_=0;
 
   ws_min_ = Eigen::Vector3f(.05, .84, -ground_coeffs_(3));
