@@ -44,7 +44,7 @@ class HumanSafetyPub:
         self.started_plot = False
         
         self.in_hysterisis = False
-        self.hys_reset = 10.
+        self.hys_reset = 5.
 
         self.robo_frame = "base_link"
         self.robo_ee_frame = "wrist_3_link"
@@ -86,7 +86,15 @@ class HumanSafetyPub:
         if (not ((np.isnan(self.hum_pos)).any() or (np.isnan(self.hum_vel)).any())):
             dist_center = np.linalg.norm(np.array(self.hum_pos - [trans_c[0], trans_c[1]]))
             dist_ee = np.linalg.norm(np.array(self.hum_pos - [trans_ee[0], trans_ee[1]]))
-            
+
+            #how much table do you have between human and End-effector
+            table_robo_y = .93
+            table_human_x = .85
+            behind_table_lim = -.3
+
+            # if ((trans_ee(1)-table_robo_y < behind_table_lim) or (trans_ee(0)-table_human_x<behind_table_lim) or (trans_ee(0) <table_human_x and trans_ee(1)-table_human_x<behind_table_lim )):
+            #     trans = [trans_c[0], trans_c[1]]
+            # else:
             if (dist_ee<dist_center):
                 trans = [trans_ee[0], trans_ee[1]]
             else:

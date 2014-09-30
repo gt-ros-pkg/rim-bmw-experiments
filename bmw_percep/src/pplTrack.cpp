@@ -544,15 +544,15 @@ void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
     if(!isnan(pit->z))
       if (pit->z>ground_z_min) //Groundplane removal
 	if(pit->y>0.84) //Robot table plane clipping
-	  if (pit->y>1.0 || pit->z>1.0) //Robot table more precise
+	  if (pit->y>1.0 || pit->z>1.2) //Robot table more precise
 	  if(pit->x>0.05) //behind front table clipping
 	    if(pit->x<4.3) //back range
 	      if(pit->x<2.9 || pit->y>2.0)//back table
 		if(pit->y<4.0) // Side range
 		  //clipping the front table
 		  if(!(pit->y<1.10 && pit->z<1.2) ){
-		  if(!(pit->x<1.10 && pit->z<0.98 && pit->y<2.3) )
-		  {cloud_f->points.push_back(*pit);}
+		  if(!(pit->x<1.10 && pit->z<1.3 && pit->y<2.3) )
+		    {cloud_f->points.push_back(*pit);}
 		  }
   }
 
@@ -915,37 +915,34 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
   float granx = .05;//(xlims(1)-xlims(0))/static_cast<float>(tbx) ;
   float grany = .05;//(ylims(1)-ylims(0))/static_cast<float>(tby) ;
 
-  int tbx = floor((xlims(1)-xlims(0))/granx) + 1;
-  int tby = floor((ylims(1)-ylims(0))/grany) + 1; 
+  int tbx = ceil((xlims(1)-xlims(0))/granx);
+  int tby = ceil((ylims(1)-ylims(0))/grany); 
 
   float out_rad = std::min(std::min((xlims(1)-xlims(0))/2., (ylims(1)-ylims(0))/2.), .3); 
-    float inn_rad=.1;
+  float inn_rad=.15;
+  inn_rad = std::min(out_rad, inn_rad);
 
-  Eigen::Vector2f kern_radius_out(floor(2*out_rad/granx), floor(2*out_rad/grany));
-  Eigen::Vector2f kern_radius_inn(floor(2*inn_rad/granx), floor(2*inn_rad/grany));
+  Eigen::Vector2f kern_size_out(floor(2*out_rad/granx), floor(2*out_rad/grany));
+  Eigen::Vector2f kern_size_inn(floor(2*inn_rad/granx), floor(2*inn_rad/grany));
   cv::Mat out_ell = cv::getStructuringElement(cv::MORPH_ELLIPSE, 
-						    cv::Size(kern_radius_out(0), 
-							     kern_radius_out(1)));
+					      cv::Size(kern_size_out(0), 
+						       kern_size_out(1)));
+
   cv::Mat inn_ell = cv::getStructuringElement(cv::MORPH_ELLIPSE, 
-					      cv::Size(kern_radius_inn(0), 
-						       kern_radius_inn(1)));
+					      cv::Size(kern_size_inn(0), 
+						       kern_size_inn(1)));
   cv::Mat inn_temp(out_ell.rows, out_ell.cols, out_ell.depth());
   inn_temp.setTo(cv::Scalar::all(0.));
+
   inn_ell.copyTo(inn_temp(cv::Rect(floor((inn_temp.cols-inn_ell.cols)/2.), 
-				   floor((inn_temp.rows-inn_ell.rows-1)/2.), 
+				   floor((inn_temp.rows-inn_ell.rows)/2.), 
 				   inn_ell.cols, inn_ell.rows)));
 
   cv::Mat struc_ellipse = out_ell  + inn_temp;
 
-  // float delta = gran/5.;
-
-  // int total_bins_x = ceil((xlims(1) - xlims(0))/gran);
-  // int total_bins_y = ceil((ylims(1) - ylims(0) )/gran);
-  // int tbx=total_bins_x, tby=total_bins_y;
-
-  hmap.resize(tby);
 
   //initialize map
+  hmap.resize(tby);
   for(size_t i=0; i<hmap.size(); ++i){
     hmap[i].resize(tbx);
     for(size_t j=0; j<hmap[i].size(); ++j){
@@ -961,7 +958,6 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
 
   float max_ht = 0.0;
   Index2D max_ht_ind;
-
   //update map with cluster points
   for(size_t i=0; i<per_cs_[c_ind].size(); ++i){
     ClusterPoint t_cl = per_cs_[c_ind][i];
@@ -989,30 +985,9 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
     }
   }
 
-
-
-
   //find the cluster with points in range
-  int h_x_span = floor(head_span/granx); int h_y_span = floor(head_span/grany);
-  vector<Index2D> head_ind;
-
-  // //debug-- check if hmap alright
-  // bool h_checks=true;
-  // if(hmap.size()!= 20){
-  //   cout << "Hmap Ysize = " << hmap.size() << endl;
-  //   h_checks=false;
-  // }
-  // for(int i=0; i<hmap.size(); ++i){
-  //   if(hmap[i].size()!=20){
-  //     cout << "Hmap Xsize = " << hmap[i].size() << endl;
-  //     h_checks=false;
-  //   }
-  // }
-  
-  // if(h_checks)
-  //   cout << "HMap checks Out!!!!!!" << endl;
-
-
+  // int h_x_span = floor(head_span/granx); int h_y_span = floor(head_span/grany);
+  // vector<Index2D> head_ind;
 
   //set flags of pixels that are in range to true
   for(size_t i=0; i<hmap.size(); ++i){
@@ -1022,8 +997,6 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
       }
     }
   }
-
-
 
 
   //debug - visualize the height map
@@ -1037,7 +1010,8 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
   }
   
   cv::Mat temp_im;
-  cv::filter2D(hmap_im, temp_im, -1., struc_ellipse, cv::Point(-1,-1),0., cv::BORDER_CONSTANT);
+  cv::filter2D(hmap_im, temp_im, -1., struc_ellipse, cv::Point(-1,-1), 0., 
+	       cv::BORDER_CONSTANT);
   
   double mini; double maxi;
   cv::Point minId, maxId;
@@ -1083,46 +1057,45 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
   cv::imshow("Height", disp_im);
   cv::imshow("Convolved", disp_im2);
   cv::imshow("Kernel", disp_im3);
-  char c = cv::waitKey(1);
+  char c = cv::waitKey(5);
 
 
-  cluster_head(hmap, max_ht_ind(0), max_ht_ind(1), h_x_span, h_y_span, head_ind);  
-
-
-
-
-
-  //TODO: Check if any clusters are being repeated
-  //get the centroid from connected clusters
-  Eigen::Vector2f temp_loc(0.,0.);
-  Eigen::Vector2f temp;
-  accumulator_set< float, stats<tag::mean> > x_acc, y_acc;
-  // cout << "**********HEAD INDICES**********" << endl;
-  // cout << "MAXES " << tbx << ',' << tby << endl;
-  int n_bins=0;
-  for(size_t i=0; i<head_ind.size(); i++){
-    // cout << "(" << head_ind[i](0) << ',' << head_ind[i](1) << ')' << endl;
-  // vector<Eigen::Vector2f> cur_pts = hmap[head_ind[i](1)][head_ind[i](0)].p_ind;
-    size_t tmpx = static_cast<size_t>(head_ind[i](0));
-    size_t tmpy = static_cast<size_t>(head_ind[i](1));
-    
-    // cout << "(" << hmap[tmpy][tmpx].loc(0) << ',' << hmap[tmpy][tmpx].loc(1) << endl;
-    
-    temp_loc += hmap[tmpy][tmpx].loc;
-    n_bins++;
-
-    for(size_t j=0;
-    	j < hmap[tmpy][tmpx].p_ind.size();
-    	++j){
-      temp = hmap[tmpy][tmpx].p_ind[j];
-      x_acc(temp(0));
-      y_acc(temp(1));
-    }
-  }
-
-  // cout << "After even this..." << endl;
+  // cluster_head(hmap, max_ht_ind(0), max_ht_ind(1), h_x_span, h_y_span, head_ind);
   
-  h_center = Eigen::Vector2f(mean(x_acc), mean(y_acc));
+
+  // //TODO: Check if any clusters are being repeated
+  // //get the centroid from connected clusters
+  // Eigen::Vector2f temp_loc(0.,0.);
+  // Eigen::Vector2f temp;
+  // accumulator_set< float, stats<tag::mean> > x_acc, y_acc;
+  // // cout << "**********HEAD INDICES**********" << endl;
+  // // cout << "MAXES " << tbx << ',' << tby << endl;
+  // int n_bins=0;
+  // for(size_t i=0; i<head_ind.size(); i++){
+  //   // cout << "(" << head_ind[i](0) << ',' << head_ind[i](1) << ')' << endl;
+  // // vector<Eigen::Vector2f> cur_pts = hmap[head_ind[i](1)][head_ind[i](0)].p_ind;
+  //   size_t tmpx = static_cast<size_t>(head_ind[i](0));
+  //   size_t tmpy = static_cast<size_t>(head_ind[i](1));
+    
+  //   // cout << "(" << hmap[tmpy][tmpx].loc(0) << ',' << hmap[tmpy][tmpx].loc(1) << endl;
+    
+  //   temp_loc += hmap[tmpy][tmpx].loc;
+  //   n_bins++;
+
+  //   for(size_t j=0;
+  //   	j < hmap[tmpy][tmpx].p_ind.size();
+  //   	++j){
+  //     temp = hmap[tmpy][tmpx].p_ind[j];
+  //     x_acc(temp(0));
+  //     y_acc(temp(1));
+  //   }
+  // }
+
+  // // cout << "After even this..." << endl;
+  
+  // h_center = Eigen::Vector2f(mean(x_acc), mean(y_acc));
+
+
   h_center = hmap[maxId.y][maxId.x].loc;
   // cout << "Locaion= ("<<temp_loc(0) << ',' << temp_loc(1)<< '). Nbins='
   //      << n_bins << endl;
