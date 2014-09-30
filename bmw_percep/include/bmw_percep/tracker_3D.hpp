@@ -57,13 +57,14 @@ enum { COLS=640, ROWS=480};
 bool got_transform_;
   bool new_cloud_available_flag;
 
-ros::Subscriber pc_sub;
-ros::Subscriber pc_sub_;
-ros::Publisher db_pc;
-ros::Publisher pub_viz;
-ros::Publisher pub_raw_obs;
+  ros::Subscriber pc_sub;
+  ros::Subscriber pc_sub_;
+  ros::Publisher db_pc;
+  ros::Publisher pub_viz;
+  ros::Publisher pub_raw_obs;
   ros::Publisher  pub_obs_pos;
   ros::Publisher pub_est_pos;
+  ros::Publisher pub_debug_pos;
 
 protected:
   //Pointcloud callback
@@ -95,6 +96,7 @@ got_transform_ = false;
   robo_frame = "base_link";
   string obs_pose_topic = "/human/observations/position";
   string est_pose_topic = "/human/estimated/pose";
+  string debug_pos_topic = "/debug/pose";
 
   pc_sub = nh.subscribe<PointCloudT> 
     (sub_topic, 1, &Tracker3d::pc_call, this);
@@ -106,6 +108,7 @@ got_transform_ = false;
   pub_raw_obs = nh.advertise<visualization_msgs::MarkerArray> (raw_obs_topic, 1);
   pub_obs_pos = nh.advertise<geometry_msgs::PoseArray> (obs_pose_topic, 1);
   pub_est_pos = nh.advertise<geometry_msgs::PoseArray> (est_pose_topic, 1);
+  pub_debug_pos = nh.advertise<geometry_msgs::PoseStamped> (debug_pos_topic, 1);
 
   PointCloudT::Ptr
     tcloud (new PointCloudT);
@@ -194,7 +197,7 @@ void Tracker3d::pc_call(const PointCloudT::ConstPtr& temp_cloud)
   //also listen to robot--right now
   tf::StampedTransform robo_form;
   try{
-    ros::Time a = ros::Time::now()-ros::Duration(0.005);
+    ros::Time a = ros::Time(0);
     // tf_listener.waitForTransform(hum_frame, robo_frame, a,
     // 				 ros::Duration(1.0));
     tf_listener.lookupTransform(hum_frame, robo_frame, a,

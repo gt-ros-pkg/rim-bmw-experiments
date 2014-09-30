@@ -160,6 +160,8 @@ void get_clusters_stats(PointCloudT::ConstPtr cloud,
   //Publishes the position of the observation, position and velocity of the
   //filtered belief of the human
   void pub_obs_est(ros::Publisher pub_o, ros::Publisher pub_e_p);
+  
+  void pub_debug_pose(ros::Publisher pub_db);
 
 private:
 bool table_link;

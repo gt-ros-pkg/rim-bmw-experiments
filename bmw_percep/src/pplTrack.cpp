@@ -903,15 +903,39 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
 {
   vector<vector <HMapEl> > hmap;
   float dist_from_top = 0.2;
-  float head_span = 1.;
-  int tbx=50, tby=50;
+  float head_span = .5;
+
   // float gran = 0.05; // granularity
 
   Eigen::Vector2f xlims(per_stats_[c_ind].min(0), per_stats_[c_ind].max(0));
   Eigen::Vector2f ylims(per_stats_[c_ind].min(1), per_stats_[c_ind].max(1));
+  
 
-  float granx = (xlims(1)-xlims(0))/static_cast<float>(tbx) ;
-  float grany = (ylims(1)-ylims(0))/static_cast<float>(tby) ;
+
+  float granx = .05;//(xlims(1)-xlims(0))/static_cast<float>(tbx) ;
+  float grany = .05;//(ylims(1)-ylims(0))/static_cast<float>(tby) ;
+
+  int tbx = floor((xlims(1)-xlims(0))/granx) + 1;
+  int tby = floor((ylims(1)-ylims(0))/grany) + 1; 
+
+  float out_rad = std::min(std::min((xlims(1)-xlims(0))/2., (ylims(1)-ylims(0))/2.), .3); 
+    float inn_rad=.1;
+
+  Eigen::Vector2f kern_radius_out(floor(2*out_rad/granx), floor(2*out_rad/grany));
+  Eigen::Vector2f kern_radius_inn(floor(2*inn_rad/granx), floor(2*inn_rad/grany));
+  cv::Mat out_ell = cv::getStructuringElement(cv::MORPH_ELLIPSE, 
+						    cv::Size(kern_radius_out(0), 
+							     kern_radius_out(1)));
+  cv::Mat inn_ell = cv::getStructuringElement(cv::MORPH_ELLIPSE, 
+					      cv::Size(kern_radius_inn(0), 
+						       kern_radius_inn(1)));
+  cv::Mat inn_temp(out_ell.rows, out_ell.cols, out_ell.depth());
+  inn_temp.setTo(cv::Scalar::all(0.));
+  inn_ell.copyTo(inn_temp(cv::Rect(floor((inn_temp.cols-inn_ell.cols)/2.), 
+				   floor((inn_temp.rows-inn_ell.rows-1)/2.), 
+				   inn_ell.cols, inn_ell.rows)));
+
+  cv::Mat struc_ellipse = out_ell  + inn_temp;
 
   // float delta = gran/5.;
 
@@ -925,8 +949,10 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
   for(size_t i=0; i<hmap.size(); ++i){
     hmap[i].resize(tbx);
     for(size_t j=0; j<hmap[i].size(); ++j){
-      hmap[i][j].loc = Eigen::Vector2f(granx * static_cast<float>(j) + xlims(0), 
-				       grany * static_cast<float>(i) + ylims(0));
+      hmap[i][j].loc = Eigen::Vector2f(granx * (.5 + static_cast<float>(j)) 
+				       + xlims(0), 
+				       grany * (.5 + static_cast<float>(i)) 
+				       + ylims(0));
       hmap[i][j].height = 0.0;
       hmap[i][j].in_h_range = false;
       hmap[i][j].p_ind.clear();
@@ -963,14 +989,7 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
     }
   }
 
-  //set flags of pixels that are in range to true
-  for(size_t i=0; i<hmap.size(); ++i){
-    for(size_t j=0; j<hmap[i].size(); ++j){
-      if (hmap[i][j].height > (max_ht-dist_from_top)){
-	hmap[i][j].in_h_range = true;
-      }
-    }
-  }
+
 
 
   //find the cluster with points in range
@@ -993,7 +1012,84 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
   // if(h_checks)
   //   cout << "HMap checks Out!!!!!!" << endl;
 
-  cluster_head(hmap, max_ht_ind(0), max_ht_ind(1), h_x_span, h_y_span, head_ind);
+
+
+  //set flags of pixels that are in range to true
+  for(size_t i=0; i<hmap.size(); ++i){
+    for(size_t j=0; j<hmap[i].size(); ++j){
+      if (hmap[i][j].height > (max_ht-dist_from_top)){
+	hmap[i][j].in_h_range = true;
+      }
+    }
+  }
+
+
+
+
+  //debug - visualize the height map
+  cv::Mat hmap_im = cv::Mat::zeros(hmap.size(), hmap[0].size(), CV_32FC1);
+  for(size_t i=0; i<hmap.size(); ++i){
+    float* im_r = hmap_im.ptr<float>(i);
+    for(size_t j=0; j<hmap[i].size(); ++j){
+      // if (hmap[i][j].in_h_range)
+  	im_r[j] = hmap[i][j].height;
+    }
+  }
+  
+  cv::Mat temp_im;
+  cv::filter2D(hmap_im, temp_im, -1., struc_ellipse, cv::Point(-1,-1),0., cv::BORDER_CONSTANT);
+  
+  double mini; double maxi;
+  cv::Point minId, maxId;
+
+  cv::minMaxIdx(hmap_im, &mini, &maxi);
+  cv::Mat adjMap;
+  // expand your range to 0..255. Similar to histEq();
+  hmap_im.convertTo(adjMap, CV_8UC1, 255 / (maxi-mini), -mini); 
+
+  // this is great. It converts your grayscale image into a tone-mapped one, 
+  // much more pleasing for the eye
+  // function is found in contrib module, so include contrib.hpp 
+  // and link accordingly
+  cv::Mat falseColorsMap1, falseColorsMap2, falseColorsMap3;
+  applyColorMap(adjMap, falseColorsMap1, cv::COLORMAP_JET);
+  cv::Mat disp_im;
+  // disp_im = falseColorsMap;
+  
+  cout << "Max = " << maxi << endl;
+  cout << "Min = " << mini << endl;
+
+
+  cv::minMaxLoc(temp_im, &mini, &maxi, &minId, &maxId);
+
+  temp_im.convertTo(adjMap, CV_8UC1, 255 / (maxi-mini), -mini); 
+  applyColorMap(adjMap, falseColorsMap2, cv::COLORMAP_JET);
+  cv::Mat disp_im2;
+
+
+  cv::minMaxIdx(struc_ellipse, &mini, &maxi);
+  struc_ellipse.convertTo(adjMap, CV_8UC1, 255 / (maxi-mini), -mini); 
+  applyColorMap(adjMap, falseColorsMap3, cv::COLORMAP_JET);
+  cv::Mat disp_im3;
+
+
+  circle(falseColorsMap1, maxId, 1, cv::Scalar(0,255,0), -1);
+  circle(falseColorsMap2, maxId, 1, cv::Scalar(0,255,0), -1);
+
+  cv::resize(falseColorsMap1, disp_im, cv::Size(0,0), 15, 15);
+  cv::resize(falseColorsMap2, disp_im2, cv::Size(0,0), 15, 15);  
+  cv::resize(falseColorsMap3, disp_im3, cv::Size(0,0), 15, 15);  
+
+  cv::imshow("Height", disp_im);
+  cv::imshow("Convolved", disp_im2);
+  cv::imshow("Kernel", disp_im3);
+  char c = cv::waitKey(1);
+
+
+  cluster_head(hmap, max_ht_ind(0), max_ht_ind(1), h_x_span, h_y_span, head_ind);  
+
+
+
 
 
   //TODO: Check if any clusters are being repeated
@@ -1027,9 +1123,10 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
   // cout << "After even this..." << endl;
   
   h_center = Eigen::Vector2f(mean(x_acc), mean(y_acc));
+  h_center = hmap[maxId.y][maxId.x].loc;
   // cout << "Locaion= ("<<temp_loc(0) << ',' << temp_loc(1)<< '). Nbins='
   //      << n_bins << endl;
-  h_center = temp_loc/static_cast<float>(n_bins);
+  // h_center = temp_loc/static_cast<float>(n_bins);
   // cout << "Head center " << h_center(0) << ','<<h_center(1) << endl;
 }
 
