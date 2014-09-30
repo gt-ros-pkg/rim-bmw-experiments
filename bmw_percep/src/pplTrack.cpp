@@ -6,6 +6,14 @@
    Uses PCL.
 **/
 
+enum MarkerIDs{
+  INNER_CYLINDER,
+  OUTER_CYLINDER,
+  VEL1,
+  VEL2,
+  VEL3
+};
+
 using namespace std;
 
 typedef pcl::PointXYZRGB PointT;
@@ -78,7 +86,7 @@ int PplTrack::getOneCluster(const vector<vector<ClusterPoint> > clusters)
       float dt = static_cast<float>((pub_time_-prev_time_).toSec());
 
       cur_est = kf_tracker_.get_state();
-      kf_tracker_.predict(cur_est, P_useless, dt);
+      // kf_tracker_.predict(cur_est, P_useless, dt);
       prediction = Eigen::Vector2f(cur_est(0), cur_est(1));
 
       int best_id=-1;
@@ -87,13 +95,10 @@ int PplTrack::getOneCluster(const vector<vector<ClusterPoint> > clusters)
       //find all the distances and choose the cluster closest to last observation
       for(int i=0; i<clusters.size(); ++i){
 	Eigen::Vector2f h_cent;
-	cout << "Points in cluster: " << clusters[i].size() << endl;
-	get_head_center(i, h_cent);
-	cout << "Found head" << endl;
 
+	get_head_center(i, h_cent);
 	float cur_err = (h_cent-prediction).norm();
 
-	cout << "Estimated the trace = " << cur_err << endl;
 	if ( cur_err < min_trace){
 	  min_trace = cur_err;
 	  best_id = i;
@@ -237,7 +242,7 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
     // Any marker sent with the same namespace and id will overwrite the old one
     inn_cyl_marker.ns = name_space;
     //TODO: use enum and not these numbers
-    inn_cyl_marker.id = 0;
+    inn_cyl_marker.id = INNER_CYLINDER;
 
     // Set the marker type to Cylinder
     uint32_t cylinder = visualization_msgs::Marker::CYLINDER;
@@ -275,7 +280,7 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
     visualization_msgs::Marker out_cyl_marker;
     out_cyl_marker = inn_cyl_marker;
 
-    out_cyl_marker.id = 1;
+    out_cyl_marker.id = OUTER_CYLINDER;
 
     out_cyl_marker.scale.x = person.out_cyl(0);
     out_cyl_marker.scale.y = person.out_cyl(1);
@@ -302,7 +307,7 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
 
       //velocity markers
       vel_marker1 = inn_cyl_marker;
-      vel_marker1.id += 5;
+      vel_marker1.id = VEL1;
       vel_marker1.pose.position.z = 0;
 
       vel_marker1.pose.position.x = person.pos(0)+ delta_t * person.vel(0);
@@ -320,8 +325,8 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
       vel_marker2 = vel_marker1;
       vel_marker3 = vel_marker2;
 
-      vel_marker2.id += 2;
-      vel_marker3.id += 3;
+      vel_marker2.id = VEL2;
+      vel_marker3.id += VEL3;
   
       vel_marker2.color.a *= (.5);
       vel_marker3.color.a *= pow((.5),2);
@@ -349,6 +354,32 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
   else{
     //No Publish if no observation
     //TODO: delete the message
+    visualization_msgs::MarkerArray mark_arr;
+    mark_arr.markers.clear();
+    
+    //Inner-cylinder marker
+    visualization_msgs::Marker inn_cyl_marker, out_cyl_marker, vel_marker1, vel_marker2, vel_marker3;
+
+    inn_cyl_marker.action = visualization_msgs::Marker::DELETE;
+    inn_cyl_marker.ns = name_space;
+
+    out_cyl_marker = inn_cyl_marker;
+    vel_marker1 = inn_cyl_marker;
+    vel_marker2 = inn_cyl_marker;
+    vel_marker3 = inn_cyl_marker;
+
+    inn_cyl_marker.id = INNER_CYLINDER;
+    out_cyl_marker.id = OUTER_CYLINDER;
+    vel_marker1.id = VEL1;
+    vel_marker2.id = VEL2;
+    vel_marker3.id = VEL3;
+
+    mark_arr.markers.push_back(inn_cyl_marker);
+    mark_arr.markers.push_back(out_cyl_marker);
+    mark_arr.markers.push_back(vel_marker1);
+    mark_arr.markers.push_back(vel_marker2);
+    mark_arr.markers.push_back(vel_marker3);
+
   }
 }
 
@@ -1093,48 +1124,8 @@ void PplTrack::get_head_center(int c_ind, Eigen::Vector2f &h_center)
   cv::imshow("Kernel", disp_im3);
   char c = cv::waitKey(5);
 
-
-  // cluster_head(hmap, max_ht_ind(0), max_ht_ind(1), h_x_span, h_y_span, head_ind);
-  
-
-  // //TODO: Check if any clusters are being repeated
-  // //get the centroid from connected clusters
-  // Eigen::Vector2f temp_loc(0.,0.);
-  // Eigen::Vector2f temp;
-  // accumulator_set< float, stats<tag::mean> > x_acc, y_acc;
-  // // cout << "**********HEAD INDICES**********" << endl;
-  // // cout << "MAXES " << tbx << ',' << tby << endl;
-  // int n_bins=0;
-  // for(size_t i=0; i<head_ind.size(); i++){
-  //   // cout << "(" << head_ind[i](0) << ',' << head_ind[i](1) << ')' << endl;
-  // // vector<Eigen::Vector2f> cur_pts = hmap[head_ind[i](1)][head_ind[i](0)].p_ind;
-  //   size_t tmpx = static_cast<size_t>(head_ind[i](0));
-  //   size_t tmpy = static_cast<size_t>(head_ind[i](1));
-    
-  //   // cout << "(" << hmap[tmpy][tmpx].loc(0) << ',' << hmap[tmpy][tmpx].loc(1) << endl;
-    
-  //   temp_loc += hmap[tmpy][tmpx].loc;
-  //   n_bins++;
-
-  //   for(size_t j=0;
-  //   	j < hmap[tmpy][tmpx].p_ind.size();
-  //   	++j){
-  //     temp = hmap[tmpy][tmpx].p_ind[j];
-  //     x_acc(temp(0));
-  //     y_acc(temp(1));
-  //   }
-  // }
-
-  // // cout << "After even this..." << endl;
-  
-  // h_center = Eigen::Vector2f(mean(x_acc), mean(y_acc));
-
-
   h_center = hmap[maxId.y][maxId.x].loc;
-  // cout << "Locaion= ("<<temp_loc(0) << ',' << temp_loc(1)<< '). Nbins='
-  //      << n_bins << endl;
-  // h_center = temp_loc/static_cast<float>(n_bins);
-  // cout << "Head center " << h_center(0) << ','<<h_center(1) << endl;
+
 }
 
 void PplTrack::cluster_head(vector<vector<HMapEl> > hmap, size_t x, size_t y, 
@@ -1187,11 +1178,11 @@ void PplTrack::pub_obs_est(ros::Publisher pub_o, ros::Publisher pub_e_p)
   //position
   obs_p.position.x = pers_obs_.pos(0);
   obs_p.position.y = pers_obs_.pos(1);
-  obs_p.position.z = 0.;  
+  obs_p.position.z = 0.;
 
   est_p.position.x = pers_est_.pos(0);
   est_p.position.y = pers_est_.pos(1);
-  est_p.position.z = 0.;  
+  est_p.position.z = 0.;
 
   est_v.position.x = pers_est_.vel(0);
   est_v.position.y = pers_est_.vel(1);

@@ -74,6 +74,7 @@ ClusterPoint var; //variance
 ClusterPoint min; 
 ClusterPoint max; //all these stats are taken independent in the dimensions
 ClusterPoint median;
+  Eigen::Vector2f head_2d;
 };
 typedef struct ClusterStats ClusterStats;
 typedef Eigen::Matrix<int, 2, 1> Index2D;
