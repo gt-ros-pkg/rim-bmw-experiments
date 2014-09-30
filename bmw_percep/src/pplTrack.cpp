@@ -53,20 +53,54 @@ int PplTrack::getOneCluster(const vector<vector<ClusterPoint> > clusters)
 {
   //can only get cluster if size not zero
   if (clusters.size()>0){
-  //Presently chooses the one with max number of points
-  int max_size=0;
-  int max_id=0; int cur_id=0;
-    
-  for (vector<vector<ClusterPoint> >::const_iterator cit=clusters.begin();
-       cit!=clusters.end(); ++cit){
-    if ((*cit).size()>max_size){
-      max_size=(*cit).size();
-      max_id = cur_id;
+
+    if (!currently_filtering_){ //no history
+      //Presently chooses the one with max number of points
+      int max_size=0;
+      int max_id=0; int cur_id=0;
+      
+      for (vector<vector<ClusterPoint> >::const_iterator cit=clusters.begin();
+	   cit!=clusters.end(); ++cit){
+	if ((*cit).size()>max_size){
+	  max_size=(*cit).size();
+	  max_id = cur_id;
+	}
+	++cur_id;
+      }
+      
+      return max_id;
     }
-    ++cur_id;
-  }
-  
-  return max_id;
+    else{ //if history is there
+      Eigen::Vector2f prediction;
+      Eigen::Matrix<float, 6, 6> P_useless;
+      Eigen::Matrix<float, 6, 1> cur_est;
+
+      float dt = static_cast<float>((pub_time_-prev_time_).toSec());
+
+      cur_est = kf_tracker_.get_state();
+      kf_tracker_.predict(cur_est, P_useless, dt);
+      prediction = Eigen::Vector2f(cur_est(0), cur_est(1));
+
+      int best_id=-1;
+      float min_trace=numeric_limits<float>::infinity();
+
+      //find all the distances and choose the cluster closest to last observation
+      for(int i=0; i<clusters.size(); ++i){
+	Eigen::Vector2f h_cent;
+	cout << "Points in cluster: " << clusters[i].size() << endl;
+	get_head_center(i, h_cent);
+	cout << "Found head" << endl;
+
+	float cur_err = (h_cent-prediction).norm();
+
+	cout << "Estimated the trace = " << cur_err << endl;
+	if ( cur_err < min_trace){
+	  min_trace = cur_err;
+	  best_id = i;
+	}
+      }
+      return best_id;
+    }
   }
   
   else{return -1;}
@@ -581,7 +615,7 @@ PplTrack::PplTrack(float z){
   ground_coeffs_ =   Eigen::Vector4f(0.0,0.0,0.0,-z);
   table_link = true;
 
-  max_height_=2.3; min_height_=1.0; max_dist_gr_=0.4;
+  max_height_=2.3; min_height_=1.3; max_dist_gr_=0.4;
   max_c_size_=18000; min_c_size_=100;
   jerk_std_=2.50;//0.65;
   file_no_=0;

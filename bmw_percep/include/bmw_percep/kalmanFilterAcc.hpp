@@ -23,10 +23,10 @@ public:
   void predict(float delta_t);
 
   //incase only prediction is required and not update of everything
-  void predict(State &s, float delta_t);
+  void predict(State &s,Eigen::Matrix<float, 6, 6> &P, float delta_t);
   
   void correct(Eigen::Vector2f z_k);
-
+  
   void reinitialize(Eigen::Vector2f jerk_std,
 		    Eigen::Vector2f measur_std,
 		    float delta_t,
@@ -36,6 +36,11 @@ public:
   
   //estimate new state vector given observation
   void estimate(Eigen::Vector2f obs, float delta_t, Eigen::Matrix<float, 6, 1> &est);
+  //returns the error of the observation w.r.t the current filter
+  float estimate_check(Eigen::Vector2f obs, float delta_t);
+  
+  //get current state
+  State get_state();
 
 private:
   Eigen::Matrix<float, 6,1> x_k_p_, x_k_n_; //previous and next Xk s
