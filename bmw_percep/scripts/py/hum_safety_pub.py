@@ -102,7 +102,7 @@ class HumanSafetyPub:
 
             if (dist_ee<dist_center):
                 trans = [trans_ee[0], trans_ee[1]]
-                self.min_dist1 = 1.25
+                self.min_dist1 = .95
                 self.min_dist2 = 1.75
 
             else:
@@ -195,13 +195,13 @@ class HumanSafetyPub:
             pointx = self.dist
             pointy = self.vel_mag
         
-            if framy is 0:
-                plt.clf()
+            #if framy is 0:
+            plt.clf()
                 
-            framy = (framy+1)%10
+            #framy = (framy+1)%3
 
             plt.axis(xylims, figure=self.fig)
-            plt.plot(line1x, line1y, 'r', line2x, line2y, 'b', pointx, pointy, 'g^', fixl1x, fixl1y, 'r', fixl2x, fixl2y, 'b')
+            plt.plot(line1x, line1y,'r', line2x, line2y, 'b', pointx, pointy, 'g^', fixl1x, fixl1y, 'r', fixl2x, fixl2y, 'b', markersize=10)
             plt.draw()
             time.sleep(.03)
         #plt.close()
