@@ -37,6 +37,7 @@
 #include<visualization_msgs/Marker.h>
 #include<std_msgs/UInt8.h>
 #include<std_msgs/Bool.h>
+#include<std_msgs/String.h>
 #include<geometry_msgs/PoseStamped.h>
 #include<geometry_msgs/PoseArray.h>
 #include<geometry_msgs/Pose.h>
@@ -107,6 +108,8 @@ PplTrack(Eigen::Vector4f ground_coeffs);
 //If pointcloud in table_link frame
 PplTrack(float z);
 
+void pub_human_workspace(ros::Publisher pub, ros::Publisher pub2);
+
 void estimate(vector<vector<ClusterPoint> > clusters);
 
 // Takes in point cloud 
@@ -165,6 +168,7 @@ void get_clusters_stats(PointCloudT::ConstPtr cloud,
   void pub_debug_pose(ros::Publisher pub_db);
 
 private:
+  bool occupied_;
 bool table_link;
 int person_id_; // the index of the person from the person clusters
 PointCloudT::Ptr cur_cloud_;

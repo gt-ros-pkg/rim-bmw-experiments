@@ -19,6 +19,7 @@
 #include<visualization_msgs/Marker.h>
 #include<std_msgs/UInt8.h>
 #include<std_msgs/Bool.h>
+#include<std_msgs/String.h>
 #include<geometry_msgs/PoseStamped.h>
 #include<geometry_msgs/PoseArray.h>
 #include <tf/transform_listener.h>
@@ -65,6 +66,8 @@ bool got_transform_;
   ros::Publisher  pub_obs_pos;
   ros::Publisher pub_est_pos;
   ros::Publisher pub_debug_pos;
+  ros::Publisher pub_hum_work;
+  ros::Publisher pub_status_msg;
 
 protected:
   //Pointcloud callback
@@ -97,6 +100,8 @@ got_transform_ = false;
   string obs_pose_topic = "/human/observations/position";
   string est_pose_topic = "/human/estimated/pose";
   string debug_pos_topic = "/debug/pose";
+  string hum_work_topic = "human/workspace/occupied";
+  string status_topic = "/display/message";
 
   pc_sub = nh.subscribe<PointCloudT> 
     (sub_topic, 1, &Tracker3d::pc_call, this);
@@ -109,6 +114,8 @@ got_transform_ = false;
   pub_obs_pos = nh.advertise<geometry_msgs::PoseArray> (obs_pose_topic, 1);
   pub_est_pos = nh.advertise<geometry_msgs::PoseArray> (est_pose_topic, 1);
   pub_debug_pos = nh.advertise<geometry_msgs::PoseStamped> (debug_pos_topic, 1);
+  pub_hum_work = nh.advertise<std_msgs::Bool>(hum_work_topic, 1);
+  pub_status_msg = nh.advertise<std_msgs::String>(status_topic, 1);
 
   PointCloudT::Ptr
     tcloud (new PointCloudT);
@@ -158,6 +165,8 @@ got_transform_ = false;
     ppl_tracker.visualize_obs(pub_raw_obs);
 
     ppl_tracker.pub_obs_est(pub_obs_pos, pub_est_pos);
+    ppl_tracker.pub_human_workspace(pub_hum_work, pub_status_msg);
+
     // pcl::copyPointCloud(*cloud, *viz_cloud);
     if (cloud->points.size()>0){
       pcl::copyPointCloud(*cloud, *tcloud);

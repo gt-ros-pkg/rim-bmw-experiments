@@ -1,5 +1,5 @@
 #include <bmw_percep/pplTrack.hpp>
-
+#define SPAM_STATUS false
 /**
    
    Class *implementation* for tracking people from RGBD imagery.
@@ -591,10 +591,6 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 
 void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
 {
-
-  // //debug
-  // cout << "Initial points" << cloud->points.size() << endl;
-  
   PointCloudT::Ptr cloud_f(new PointCloudT);
   
   //Groundplane removal
@@ -643,6 +639,7 @@ void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
 }
 
 PplTrack::PplTrack(float z){
+  occupied_ = false;
   ground_coeffs_ =   Eigen::Vector4f(0.0,0.0,0.0,-z);
   table_link = true;
 
@@ -1201,3 +1198,36 @@ void PplTrack::pub_obs_est(ros::Publisher pub_o, ros::Publisher pub_e_p)
 
   return;
  }
+
+void PplTrack::pub_human_workspace(ros::Publisher pub, ros::Publisher pub2)
+{
+
+  float tablex = 1.1;
+  float tabley = 2.3;
+  float hys_gap=0.;
+
+  bool occupied = false;
+
+  if (occupied_)
+    hys_gap  = 0.2;
+
+  if (currently_filtering_){
+    if (per_stats_[person_id_].min(0)-hys_gap <tablex &&
+	per_stats_[person_id_].min(1)-hys_gap <tabley)
+      occupied = true;
+  }
+
+  std_msgs::Bool msg;
+  msg.data = occupied;
+  pub.publish(msg);
+
+  std_msgs::String msg2;
+  if(occupied)
+    msg2.data = "Get out of the way, PLEASE";
+  else
+    msg2.data = "Not in the way.";
+  if (SPAM_STATUS)
+    pub2.publish(msg2);
+
+  occupied_=occupied;
+}
