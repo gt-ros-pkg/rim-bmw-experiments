@@ -62,7 +62,7 @@ int PplTrack::getOneCluster(const vector<vector<ClusterPoint> > clusters)
   //can only get cluster if size not zero
   if (clusters.size()>0){
 
-    if (!currently_filtering_){ //no history
+    if (isnan(robo_loc_(0))){
       //Presently chooses the one with max number of points
       int max_size=0;
       int max_id=0; int cur_id=0;
@@ -79,35 +79,53 @@ int PplTrack::getOneCluster(const vector<vector<ClusterPoint> > clusters)
       return max_id;
     }
     else{ //if history is there
-      Eigen::Vector2f prediction;
-      Eigen::Matrix<float, 6, 6> P_useless;
-      Eigen::Matrix<float, 6, 1> cur_est;
+      float min_dist=100.;
+      int best_id = -1;
 
-      float dt = static_cast<float>((pub_time_-prev_time_).toSec());
-
-      cur_est = kf_tracker_.get_state();
-      // kf_tracker_.predict(cur_est, P_useless, dt);
-      prediction = Eigen::Vector2f(cur_est(0), cur_est(1));
-
-      int best_id=-1;
-      float min_trace=numeric_limits<float>::infinity();
-
-      //find all the distances and choose the cluster closest to last observation
       for(int i=0; i<clusters.size(); ++i){
-	Eigen::Vector2f h_cent;
+    	Eigen::Vector2f h_cent;
 
-	get_head_center(i, h_cent);
-	float cur_err = (h_cent-prediction).norm();
+    	get_head_center(i, h_cent);
+    	float cur_err = (h_cent-robo_loc_).norm();
 
-	if ( cur_err < min_trace){
-	  min_trace = cur_err;
-	  best_id = i;
-	}
+    	if ( cur_err < min_dist){
+    	  min_dist = cur_err;
+    	  best_id = i;
+    	}
       }
       return best_id;
     }
-  }
-  
+      
+    //   Eigen::Vector2f prediction;
+    //   Eigen::Matrix<float, 6, 6> P_useless;
+    //   Eigen::Matrix<float, 6, 1> cur_est;
+
+    //   float dt = static_cast<float>((pub_time_-prev_time_).toSec());
+
+    //   cur_est = kf_tracker_.get_state();
+    //   // kf_tracker_.predict(cur_est, P_useless, dt);
+    //   prediction = Eigen::Vector2f(cur_est(0), cur_est(1));
+
+    //   int best_id=-1;
+    //   float min_trace=numeric_limits<float>::infinity();
+
+    //   //find all the distances and choose the cluster closest to last observation
+    //   for(int i=0; i<clusters.size(); ++i){
+    // 	Eigen::Vector2f h_cent;
+
+    // 	get_head_center(i, h_cent);
+    // 	float cur_err = (h_cent-prediction).norm();
+
+    // 	if ( cur_err < min_trace){
+    // 	  min_trace = cur_err;
+    // 	  best_id = i;
+    // 	}
+    //   }
+    //   return best_id;
+    // }
+  //   }
+  // }
+  }  
   else{return -1;}
 }
 
@@ -404,6 +422,8 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 
     workspace_limit(cloud);
 
+    robo_loc_ = Eigen::Vector2f(robo_loc(0), robo_loc(0));
+
     if (got_tf_robot) // in case the robots location is known
       robot_remove(cloud, robo_loc);
 
@@ -479,6 +499,22 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 	  if (currently_filtering_){
 	    float dt = static_cast<float>((pub_time_-prev_time_).toSec());
 	    Eigen::Matrix<float, 6, 1> kf_est;
+
+	    bool reinit = check_if_reinitialize();
+	    if(reinit){
+	      Eigen::Vector2f jerk_std(jerk_std_,jerk_std_);
+	      Eigen::Vector2f measur_std(0.05,0.05);
+	      ///float delta_t = 1./15.;
+	      Eigen::Matrix<float, 6, 1> x_k1;
+	      x_k1.fill(0.);
+	      x_k1(0,0)=pers_obs_.pos(0); x_k1(1,0)=pers_obs_.pos(1);
+	      Eigen::Matrix<float, 6, 6> init_cov 
+		= 10000*Eigen::MatrixXf::Identity(6,6);
+	    
+	      kf_tracker_.reinitialize(jerk_std, measur_std, 
+				       dt, x_k1, init_cov);
+
+	    }
 	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), 
 						 pers_obs_.pos(1)), dt, kf_est);
 
@@ -1243,4 +1279,19 @@ void PplTrack::pub_human_workspace(ros::Publisher &pub, ros::Publisher &pub2)
   
 
   occupied_=occupied;
+}
+
+bool PplTrack::check_if_reinitialize()
+{
+  if (isnan(pers_est_.pos(0)) || isnan(pers_obs_.pos(0)) )
+    return false;
+  Eigen::Vector2f cur_p(pers_obs_.pos(0), pers_obs_.pos(1));
+  Eigen::Vector2f cur_r(pers_est_.pos(0), pers_est_.pos(1));
+  
+  float dist = (cur_p-cur_r).norm();
+
+  if (dist > .2)
+    return true;
+  else
+    return false;
 }

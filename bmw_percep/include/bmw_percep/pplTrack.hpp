@@ -112,6 +112,7 @@ void pub_human_workspace(ros::Publisher &pub, ros::Publisher &pub2);
 
 void estimate(vector<vector<ClusterPoint> > clusters);
 
+  bool check_if_reinitialize();
 // Takes in point cloud 
 // (background subtracted or not undecided)
 // Performs the complete pipeline of PC 
@@ -182,6 +183,7 @@ vector<ClusterPoint> cur_pos_;
 float max_height_, min_height_, max_dist_gr_;
 int max_c_size_, min_c_size_;
 bool more_than_one_;
+  Eigen::Vector2f robo_loc_;
 ros::Time pub_time_; //time-stamp associated with human estimation
   ros::Time prev_time_;
   float jerk_std_;
