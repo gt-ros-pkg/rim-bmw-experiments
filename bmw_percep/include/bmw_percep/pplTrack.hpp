@@ -108,7 +108,7 @@ PplTrack(Eigen::Vector4f ground_coeffs);
 //If pointcloud in table_link frame
 PplTrack(float z);
 
-void pub_human_workspace(ros::Publisher pub, ros::Publisher pub2);
+void pub_human_workspace(ros::Publisher &pub, ros::Publisher &pub2);
 
 void estimate(vector<vector<ClusterPoint> > clusters);
 

@@ -1,5 +1,5 @@
 #include <bmw_percep/pplTrack.hpp>
-#define SPAM_STATUS true
+#define SPAM_STATUS false
 /**
    
    Class *implementation* for tracking people from RGBD imagery.
@@ -1199,7 +1199,7 @@ void PplTrack::pub_obs_est(ros::Publisher pub_o, ros::Publisher pub_e_p)
   return;
  }
 
-void PplTrack::pub_human_workspace(ros::Publisher pub, ros::Publisher pub2)
+void PplTrack::pub_human_workspace(ros::Publisher &pub, ros::Publisher &pub2)
 {
 
   float tablex = 1.1;
@@ -1220,6 +1220,8 @@ void PplTrack::pub_human_workspace(ros::Publisher pub, ros::Publisher pub2)
   std_msgs::Bool msg;
   msg.data = occupied;
   pub.publish(msg);
+  cout << "Do somethin" << endl;
+  cout << msg << endl;
 
   std_msgs::String msg2;
   if(occupied)
@@ -1228,6 +1230,17 @@ void PplTrack::pub_human_workspace(ros::Publisher pub, ros::Publisher pub2)
     msg2.data = "Not in the way.";
   if (SPAM_STATUS)
     pub2.publish(msg2);
+
+  cv::Mat viz(640, 480, CV_8UC3);
+  
+  if(occupied)
+    viz.setTo(cv::Scalar(0,0, 255));
+  else
+    viz.setTo(cv::Scalar(0,255, 0));
+
+  cv::imshow("Workspace" , viz);
+  cv::waitKey(3);
+  
 
   occupied_=occupied;
 }

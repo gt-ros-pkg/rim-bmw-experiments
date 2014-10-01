@@ -100,7 +100,7 @@ got_transform_ = false;
   string obs_pose_topic = "/human/observations/position";
   string est_pose_topic = "/human/estimated/pose";
   string debug_pos_topic = "/debug/pose";
-  string hum_work_topic = "human/workspace/occupied";
+  string hum_work_topic = "/human/workspace/occupied";
   string status_topic = "/display/message";
 
   pc_sub = nh.subscribe<PointCloudT> 

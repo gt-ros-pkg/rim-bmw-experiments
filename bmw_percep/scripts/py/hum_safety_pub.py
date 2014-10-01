@@ -44,13 +44,13 @@ class HumanSafetyPub:
         self.started_plot = False
         
         self.in_hysterisis = False
-        self.hys_reset = 5.
+        self.hys_reset = 3.
 
         self.robo_frame = "base_link"
         self.robo_ee_frame = "wrist_3_link"
         self.slope = 2.5
-        self.min_dist1 = 1.25;
-        self.min_dist2 = 1.75;
+        self.min_dist1 = .75#1.25
+        self.min_dist2 = 1.25#1.75
         self.max_dist = 4.
         self.min_dist_hyster = self.min_dist2
         #initialize to don't stop human
@@ -95,8 +95,16 @@ class HumanSafetyPub:
             # if ((trans_ee(1)-table_robo_y < behind_table_lim) or (trans_ee(0)-table_human_x<behind_table_lim) or (trans_ee(0) <table_human_x and trans_ee(1)-table_human_x<behind_table_lim )):
             #     trans = [trans_c[0], trans_c[1]]
             # else:
+
+            self.min_dist1 = .75#1.25
+            self.min_dist2 = 1.25#1.75
+
+
             if (dist_ee<dist_center):
                 trans = [trans_ee[0], trans_ee[1]]
+                self.min_dist1 = 1.25
+                self.min_dist2 = 1.75
+
             else:
                 trans = [trans_c[0], trans_c[1]]
             
@@ -162,6 +170,8 @@ class HumanSafetyPub:
 
         xylims = [0., 6., -2., 2.]
 
+        framy=0
+        
         while not rospy.is_shutdown():
             if (self.in_hysterisis):
                 min_dist2 = self.min_dist_hyster
@@ -181,11 +191,14 @@ class HumanSafetyPub:
             fixl2y = [0., xylims[2]]
             
             #fix
-
+            
             pointx = self.dist
             pointy = self.vel_mag
         
-            plt.clf()
+            if framy is 0:
+                plt.clf()
+                
+            framy = (framy+1)%10
 
             plt.axis(xylims, figure=self.fig)
             plt.plot(line1x, line1y, 'r', line2x, line2y, 'b', pointx, pointy, 'g^', fixl1x, fixl1y, 'r', fixl2x, fixl2y, 'b')
@@ -247,8 +260,8 @@ class HumanSafetyPub:
         viz_.pose.orientation.z = 0.
         viz_.pose.orientation.w = 1.
 
-        viz_.scale.x = 1.
-        viz_.scale.y = 1.
+        viz_.scale.x = self.min_dist1
+        viz_.scale.y = self.min_dist1
         viz_.scale.z = .01
 
         viz_.color.r = color[0]
