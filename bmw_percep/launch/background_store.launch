@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find bmw_percep)/launch/background_store_back.launch"/>
+  <include file="$(find bmw_percep)/launch/background_store_front.launch"/>
+</launch>

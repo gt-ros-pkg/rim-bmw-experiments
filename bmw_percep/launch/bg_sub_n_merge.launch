@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find bmw_percep)/launch/background_sub.launch"/>
+  <node name="merge_pc" pkg="bmw_percep" type="merge_pc" output="screen"/>
+</launch>

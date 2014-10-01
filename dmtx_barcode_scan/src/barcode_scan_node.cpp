@@ -3,7 +3,7 @@
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 #include <cv_bridge/cv_bridge.h>
-
+#include <dmtx_barcode_scan/Scan.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -70,57 +70,9 @@ blah()
 }
 */
 
-void imageCallback(const sensor_msgs::ImageConstPtr& msg)
-{
-  ROS_INFO("IMG");
-  cv_bridge::CvImagePtr cv_ptr;
-  cv_ptr = cv_bridge::toCvCopy(msg, "bgr8");
-  // cv::Mat* img_mat = &cv_ptr->image;
-  try
-  {
-    imshow("view", cv_ptr->image);
-  }
-  catch (cv_bridge::Exception& e)
-  {
-    ROS_ERROR("Could not convert from '%s' to 'bgr8'.", msg->encoding.c_str());
-  }
-
-  ////////////////////////////////////////////////////////////////
-  DmtxImage      *img;
-  DmtxDecode     *dec;
-  DmtxRegion     *reg;
-  DmtxMessage    *dmtx_msg;
-
-  img = dmtxImageCreate(cv_ptr->image.data, cv_ptr->image.cols, cv_ptr->image.rows, 
-                        DmtxPack24bppBGR);
-  assert(img != NULL);
-ROS_INFO("A %d %d", img->width, img->height);
-
-  dec = dmtxDecodeCreate(img, 1);
-  assert(dec != NULL);
-ROS_INFO("B");
-
-  reg = dmtxRegionFindNext(dec, NULL);
-ROS_INFO("C");
-  if(reg != NULL) {
-     dmtx_msg = dmtxDecodeMatrixRegion(dec, reg, DmtxUndefined);
-ROS_INFO("D");
-     if(dmtx_msg != NULL) {
-ROS_INFO("E");
-        const char* output = reinterpret_cast<const char*>(dmtx_msg->output);
-        ROS_INFO("Message: %s", output);
-        dmtxMessageDestroy(&dmtx_msg);
-     } else {
-        ROS_INFO("Message not found");
-     }
-     dmtxRegionDestroy(&reg);
-  }
-
-ROS_INFO("F");
-  dmtxDecodeDestroy(&dec);
-  dmtxImageDestroy(&img);
-ROS_INFO("G");
-}
+void imageCallback(const sensor_msgs::ImageConstPtr& msg);
+//GLOBALS
+ros::Publisher pub_scan;
 
 int main(int argc, char **argv)
 {
@@ -130,7 +82,85 @@ int main(int argc, char **argv)
   cvNamedWindow("view");
   cvStartWindowThread();
   image_transport::ImageTransport it(nh);
-  image_transport::Subscriber sub = it.subscribe("/camera/image_raw", 1, imageCallback);
+  image_transport::Subscriber sub = it.subscribe("/scan_barcode_cam/image_raw", 1, imageCallback);
+  pub_scan = nh.advertise<dmtx_barcode_scan::Scan>("scan/", 1);
   ros::spin();
   cvDestroyWindow("view");
+}
+
+
+void imageCallback(const sensor_msgs::ImageConstPtr& msg)
+{
+
+  std::string expect_msg = "ASIF";
+
+  ROS_INFO("IMG");
+  cv_bridge::CvImagePtr cv_ptr;
+  cv_ptr = cv_bridge::toCvCopy(msg, "mono8");
+  // cv::Mat* img_mat = &cv_ptr->image;
+  try
+  {
+    imshow("view", cv_ptr->image);
+  }
+  catch (cv_bridge::Exception& e)
+  {
+    ROS_ERROR("Could not convert from '%s' to 'mono8'.", msg->encoding.c_str());
+  }
+
+  ////////////////////////////////////////////////////////////////
+  DmtxImage      *img;
+  DmtxDecode     *dec;
+  DmtxRegion     *reg;
+  DmtxMessage    *dmtx_msg;
+
+  dmtx_barcode_scan::Scan smsg;
+  smsg.found = false;
+  std::cout << "Scan Message" << smsg << std::endl;
+
+  img = dmtxImageCreate(cv_ptr->image.data, cv_ptr->image.cols, cv_ptr->image.rows, 
+                        DmtxPack8bppK);
+  assert(img != NULL);
+  ROS_INFO("A %d %d", img->width, img->height);
+
+  dec = dmtxDecodeCreate(img, 1);
+  assert(dec != NULL);
+  ROS_INFO("B");
+
+  reg = dmtxRegionFindNext(dec, NULL);
+  while(reg!=NULL){
+    ROS_INFO("C");
+
+    dmtx_msg = dmtxDecodeMatrixRegion(dec, reg, DmtxUndefined);
+    ROS_INFO("D");
+    if(dmtx_msg != NULL) {
+
+      std::string str_dmtx((char*)reinterpret_cast<char*>(dmtx_msg->output));
+
+      if(str_dmtx == expect_msg){
+      ROS_INFO("E");
+      smsg.found = true;
+
+      smsg.tag = str_dmtx;
+      std::cout << "Scan Message. True?" << smsg << std::endl;
+   
+      char c = cv::waitKey(500);
+      const char* output = reinterpret_cast<const char*>(dmtx_msg->output);
+      ROS_INFO("Message: %s", output);
+      dmtxMessageDestroy(&dmtx_msg);
+      break;
+      }
+    } else {
+      ROS_INFO("Message not found");
+    }
+    dmtxRegionDestroy(&reg);
+  }
+  
+  ROS_INFO("F");
+  dmtxDecodeDestroy(&dec);
+  dmtxImageDestroy(&img);
+  ROS_INFO("G");
+
+  std::cout << "Scan Message before publish." << smsg << std::endl;
+  pub_scan.publish(smsg);
+
 }

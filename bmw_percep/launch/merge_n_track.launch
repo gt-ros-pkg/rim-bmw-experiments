@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find bmw_percep)/launch/bg_sub_n_merge.launch"/>
+  <node name="tracker_3D" pkg="bmw_percep" type="tracker_3D" output="screen"/>
+</launch>
