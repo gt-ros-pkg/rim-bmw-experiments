@@ -1,5 +1,5 @@
 #include <bmw_percep/pplTrack.hpp>
-#define SPAM_STATUS false
+#define SPAM_STATUS true
 /**
    
    Class *implementation* for tracking people from RGBD imagery.
