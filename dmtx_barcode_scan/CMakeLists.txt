@@ -62,21 +62,21 @@ generate_messages(
     ${catkin_INCLUDE_DIRS}
   )
   
-  add_executable(barcode_scan_node src/barcode_scan_node.cpp)
+  # add_executable(barcode_scan_node src/barcode_scan_node.cpp)
 
-  add_executable(barcodeScan src/barcodeScan.cpp)
-  
-  target_link_libraries(barcode_scan_node
-    ${catkin_LIBRARIES}
-    ${OpenCV_LIBRARIES}
-    ${DMTX_LIBRARIES}
-  )
+  # add_executable(barcodeScan src/barcodeScan.cpp)
+  # 
+  # target_link_libraries(barcode_scan_node
+  #   ${catkin_LIBRARIES}
+  #   ${OpenCV_LIBRARIES}
+  #   ${DMTX_LIBRARIES}
+  # )
 
-  target_link_libraries(barcodeScan
-    ${catkin_LIBRARIES}
-    ${OpenCV_LIBRARIES}
-    ${DMTX_LIBRARIES}
-  )
+  # target_link_libraries(barcodeScan
+  #   ${catkin_LIBRARIES}
+  #   ${OpenCV_LIBRARIES}
+  #   ${DMTX_LIBRARIES}
+  # )
 
 #endif()
 

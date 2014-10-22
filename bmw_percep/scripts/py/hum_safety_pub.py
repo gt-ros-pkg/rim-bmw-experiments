@@ -56,6 +56,11 @@ class HumanSafetyPub:
         #initialize to don't stop human
         self.stop_human = False
         self.in_hysterisis_start = rospy.Time.now()
+        
+        #initialize
+        self.robo_pos_prev = np.array([0, 0]])
+        self.robo_ee_pos_prev = np.array([0, 0]])
+        self.prev_time = rospy.Time.now()
 
     #callback receives person position and velocity
     def pers_cb(self, msg):
@@ -80,6 +85,16 @@ class HumanSafetyPub:
                                                               self.cur_time_tf)
             #by default, robo-pos is center
             self.robo_pos = np.array([trans_c[0], trans_c[1]])
+            self.robo_ee_pos = np.array([trans_ee[0], trans_ee[1]])
+            
+            #robot center velocity
+            self.robo_vel = (self.robo_pos - self.robo_pos_prev) / (self.cur_time - self.prev_time)
+            self.robo_ee_vel = (self.robo_ee_pos - self.robo_ee_pos_prev) / (self.cur_time - self.prev_time)
+            
+            self.robo_pos_prev = self.robo_pos
+            self.robo_ee_pos_prev = self.robo_ee_pos
+            self.prev_time = self.cur_time
+            
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             return
 
@@ -99,14 +114,17 @@ class HumanSafetyPub:
             self.min_dist1 = .75#1.25
             self.min_dist2 = 1.25#1.75
 
-
+            
+            
             if (dist_ee<dist_center):
                 trans = [trans_ee[0], trans_ee[1]]
                 self.min_dist1 = .95
                 self.min_dist2 = 1.75
+                self.robo_human_vel = self.robo_ee_vel
 
             else:
                 trans = [trans_c[0], trans_c[1]]
+                self.robo_human_vel = self.robo_vel
             
             self.robo_pos = np.array([trans[0], trans[1]])
             
@@ -116,8 +134,11 @@ class HumanSafetyPub:
             person_to_rob = -self.hum_pos + self.robo_pos
             self.dist = np.linalg.norm(person_to_rob)
 
+            
+            
+            
             #magnitude of velocity in the direction of the robot
-            self.vel_mag = np.dot(self.hum_vel, person_to_rob)/self.dist
+            self.vel_mag = np.dot((self.hum_vel-self.robo_human_vel), person_to_rob)/self.dist
 
             if self.stop_human:
                 
@@ -160,6 +181,8 @@ class HumanSafetyPub:
         
         # self.plot_things()
         self.pub_visuals()
+        
+        
         return
 
     def plot_things(self):
