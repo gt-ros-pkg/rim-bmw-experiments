@@ -10,7 +10,7 @@ import rospy
 import tf
 import matplotlib.pyplot as plt
 import matplotlib.axis as m_axes
-
+import numpy
 from geometry_msgs.msg import PoseArray, Pose
 from std_msgs.msg import Bool as BoolMsg
 from math import sqrt
@@ -58,8 +58,8 @@ class HumanSafetyPub:
         self.in_hysterisis_start = rospy.Time.now()
         
         #initialize
-        self.robo_pos_prev = np.array([0, 0]])
-        self.robo_ee_pos_prev = np.array([0, 0]])
+        self.robo_pos_prev = np.array([0, 0])
+        self.robo_ee_pos_prev = np.array([0, 0])
         self.prev_time = rospy.Time.now()
 
     #callback receives person position and velocity
@@ -80,6 +80,9 @@ class HumanSafetyPub:
             (trans_c, rot) = self.robo_listener.lookupTransform(self.frame, 
                                                               self.robo_frame, 
                                                               self.cur_time_tf)
+	    self.robo_curr_common = self.robo_listener.getLatestCommonTime(self.frame,
+							      self.robo_frame)
+	     	
             (trans_ee, rot) = self.robo_listener.lookupTransform(self.frame, 
                                                               self.robo_ee_frame, 
                                                               self.cur_time_tf)
@@ -88,12 +91,17 @@ class HumanSafetyPub:
             self.robo_ee_pos = np.array([trans_ee[0], trans_ee[1]])
             
             #robot center velocity
-            self.robo_vel = (self.robo_pos - self.robo_pos_prev) / (self.cur_time - self.prev_time)
-            self.robo_ee_vel = (self.robo_ee_pos - self.robo_ee_pos_prev) / (self.cur_time - self.prev_time)
+            if not self.robo_curr_common == self.prev_time:
+	    	self.robo_vel = (self.robo_pos - self.robo_pos_prev) / (self.robo_curr_common - self.prev_time).to_sec()
+            	self.robo_ee_vel = (self.robo_ee_pos - self.robo_ee_pos_prev) / (self.robo_curr_common - self.prev_time).to_sec()
             
+
+
+	
+            print self.robo_curr_common.to_sec(),',',self.robo_ee_vel[0],',',self.robo_ee_vel[1] 
             self.robo_pos_prev = self.robo_pos
             self.robo_ee_pos_prev = self.robo_ee_pos
-            self.prev_time = self.cur_time
+            self.prev_time = self.robo_curr_common
             
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             return
