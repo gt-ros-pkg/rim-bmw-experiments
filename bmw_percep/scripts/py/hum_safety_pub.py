@@ -10,13 +10,15 @@ import rospy
 import tf
 import matplotlib.pyplot as plt
 import matplotlib.axis as m_axes
-import numpy
+
 from geometry_msgs.msg import PoseArray, Pose
 from std_msgs.msg import Bool as BoolMsg
 from math import sqrt
 import numpy as np
 from visualization_msgs.msg import MarkerArray, Marker
 import threading
+
+from excel_servers.srv import KinematicsInfo
 
 class HumanSafetyPub:
     def __init__(self):
@@ -61,16 +63,46 @@ class HumanSafetyPub:
         self.robo_pos_prev = np.array([0, 0])
         self.robo_ee_pos_prev = np.array([0, 0])
         self.prev_time = rospy.Time.now()
+        self.prev_time2 = rospy.Time.now()
+        
+        self.kinematics_info = rospy.ServiceProxy('get_kinematics_info', KinematicsInfo)
+	
+        kinematics = self.kinematics_info()
+        joint_positions = kinematics.positions.data
+        joint_velocities = kinematics.velocities.data
+        joint_jacobian = kinematics.jacobian.data
 
+        self.joint_positions_prev = joint_positions
+        self.joint_velocities_prev = joint_velocities
+        self.joint_jacobian_prev = joint_jacobian
+        self.joint_time_prev = rospy.Time.now()
+        
     #callback receives person position and velocity
     def pers_cb(self, msg):
+        try:
+            human_safety_mode = rospy.get_param("human_safety_mode")
+        except KeyError:
+            human_safety_mode = 1
+        
+        print human_safety_mode
+        
+        
+        kinematics = self.kinematics_info()
+        joint_positions = kinematics.positions.data
+        joint_velocities = kinematics.velocities.data
+        joint_jacobian = kinematics.jacobian.data
 
+        
+	
         self.frame = msg.header.frame_id
         self.hum_time = msg.header.stamp
         self.hum_pos = np.array([msg.poses[0].position.x, msg.poses[0].position.y])
         self.hum_vel = np.array([msg.poses[1].position.x, msg.poses[1].position.y])
         self.cur_time_tf = rospy.Time(0)
         self.cur_time = rospy.Time.now()
+
+        
+        
 
         #Get robot transform
         try:
@@ -80,28 +112,45 @@ class HumanSafetyPub:
             (trans_c, rot) = self.robo_listener.lookupTransform(self.frame, 
                                                               self.robo_frame, 
                                                               self.cur_time_tf)
-	    self.robo_curr_common = self.robo_listener.getLatestCommonTime(self.frame,
-							      self.robo_frame)
-	     	
             (trans_ee, rot) = self.robo_listener.lookupTransform(self.frame, 
                                                               self.robo_ee_frame, 
                                                               self.cur_time_tf)
+            
+            self.robo_position_time = self.robo_listener.getLatestCommonTime(self.frame, 
+                                                              self.robo_ee_frame)            
+                        
             #by default, robo-pos is center
             self.robo_pos = np.array([trans_c[0], trans_c[1]])
             self.robo_ee_pos = np.array([trans_ee[0], trans_ee[1]])
             
-            #robot center velocity
-            if not self.robo_curr_common == self.prev_time:
-	    	self.robo_vel = (self.robo_pos - self.robo_pos_prev) / (self.robo_curr_common - self.prev_time).to_sec()
-            	self.robo_ee_vel = (self.robo_ee_pos - self.robo_ee_pos_prev) / (self.robo_curr_common - self.prev_time).to_sec()
-            
-
-
-	
-            print self.robo_curr_common.to_sec(),',',self.robo_ee_vel[0],',',self.robo_ee_vel[1] 
-            self.robo_pos_prev = self.robo_pos
-            self.robo_ee_pos_prev = self.robo_ee_pos
-            self.prev_time = self.robo_curr_common
+            if not self.robo_position_time == self.prev_time:
+                #robot center velocity
+                self.robo_vel = (self.robo_pos - self.robo_pos_prev) / (self.robo_position_time - self.prev_time).to_sec()
+                self.robo_ee_vel = (self.robo_ee_pos - self.robo_ee_pos_prev) / (self.robo_position_time - self.prev_time).to_sec()
+                
+                self.robo_pos_prev = self.robo_pos
+                self.robo_ee_pos_prev = self.robo_ee_pos
+                self.prev_time = self.robo_position_time
+            if human_safety_mode == 3:
+                temp  = np.dot(np.resize(np.asarray(joint_jacobian),(6,7)), np.asarray(joint_velocities))
+                print temp
+                self.robo_ee_vel[0]  = temp[0]
+                self.robo_ee_vel[1]  = temp[1]
+                self.robo_vel[0] = joint_velocities[0]
+                self.robo_vel[1] = 0
+            if human_safety_mode == 4:
+                temp1 = (np.asarray(joint_jacobian)-np.asarray(self.joint_jacobian_prev))/(self.cur_time - self.prev_time2).to_sec()
+                temp2 = (np.asarray(joint_velocities) - np.asarray(self.joint_velocities_prev))/(self.cur_time - self.prev_time2).to_sec()
+                temp  = np.dot(np.resize(np.asarray(joint_jacobian),(6,7)), np.asarray(joint_velocities))
+                temp3 = np.dot(np.resize(np.asarray(temp1),(6,7)), np.asarray(joint_velocities))
+                temp4 = np.dot(np.resize(np.asarray(joint_jacobian),(6,7)), np.asarray(temp2))
+                self.robo_ee_vel[0]  = temp[0]+temp3[0]+temp4[0]
+                self.robo_ee_vel[1]  = temp[1]+temp3[1]+temp4[1]
+                self.robo_vel[0] = joint_velocities[0]
+                self.robo_vel[1] = 0
+                self.joint_jacobian_prev = joint_jacobian
+                self.prev_time2 = self.cur_time
+                self.joint_velocities_prev = joint_velocities
             
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             return
@@ -146,7 +195,14 @@ class HumanSafetyPub:
             
             
             #magnitude of velocity in the direction of the robot
-            self.vel_mag = np.dot((self.hum_vel-self.robo_human_vel), person_to_rob)/self.dist
+            if human_safety_mode == 1:
+                self.vel_mag = np.dot(self.hum_vel, person_to_rob)/self.dist
+            elif human_safety_mode == 2:
+                self.vel_mag = np.dot((self.hum_vel-self.robo_human_vel), person_to_rob)/self.dist
+            elif human_safety_mode == 3:
+                self.vel_mag = np.dot((self.hum_vel-self.robo_human_vel), person_to_rob)/self.dist
+            elif human_safety_mode == 4:
+                self.vel_mag = np.dot((self.hum_vel-self.robo_human_vel), person_to_rob)/self.dist
 
             if self.stop_human:
                 
