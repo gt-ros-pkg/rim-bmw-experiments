@@ -59,7 +59,7 @@ pclTransform back_transform, front_transform;
 bool first_frame;
 string front_frame, back_frame;
 bool new_pc_f, new_pc_b;
-ros::Publisher pc_pub;
+ros::Publisher pc_pub, back_pc_pub, front_pc_pub;
 string new_frame;
 PointCloudSM::Ptr back_pc, new_b_pc, pub_pc, front_pc;
 
@@ -84,6 +84,11 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
   pc_pub = nh.advertise<PointCloudSM> 
     ("/kinect_both/depth_registered/points", 1);
+  back_pc_pub = nh.advertise<PointCloudSM> 
+    ("/kinect_back/world/depth_registered/points", 1);
+  front_pc_pub = nh.advertise<PointCloudSM> 
+    ("/kinect_front/world/depth_registered/points", 1);
+
   // ros::Subscriber front_sub = nh.subscribe<PointCloudSM> 
   //   ("/kinect_front/depth_registered/points", 1, front_call);
   // ros::Subscriber back_sub = nh.subscribe<PointCloudSM> 
@@ -146,6 +151,12 @@ void callback(const PCMsg::ConstPtr& front_pc_, const PCMsg::ConstPtr& back_pc_ 
   pcl::transformPointCloud(*front_pc, *pub_pc, back_transform.translation, 
   			   back_transform.rotation);
 
+  
+  pub_pc->header.frame_id = new_frame;
+  new_b_pc->header.frame_id = new_frame;
+  
+  front_pc_pub.publish(*pub_pc);
+  back_pc_pub.publish(*new_b_pc);
 
   if(COLOR_DIFF) //change PC colors
     {
@@ -165,8 +176,7 @@ void callback(const PCMsg::ConstPtr& front_pc_, const PCMsg::ConstPtr& back_pc_ 
     }
 
   *pub_pc += *new_b_pc;
-  
-  pub_pc->header.frame_id = new_frame;
+
   
 
   

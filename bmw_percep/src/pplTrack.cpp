@@ -470,13 +470,21 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     ec.extract (cluster_indices);
 
     // cout << "Clustering takes = " << clusterize.elapsed() << "s" << endl;
+    //debug
+    cout << "No. clusters = " << cluster_indices.size() << endl; 
 
     //merge
     merge_floor_clusters(cloud, cluster_indices);
+    cout << "No. clusters after floor merge = " << cluster_indices.size() << endl; 
 
+    //---
     //remove clusters acc to rules
     rm_clusters_rules(cloud, cluster_indices);
 
+    cout << "No. clusters after rule application = " << cluster_indices.size() << endl; 
+
+    // if (cluster_indices.size()>0)
+    //   {string puseless; cin>>puseless;}
     //assign person clusters to the private member
     assign_ppl_clusters(cloud, cluster_indices);
 
@@ -495,70 +503,70 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     //Track them
     if (person_id_>-1){ //current observation=true
       if (history_per_stats_.size()>0){
-	if (!isnan(history_per_stats_.front().pos(0))){
-	  if (currently_filtering_){
-	    float dt = static_cast<float>((pub_time_-prev_time_).toSec());
-	    Eigen::Matrix<float, 6, 1> kf_est;
+    	if (!isnan(history_per_stats_.front().pos(0))){
+    	  if (currently_filtering_){
+    	    float dt = static_cast<float>((pub_time_-prev_time_).toSec());
+    	    Eigen::Matrix<float, 6, 1> kf_est;
 
-	    bool reinit = check_if_reinitialize();
-	    if(reinit){
-	      Eigen::Vector2f jerk_std(jerk_std_,jerk_std_);
-	      Eigen::Vector2f measur_std(0.05,0.05);
-	      ///float delta_t = 1./15.;
-	      Eigen::Matrix<float, 6, 1> x_k1;
-	      x_k1.fill(0.);
-	      x_k1(0,0)=pers_obs_.pos(0); x_k1(1,0)=pers_obs_.pos(1);
-	      Eigen::Matrix<float, 6, 6> init_cov 
-		= 10000*Eigen::MatrixXf::Identity(6,6);
+    	    bool reinit = check_if_reinitialize();
+    	    if(reinit){
+    	      Eigen::Vector2f jerk_std(jerk_std_,jerk_std_);
+    	      Eigen::Vector2f measur_std(0.05,0.05);
+    	      ///float delta_t = 1./15.;
+    	      Eigen::Matrix<float, 6, 1> x_k1;
+    	      x_k1.fill(0.);
+    	      x_k1(0,0)=pers_obs_.pos(0); x_k1(1,0)=pers_obs_.pos(1);
+    	      Eigen::Matrix<float, 6, 6> init_cov 
+    		= 10000*Eigen::MatrixXf::Identity(6,6);
 	    
-	      kf_tracker_.reinitialize(jerk_std, measur_std, 
-				       dt, x_k1, init_cov);
+    	      kf_tracker_.reinitialize(jerk_std, measur_std, 
+    				       dt, x_k1, init_cov);
 
-	    }
-	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), 
-						 pers_obs_.pos(1)), dt, kf_est);
+    	    }
+    	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), 
+    						 pers_obs_.pos(1)), dt, kf_est);
 
-	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
-	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
+    	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
+    	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
 
-	    // //write to disk
-	    // write_clusters_disk();
-	  }
-	  else{
+    	    // //write to disk
+    	    // write_clusters_disk();
+    	  }
+    	  else{
 
-	    cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0),
-					       history_per_stats_.front().pos(1));
-	    //kalman
-	    Eigen::Vector2f jerk_std(jerk_std_,jerk_std_);
-	    Eigen::Vector2f measur_std(0.05,0.05);
-	    float delta_t = 1./15.;
-	    Eigen::Matrix<float, 6, 1> x_k1;
-	    x_k1.fill(0.);
-	    x_k1(0,0)=pers_obs_.pos(0); x_k1(1,0)=pers_obs_.pos(1);
-	    Eigen::Matrix<float, 6, 6> init_cov 
-	      = 10000*Eigen::MatrixXf::Identity(6,6);
+    	    cv::Point2f prev_pos = cv::Point2f(history_per_stats_.front().pos(0),
+    					       history_per_stats_.front().pos(1));
+    	    //kalman
+    	    Eigen::Vector2f jerk_std(jerk_std_,jerk_std_);
+    	    Eigen::Vector2f measur_std(0.05,0.05);
+    	    float delta_t = 1./15.;
+    	    Eigen::Matrix<float, 6, 1> x_k1;
+    	    x_k1.fill(0.);
+    	    x_k1(0,0)=pers_obs_.pos(0); x_k1(1,0)=pers_obs_.pos(1);
+    	    Eigen::Matrix<float, 6, 6> init_cov 
+    	      = 10000*Eigen::MatrixXf::Identity(6,6);
 	    
-	    kf_tracker_.reinitialize(jerk_std, measur_std, 
-				     delta_t, x_k1, init_cov);
+    	    kf_tracker_.reinitialize(jerk_std, measur_std, 
+    				     delta_t, x_k1, init_cov);
 
-	    Eigen::Matrix<float, 6, 1> kf_est;
-	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), 
-						 pers_obs_.pos(1)), 
-				 delta_t, kf_est);
+    	    Eigen::Matrix<float, 6, 1> kf_est;
+    	    kf_tracker_.estimate(Eigen::Vector2f(pers_obs_.pos(0), 
+    						 pers_obs_.pos(1)), 
+    				 delta_t, kf_est);
 	    
-	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
-	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
+    	    pers_est_.pos = Eigen::Vector2f(kf_est(0), kf_est(1));
+    	    pers_est_.vel = Eigen::Vector2f(kf_est(2), kf_est(3));
 
-	    currently_filtering_ = true;
-	  }
-	}
-	else{ // no observation -- prev frame
+    	    currently_filtering_ = true;
+    	  }
+    	}
+    	else{ // no observation -- prev frame
 
-	  currently_filtering_ = false;
-	  pers_est_.pos = pers_obs_.pos;
-	  pers_est_.vel = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
-					  numeric_limits<float>::quiet_NaN());
-	}
+    	  currently_filtering_ = false;
+    	  pers_est_.pos = pers_obs_.pos;
+    	  pers_est_.vel = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
+    					  numeric_limits<float>::quiet_NaN());
+    	}
       }
     }
     else{ //no observation
@@ -568,9 +576,9 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
       
       currently_filtering_ = false;
       pers_est_.pos = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
-				     numeric_limits<float>::quiet_NaN());
+    				     numeric_limits<float>::quiet_NaN());
       pers_est_.vel = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
-				     numeric_limits<float>::quiet_NaN());
+    				     numeric_limits<float>::quiet_NaN());
     }
     
     //set estimate now that filtering is done
@@ -579,7 +587,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     //store history
     if (history_per_stats_.size() > history_size_-1)
       {
-	history_per_stats_.pop();
+    	history_per_stats_.pop();
       }
     history_per_stats_.push(pers_est_);
 
@@ -854,14 +862,28 @@ void PplTrack::rm_clusters_rules(const PointCloudT::Ptr &cloud,
 
   for (int i=0; i<cs_indices.size(); ++i){
     ClusterStats cur_stats = cs_stats[i];
-    
+
+    //debug 
+    cout << "Dist from ground = " << cur_stats.min(2) << endl;
+
     //check z distance from ground
     if (cur_stats.min(2)<max_dist_gr_){
+      //debug
+      cout << "Ground distance aiight " << endl;
+
       //is height in range
       float cur_ht=cur_stats.max(2);
+      //debug
+      cout << "Height" << cur_ht << endl;
+
       if(cur_ht>min_height_ && cur_ht<max_height_){
+
 	//cluster size in range
 	int no_pts = cs_indices[i].indices.size();
+	//debug
+	cout << "Height range met.. " << endl; 
+	cout << "Cluster size = " << no_pts << endl;
+
 	if (no_pts>min_c_size_ && no_pts<max_c_size_)
 	  {	
 	    cs_new.push_back(cs_indices[i]);}

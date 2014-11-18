@@ -90,8 +90,9 @@ got_transform_ = false;
   string pub_topic = "/human/debug/pc";
   string file_topic = "/read_pcd";
   string live_bg_topic = "/subtracted_read_pcd";
+  string temp_topic = "/kinect_back/world/depth_registered/points";
   string live_topic = "/kinect_both/depth_registered/points";
-  string sub_topic = live_topic;
+  string sub_topic = temp_topic;
   // string sub_topic = file_topic;
   string viz_topic = "/human/visuals";
   string raw_obs_topic = "/human/observations/visuals";
@@ -173,6 +174,11 @@ got_transform_ = false;
       pcl::toPCLPointCloud2(*tcloud, pub_pc);
       pub_pc.header.frame_id = hum_frame;
       db_pc.publish(pub_pc);
+
+      //debug
+      // cout << "Found a person, Aaaaah!" << endl;
+      // string useless; cin >> useless;
+
     }
     // int useless;
     //cin >> useless;
