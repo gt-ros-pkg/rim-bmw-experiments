@@ -38,6 +38,8 @@ typedef pcl::PointCloud<PointT> PointCloudT;
 typedef pcl::PointXYZRGB PRGB;
 typedef pcl::PointCloud<PRGB> PCRGB;
 
+enum CamMode {BOTH, FRONT, BACK};
+
 class Tracker3d{
 
 private:
@@ -46,6 +48,8 @@ private:
   ros::Time cur_pc_time;
   string hum_frame, robo_frame;
   int frame_rate;
+  CamMode kin_mode;
+
 enum { COLS=640, ROWS=480};
   //Subscribe tf
   tf::TransformListener tf_listener;
@@ -80,19 +84,21 @@ public:
 };
 
 // MAIN
-Tracker3d::Tracker3d(ros::NodeHandle& nh):cloud(new PointCloudT), nh_(nh)
+Tracker3d::Tracker3d(ros::NodeHandle& nh):cloud(new PointCloudT), nh_(nh), 
+					  kin_mode(BOTH)
 {
 
-got_transform_ = false;
-  //debug
-  cout << "Are you even compiling?" << endl;
+  got_transform_ = false;
   frame_rate=30;
   string pub_topic = "/human/debug/pc";
   string file_topic = "/read_pcd";
   string live_bg_topic = "/subtracted_read_pcd";
   string temp_topic = "/kinect_back/world/depth_registered/points";
   string live_topic = "/kinect_both/depth_registered/points";
-  string sub_topic = temp_topic;
+  string back_topic ="/kinect_back/world/depth_registered/points"; 
+  string front_topic ="/kinect_front/world/depth_registered/points"; 
+
+  string sub_topic = live_topic;
   // string sub_topic = file_topic;
   string viz_topic = "/human/visuals";
   string raw_obs_topic = "/human/observations/visuals";
@@ -134,6 +140,11 @@ got_transform_ = false;
   PointCloudT::Ptr 
     viz_cloud (new PointCloudT);
 
+
+  boost::timer time_since_cloud;
+  double exit_both=60.; // time to wait until both mode is exited
+  double switch_kin=5.; // time to wait before switching to other kinect
+
   while(ros::ok()){
     // //debug
     // cout << "Got to the while? " << endl;
@@ -142,9 +153,27 @@ got_transform_ = false;
     // cout << "Spun" << endl;
     if (new_cloud_available_flag)
       n_frames++;
-    else
+    else{ //if no clouds - check timer
+      if (kin_mode == BOTH && time_since_cloud.elapsed()>exit_both){
+	pc_sub.shutdown();
+	pc_sub = nh.subscribe<PointCloudT> 
+	  (front_topic, 1, &Tracker3d::pc_call, this);
+	time_since_cloud.restart();
+      }
+      else if(kin_mode==FRONT && time_since_cloud.elapsed()>switch_kin){
+	pc_sub.shutdown();
+	pc_sub = nh.subscribe<PointCloudT> 
+	  (back_topic, 1, &Tracker3d::pc_call, this);
+	time_since_cloud.restart();
+      }
+      else if(kin_mode==BACK && time_since_cloud.elapsed()>switch_kin){
+	pc_sub.shutdown();
+	pc_sub = nh.subscribe<PointCloudT> 
+	  (front_topic, 1, &Tracker3d::pc_call, this);
+	time_since_cloud.restart();
+      }
       continue;
-
+    }
     vector<vector<Eigen::Vector3f> > clusters;
     
     //check if cloud empty
