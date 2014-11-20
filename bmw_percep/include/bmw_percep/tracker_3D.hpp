@@ -12,6 +12,7 @@
 #include<bmw_percep/kalmanFilter.hpp>
 #include<bmw_percep/pplTrack.hpp>
 #include <boost/timer.hpp>
+#include <pcl/registration/transforms.h>
 
 //ros-includes
 #include<ros/ros.h>
@@ -40,13 +41,21 @@ typedef pcl::PointCloud<PRGB> PCRGB;
 
 enum CamMode {BOTH, FRONT, BACK};
 
+struct pclTransform{
+  Eigen::Vector3d translation;
+  Eigen::Quaterniond rotation;
+}; typedef struct pclTransform pclTransform;
+
+
 class Tracker3d{
 
 private:
   ros::NodeHandle nh_;
   // Globals
   ros::Time cur_pc_time;
-  string hum_frame, robo_frame;
+  string hum_frame, robo_frame, fixed_frame, conversion_frame_;
+  string back_topic, front_topic;
+  bool conversion_stored_; //is the conversion for front and back kinects present
   int frame_rate;
   CamMode kin_mode;
 
@@ -59,7 +68,7 @@ enum { COLS=640, ROWS=480};
   //subscribes to the robots location
   Eigen::Vector3f robo_loc;
 
-bool got_transform_;
+  bool got_transform_;
   bool new_cloud_available_flag;
 
   ros::Subscriber pc_sub;
@@ -73,19 +82,27 @@ bool got_transform_;
   ros::Publisher pub_hum_work;
   ros::Publisher pub_status_msg;
 
+  pclTransform stored_transform;
+
 protected:
+  
+
   //Pointcloud callback
   void pc_call(const PointCloudT::ConstPtr& );
   void recvPCCallback(const PCRGB::ConstPtr& );
+  void convert_cloud_fixed(PointCloudT::Ptr &, string);
+  void store_transform(string);
 
 public:
   Tracker3d(ros::NodeHandle& nh);
-
 };
 
 // MAIN
-Tracker3d::Tracker3d(ros::NodeHandle& nh):cloud(new PointCloudT), nh_(nh), 
-					  kin_mode(BOTH)
+Tracker3d::Tracker3d(ros::NodeHandle& nh): cloud(new PointCloudT), 
+					   nh_(nh), 
+					   kin_mode(BOTH), 
+					   fixed_frame("table_link"),
+					   conversion_stored_(true)
 {
 
   got_transform_ = false;
@@ -95,8 +112,8 @@ Tracker3d::Tracker3d(ros::NodeHandle& nh):cloud(new PointCloudT), nh_(nh),
   string live_bg_topic = "/subtracted_read_pcd";
   string temp_topic = "/kinect_back/world/depth_registered/points";
   string live_topic = "/kinect_both/depth_registered/points";
-  string back_topic ="/kinect_back/world/depth_registered/points"; 
-  string front_topic ="/kinect_front/world/depth_registered/points"; 
+  back_topic ="/background_sub_back/pc1_out";
+  front_topic ="/background_sub_front/pc1_out"; 
 
   string sub_topic = live_topic;
   // string sub_topic = file_topic;
@@ -142,35 +159,55 @@ Tracker3d::Tracker3d(ros::NodeHandle& nh):cloud(new PointCloudT), nh_(nh),
 
 
   boost::timer time_since_cloud;
-  double exit_both=60.; // time to wait until both mode is exited
-  double switch_kin=5.; // time to wait before switching to other kinect
+  double exit_both=1.; // time to wait until both mode is exited
+  double switch_kin=1.; // time to wait before switching to other kinect
 
   while(ros::ok()){
     // //debug
     // cout << "Got to the while? " << endl;
+
+    switch(kin_mode){
+    case BOTH: 
+      cout << "Mode - BOTH" << endl;
+      break;
+    case FRONT: 
+      cout << "Mode - FRONT" << endl;
+      break;
+    case BACK: 
+      cout << "Mode - BACK" << endl;
+      break;
+    }
+
     new_cloud_available_flag=false;
     ros::spinOnce();
     // cout << "Spun" << endl;
-    if (new_cloud_available_flag)
+    if (new_cloud_available_flag){
       n_frames++;
+      time_since_cloud.restart();
+    }
     else{ //if no clouds - check timer
+      cout << "No Cloud since = " << time_since_cloud.elapsed() << endl;
+      
       if (kin_mode == BOTH && time_since_cloud.elapsed()>exit_both){
 	pc_sub.shutdown();
 	pc_sub = nh.subscribe<PointCloudT> 
 	  (front_topic, 1, &Tracker3d::pc_call, this);
 	time_since_cloud.restart();
+	kin_mode = FRONT;
       }
       else if(kin_mode==FRONT && time_since_cloud.elapsed()>switch_kin){
 	pc_sub.shutdown();
 	pc_sub = nh.subscribe<PointCloudT> 
 	  (back_topic, 1, &Tracker3d::pc_call, this);
 	time_since_cloud.restart();
+	kin_mode = BACK;
       }
       else if(kin_mode==BACK && time_since_cloud.elapsed()>switch_kin){
 	pc_sub.shutdown();
 	pc_sub = nh.subscribe<PointCloudT> 
 	  (front_topic, 1, &Tracker3d::pc_call, this);
 	time_since_cloud.restart();
+	kin_mode = FRONT;
       }
       continue;
     }
@@ -220,12 +257,26 @@ Tracker3d::Tracker3d(ros::NodeHandle& nh):cloud(new PointCloudT), nh_(nh),
   return;
 }
 
+void Tracker3d::convert_cloud_fixed(PointCloudT::Ptr &cloud, string cur_frame){
+  //check to see if conversion already in storage
+  if(!conversion_stored_ || conversion_frame_ != cur_frame){
+    store_transform(cur_frame);
+  }
+  
+  PointCloudT::Ptr tempy(new PointCloudT);
+
+  //convert the point cloud and return
+  pcl::transformPointCloud(*cloud, *tempy, stored_transform.translation, 
+      			       stored_transform.rotation);
+  cloud = tempy;
+}
+
 // callback:
 void Tracker3d::pc_call(const PointCloudT::ConstPtr& temp_cloud)
 {
 
   hum_frame = temp_cloud->header.frame_id;
-
+  
   boost::timer timer_total, timer_tf;
 
   // cout << "Frame = " << temp_cloud->header.frame_id << endl;
@@ -235,6 +286,11 @@ void Tracker3d::pc_call(const PointCloudT::ConstPtr& temp_cloud)
   std_msgs::Header tmp_head = pcl_conversions::fromPCL(cloud->header);
   cur_pc_time = tmp_head.stamp; //ros::Time::now();
 
+  if(hum_frame!=fixed_frame)
+    convert_cloud_fixed(cloud, hum_frame);
+  
+  //now that conversion might be completed
+  hum_frame = fixed_frame;
 
   new_cloud_available_flag = true;
   
@@ -273,4 +329,40 @@ void Tracker3d::pc_call(const PointCloudT::ConstPtr& temp_cloud)
 }
 
 void Tracker3d::recvPCCallback(const PCRGB::ConstPtr& pc_in){
+}
+
+
+void Tracker3d::store_transform(string cur_frame)
+{
+  conversion_frame_ = cur_frame;
+
+  //Listeners for both transformations
+  tf::TransformListener trans_stored_table;
+
+  //listen for transform until one is gotten
+  //since its static, don't look for transform afterwards
+  bool found_stored_t=false;
+
+  while (!found_stored_t){
+    
+    tf::StampedTransform t_stored;
+    try{
+      trans_stored_table.waitForTransform(fixed_frame, conversion_frame_, ros::Time(0),
+					ros::Duration(10.0));
+      trans_stored_table.lookupTransform(fixed_frame, conversion_frame_, ros::Time(0),
+				       t_stored);
+    }
+    catch(tf::TransformException &ex){
+      cout << ex.what() << endl;
+      ROS_ERROR("%s", ex.what());
+      continue;
+    }
+    //Store transform
+    found_stored_t=true;
+    tf::vectorTFToEigen(t_stored.getOrigin(), stored_transform.translation);      
+    tf::quaternionTFToEigen(t_stored.getRotation(), stored_transform.rotation);
+}
+
+  return;
+
 }
