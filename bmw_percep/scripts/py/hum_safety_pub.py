@@ -55,7 +55,7 @@ class HumanSafetyPub:
 
         self.min_dist_ee_go = 1.1
         self.min_dist_base_go = 1.1
-        self.min_dist_ee_stop = 0.9
+        self.min_dist_ee_stop = 0.75
         self.min_dist_base_stop = 0.80
 
         #initialize to don't stop human
