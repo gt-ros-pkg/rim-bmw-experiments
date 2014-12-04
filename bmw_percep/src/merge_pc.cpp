@@ -155,8 +155,8 @@ void callback(const PCMsg::ConstPtr& front_pc_, const PCMsg::ConstPtr& back_pc_ 
   pub_pc->header.frame_id = new_frame;
   new_b_pc->header.frame_id = new_frame;
   
-  front_pc_pub.publish(*pub_pc);
-  back_pc_pub.publish(*new_b_pc);
+  // front_pc_pub.publish(*pub_pc);
+  // back_pc_pub.publish(*new_b_pc);
 
   if(COLOR_DIFF) //change PC colors
     {

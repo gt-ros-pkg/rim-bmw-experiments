@@ -63,6 +63,7 @@ int PplTrack::getOneCluster(const vector<vector<ClusterPoint> > clusters)
   if (clusters.size()>0){
 
     if (isnan(robo_loc_(0))){
+      cout << "RObot NaN!!!!" << endl;
       //Presently chooses the one with max number of points
       int max_size=0;
       int max_id=0; int cur_id=0;
@@ -422,12 +423,17 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 
     workspace_limit(cloud);
 
-    robo_loc_ = Eigen::Vector2f(robo_loc(0), robo_loc(0));
+    //return;
 
-    if (got_tf_robot) // in case the robots location is known
+    if (got_tf_robot){ // in case the robots location is known
+      robo_loc_ = Eigen::Vector2f(robo_loc(0), robo_loc(1));
       robot_remove(cloud, robo_loc);
-
-    pcl::copyPointCloud(*cloud, *viz_cloud);
+    }
+    else{
+      robo_loc_ = Eigen::Vector2f(numeric_limits<float>::quiet_NaN(),
+				  numeric_limits<float>::quiet_NaN());
+    }
+    // pcl::copyPointCloud(*cloud, *viz_cloud);
 
     // pcl::RandomSample<PointT> ransam;
     // ransam.setInputCloud(viz_cloud);
@@ -476,6 +482,10 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
     //merge
     merge_floor_clusters(cloud, cluster_indices);
     cout << "No. clusters after floor merge = " << cluster_indices.size() << endl; 
+
+    //debug
+    vector<pcl::PointIndices> db_af_floor;
+    db_af_floor = cluster_indices;
 
     //---
     //remove clusters acc to rules
@@ -593,6 +603,10 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 
     //remember previous time
     prev_time_ = pub_time_;
+
+
+    // //debug
+    // cluster_indices = db_af_floor;
 
     // visualize by painting each PC another color
     PointCloudT::Ptr cloud_filtered;

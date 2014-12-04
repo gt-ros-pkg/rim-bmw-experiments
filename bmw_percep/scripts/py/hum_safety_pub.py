@@ -45,25 +45,23 @@ class HumanSafetyPub:
                                               MarkerArray, queue_size=1)
         self.started_plot = False
         
-        self.in_hysterisis = False
         self.hys_reset = 3.
 
         self.robo_frame = "base_link"
         self.robo_ee_frame = "wrist_3_link"
-        self.slope = 2.5
+        self.slope = 2
         self.min_dist1 = .75#1.25
         self.min_dist2 = 1.25#1.75
-        self.max_dist = 4.
-        self.min_dist_hyster = self.min_dist2
+
+        self.min_dist_ee_go = 1.1
+        self.min_dist_base_go = 1.1
+        self.min_dist_ee_stop = 0.9
+        self.min_dist_base_stop = 0.80
+
         #initialize to don't stop human
         self.stop_human = False
         self.in_hysterisis_start = rospy.Time.now()
-        
-        #initialize
-        self.robo_pos_prev = np.array([0, 0])
-        self.robo_ee_pos_prev = np.array([0, 0])
-        self.prev_time = rospy.Time.now()
-        self.prev_time2 = rospy.Time.now()
+        self.in_hysterisis = False
         
         self.kinematics_info = rospy.ServiceProxy('get_kinematics_info', KinematicsInfo)
 	
@@ -72,10 +70,6 @@ class HumanSafetyPub:
         joint_velocities = kinematics.velocities.data
         joint_jacobian = kinematics.jacobian.data
 
-        self.joint_positions_prev = joint_positions
-        self.joint_velocities_prev = joint_velocities
-        self.joint_jacobian_prev = joint_jacobian
-        self.joint_time_prev = rospy.Time.now()
         
     #callback receives person position and velocity
     def pers_cb(self, msg):
@@ -115,42 +109,18 @@ class HumanSafetyPub:
             (trans_ee, rot) = self.robo_listener.lookupTransform(self.frame, 
                                                               self.robo_ee_frame, 
                                                               self.cur_time_tf)
-            
-            self.robo_position_time = self.robo_listener.getLatestCommonTime(self.frame, 
-                                                              self.robo_ee_frame)            
+             
                         
             #by default, robo-pos is center
             self.robo_pos = np.array([trans_c[0], trans_c[1]])
             self.robo_ee_pos = np.array([trans_ee[0], trans_ee[1]])
-            
-            if not self.robo_position_time == self.prev_time:
-                #robot center velocity
-                self.robo_vel = (self.robo_pos - self.robo_pos_prev) / (self.robo_position_time - self.prev_time).to_sec()
-                self.robo_ee_vel = (self.robo_ee_pos - self.robo_ee_pos_prev) / (self.robo_position_time - self.prev_time).to_sec()
-                
-                self.robo_pos_prev = self.robo_pos
-                self.robo_ee_pos_prev = self.robo_ee_pos
-                self.prev_time = self.robo_position_time
+            self.robo_ee_vel = np.array([0.0,0.0])
             if human_safety_mode == 3:
                 temp  = np.dot(np.resize(np.asarray(joint_jacobian),(6,7)), np.asarray(joint_velocities))
-                print temp
+                
                 self.robo_ee_vel[0]  = temp[0]
                 self.robo_ee_vel[1]  = temp[1]
-                self.robo_vel[0] = joint_velocities[0]
-                self.robo_vel[1] = 0
-            if human_safety_mode == 4:
-                temp1 = (np.asarray(joint_jacobian)-np.asarray(self.joint_jacobian_prev))/(self.cur_time - self.prev_time2).to_sec()
-                temp2 = (np.asarray(joint_velocities) - np.asarray(self.joint_velocities_prev))/(self.cur_time - self.prev_time2).to_sec()
-                temp  = np.dot(np.resize(np.asarray(joint_jacobian),(6,7)), np.asarray(joint_velocities))
-                temp3 = np.dot(np.resize(np.asarray(temp1),(6,7)), np.asarray(joint_velocities))
-                temp4 = np.dot(np.resize(np.asarray(joint_jacobian),(6,7)), np.asarray(temp2))
-                self.robo_ee_vel[0]  = temp[0]+temp3[0]+temp4[0]
-                self.robo_ee_vel[1]  = temp[1]+temp3[1]+temp4[1]
-                self.robo_vel[0] = joint_velocities[0]
-                self.robo_vel[1] = 0
-                self.joint_jacobian_prev = joint_jacobian
-                self.prev_time2 = self.cur_time
-                self.joint_velocities_prev = joint_velocities
+                print self.robo_ee_vel
             
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             return
@@ -159,74 +129,36 @@ class HumanSafetyPub:
             dist_center = np.linalg.norm(np.array(self.hum_pos - [trans_c[0], trans_c[1]]))
             dist_ee = np.linalg.norm(np.array(self.hum_pos - [trans_ee[0], trans_ee[1]]))
 
-            #how much table do you have between human and End-effector
-            table_robo_y = .93
-            table_human_x = .85
-            behind_table_lim = -.3
-
-            # if ((trans_ee(1)-table_robo_y < behind_table_lim) or (trans_ee(0)-table_human_x<behind_table_lim) or (trans_ee(0) <table_human_x and trans_ee(1)-table_human_x<behind_table_lim )):
-            #     trans = [trans_c[0], trans_c[1]]
-            # else:
-
-            self.min_dist1 = .75#1.25
-            self.min_dist2 = 1.25#1.75
-
-            
-            
-            if (dist_ee<dist_center):
-                trans = [trans_ee[0], trans_ee[1]]
-                self.min_dist1 = .95
-                self.min_dist2 = 1.75
-                self.robo_human_vel = self.robo_ee_vel
-
-            else:
-                trans = [trans_c[0], trans_c[1]]
-                self.robo_human_vel = self.robo_vel
-            
-            self.robo_pos = np.array([trans[0], trans[1]])
-            
             #TODO: Propagate the person's state forward in time to current time
 
             #distance from the robot
-            person_to_rob = -self.hum_pos + self.robo_pos
-            self.dist = np.linalg.norm(person_to_rob)
-
+            person_to_ee = -self.hum_pos +  self.robo_ee_pos
+            self.dist2ee = dist_ee
             
-            
+            self.dist2base = dist_center
+                
             
             #magnitude of velocity in the direction of the robot
             if human_safety_mode == 1:
-                self.vel_mag = np.dot(self.hum_vel, person_to_rob)/self.dist
-            elif human_safety_mode == 2:
-                self.vel_mag = np.dot((self.hum_vel-self.robo_human_vel), person_to_rob)/self.dist
+                self.vel_mag = np.dot(self.hum_vel, person_to_ee)/self.dist2ee
             elif human_safety_mode == 3:
-                self.vel_mag = np.dot((self.hum_vel-self.robo_human_vel), person_to_rob)/self.dist
-            elif human_safety_mode == 4:
-                self.vel_mag = np.dot((self.hum_vel-self.robo_human_vel), person_to_rob)/self.dist
+                self.vel_mag = np.dot((self.hum_vel-self.robo_ee_vel), person_to_ee)/self.dist2ee
 
             if self.stop_human:
-                
-                if self.should_stop():
-                    self.in_hysterisis = False
-
-                else: #hysterisis
-                    print 'Reach hysterisis'
-
+                if self.should_stop_base():
+                    self.in_hysterisis  = False
+                else:
                     if (not self.in_hysterisis):
-                        print 'Set time'
                         self.in_hysterisis = True
                         self.in_hysterisis_start = self.cur_time
-                        self.min_dist_hyster = self.min_dist2
                     else:
-                        print 'change min-distance'
-                        self.min_dist_hyster = self.min_dist2 - (self.cur_time-self.in_hysterisis_start).secs * ((self.min_dist2-self.min_dist1)/self.hys_reset)
-                        print 'Time passed = ' , ((self.cur_time-self.in_hysterisis_start).secs)    
-                    # print 'Cur - Hyst = ' + str((rospy.Time.now()-self.in_hysterisis_start).secs)
-                    # print 'Cur -  curtime= ' + str((rospy.Time.now()-self.cur_time).secs)
-                    self.stop_human = not self.can_go(self.min_dist_hyster)
+                        self.min_dist_base_go = self.min_dist_base_go - (self.cur_time-self.in_hysterisis_start).to_sec()/10
+                        if self.min_dist_base_go < (self.min_dist_base_stop + 0.1):
+                            self.min_dist_base_go = (self.min_dist_base_stop + 0.1)
+                    print self.min_dist_base_go
+                self.stop_human = not (self.can_go_ee() and self.can_go_base())
             else:
-                self.in_hysterisis = False
-                self.stop_human = self.should_stop()
+                self.stop_human = self.should_stop_ee() or self.should_stop_base()
 
             #visualize
             if(not self.started_plot):
@@ -260,26 +192,22 @@ class HumanSafetyPub:
         framy=0
         
         while not rospy.is_shutdown():
-            if (self.in_hysterisis):
-                min_dist2 = self.min_dist_hyster
-            else:
-                min_dist2 = self.min_dist2
             
             #plot the lines first
-            line1x = [self.min_dist1, (self.min_dist1+1.)]
-            line1y = [0., (self.slope*(line1x[1] - self.min_dist1))]
-            line2x = [min_dist2, (min_dist2+1.)]
-            line2y = [0., (self.slope * (line2x[1] - min_dist2))]
+            line1x = [(self.min_dist_ee_stop-10.0), (self.min_dist_ee_stop+20.0)]
+            line1y = [(self.slope*(-10.0)), (self.slope*(20.0))]
+            line2x = [(self.min_dist_ee_go-10.0), (self.min_dist_ee_go+20.0)]
+            line2y = [(self.slope*(-10.0)), (self.slope * (20.0))]
             
-            fixl1x = [self.min_dist1, self.min_dist1]
-            fixl1y = [0., xylims[2]]
+            fixl1x = [self.min_dist_base_stop, self.min_dist_base_stop]
+            fixl1y = [-10, 10]
             
-            fixl2x = [min_dist2, min_dist2]
-            fixl2y = [0., xylims[2]]
+            fixl2x = [self.min_dist_base_go, self.min_dist_base_go]
+            fixl2y = [-10., 10]
             
             #fix
             
-            pointx = self.dist
+            pointx = self.dist2ee
             pointy = self.vel_mag
         
             #if framy is 0:
@@ -288,38 +216,47 @@ class HumanSafetyPub:
             #framy = (framy+1)%3
 
             plt.axis(xylims, figure=self.fig)
-            plt.plot(line1x, line1y,'r', line2x, line2y, 'b', pointx, pointy, 'g^', fixl1x, fixl1y, 'r', fixl2x, fixl2y, 'b', markersize=10)
+            plt.subplot(211)
+            plt.plot(line1x, line1y,'r', line2x, line2y, 'b', pointx, pointy, 'go', markersize=20)
+            plt.ylim(-2,3)
+            plt.xlim(0,3)
+            plt.subplot(212)
+            plt.plot(self.dist2base, 0,'go', fixl1x, fixl1y, 'r', fixl2x, fixl2y, 'b', markersize=20)
+            plt.xlim(0,3)
+            plt.ylim(-1,1)
             plt.draw()
             time.sleep(.03)
         #plt.close()
         
 
-    def can_go(self, min_dist):
-        if (self.dist<min_dist):
-            return False
-        elif (self.dist>self.max_dist):
-            return True
-
+    def can_go_ee(self):
+        
         #velocity and distance
-        evals = self.vel_mag - self.slope * (self.dist - min_dist)
+        evals = self.vel_mag - self.slope * (self.dist2ee - self.min_dist_ee_go)
 
         if (evals>0):
             return False
         else:
             return True
-    
-    def should_stop(self):
+            
+    def can_go_base(self):
 
-        #distance threshold
-        min_dist = self.min_dist1
-        if (self.dist<min_dist):
-            return True
-        elif (self.dist>self.max_dist):
+        if (self.dist2base < self.min_dist_base_go):
             return False
-
+        else:
+            return True
+    
+    def should_stop_ee(self):
         #velocity and distance
-        evals = self.vel_mag - self.slope * (self.dist - min_dist)
+        evals = self.vel_mag - self.slope * (self.dist2ee - self.min_dist_ee_stop)
         if (evals>0):
+            return True
+        else:
+            return False
+    
+    def should_stop_base(self):
+        self.min_dist_base_go = 1.1
+        if (self.dist2base<self.min_dist_base_stop):
             return True
         else:
             return False
