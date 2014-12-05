@@ -56,12 +56,14 @@ class HumanSafetyPub:
         self.min_dist_ee_go = 1.1
         self.min_dist_base_go = 1.1
         self.min_dist_ee_stop = 0.75
-        self.min_dist_base_stop = 0.80
+        self.min_dist_base_stop = 0.75
 
         #initialize to don't stop human
         self.stop_human = False
         self.in_hysterisis_start = rospy.Time.now()
         self.in_hysterisis = False
+        self.stop_human_base = False
+        self.stop_human_ee = False
         
         self.kinematics_info = rospy.ServiceProxy('get_kinematics_info', KinematicsInfo)
 	
@@ -69,6 +71,8 @@ class HumanSafetyPub:
         joint_positions = kinematics.positions.data
         joint_velocities = kinematics.velocities.data
         joint_jacobian = kinematics.jacobian.data
+        
+       
 
         
     #callback receives person position and velocity
@@ -145,9 +149,10 @@ class HumanSafetyPub:
                 self.vel_mag = np.dot((self.hum_vel-self.robo_ee_vel), person_to_ee)/self.dist2ee
 
             if self.stop_human:
+                self.should_stop_ee()
                 if self.should_stop_base():
                     self.in_hysterisis  = False
-                else:
+                elif self.stop_human_base:
                     if (not self.in_hysterisis):
                         self.in_hysterisis = True
                         self.in_hysterisis_start = self.cur_time
@@ -155,8 +160,14 @@ class HumanSafetyPub:
                         self.min_dist_base_go = self.min_dist_base_go - (self.cur_time-self.in_hysterisis_start).to_sec()/10
                         if self.min_dist_base_go < (self.min_dist_base_stop + 0.1):
                             self.min_dist_base_go = (self.min_dist_base_stop + 0.1)
-                    print self.min_dist_base_go
-                self.stop_human = not (self.can_go_ee() and self.can_go_base())
+                                
+                if self.stop_human_base and (not self.stop_human_ee):               
+                    self.stop_human = not self.can_go_base()
+                elif self.stop_human_ee and (not self.stop_human_base):
+                    self.stop_human = not self.can_go_ee()
+                else:
+                    self.stop_human = not (self.can_go_ee() and self.can_go_base())
+                    
             else:
                 self.stop_human = self.should_stop_ee() or self.should_stop_base()
 
@@ -217,11 +228,17 @@ class HumanSafetyPub:
 
             plt.axis(xylims, figure=self.fig)
             plt.subplot(211)
-            plt.plot(line1x, line1y,'r', line2x, line2y, 'b', pointx, pointy, 'go', markersize=20)
+            if self.stop_human_ee:
+                plt.plot(line1x, line1y,'r', line2x, line2y, 'b', pointx, pointy, 'ro', markersize=20)
+            else:
+                plt.plot(line1x, line1y,'r', line2x, line2y, 'b', pointx, pointy, 'go', markersize=20)
             plt.ylim(-2,3)
             plt.xlim(0,3)
             plt.subplot(212)
-            plt.plot(self.dist2base, 0,'go', fixl1x, fixl1y, 'r', fixl2x, fixl2y, 'b', markersize=20)
+            if self.stop_human_base:
+                plt.plot(self.dist2base, 0,'ro', fixl1x, fixl1y, 'r', fixl2x, fixl2y, 'b', markersize=20)
+            else:
+                plt.plot(self.dist2base, 0,'go', fixl1x, fixl1y, 'r', fixl2x, fixl2y, 'b', markersize=20)
             plt.xlim(0,3)
             plt.ylim(-1,1)
             plt.draw()
@@ -237,6 +254,7 @@ class HumanSafetyPub:
         if (evals>0):
             return False
         else:
+            self.stop_human_ee = False
             return True
             
     def can_go_base(self):
@@ -244,12 +262,14 @@ class HumanSafetyPub:
         if (self.dist2base < self.min_dist_base_go):
             return False
         else:
+            self.stop_human_base = False
             return True
     
     def should_stop_ee(self):
         #velocity and distance
         evals = self.vel_mag - self.slope * (self.dist2ee - self.min_dist_ee_stop)
         if (evals>0):
+            self.stop_human_ee = True
             return True
         else:
             return False
@@ -257,6 +277,7 @@ class HumanSafetyPub:
     def should_stop_base(self):
         self.min_dist_base_go = 1.1
         if (self.dist2base<self.min_dist_base_stop):
+            self.stop_human_base = True
             return True
         else:
             return False

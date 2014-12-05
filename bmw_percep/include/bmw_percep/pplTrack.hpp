@@ -118,10 +118,11 @@ void estimate(vector<vector<ClusterPoint> > clusters);
 // Performs the complete pipeline of PC 
 // processing and then estimates the position of
 // person or people
-void estimate(PointCloudT::Ptr& cloud, 
+  void estimate(PointCloudT::Ptr& cloud, 
 		vector<vector<ClusterPoint> > &clusters,
 		const Eigen::Vector3f robo_loc,
-	      bool got_tf_robot, ros::Time pc_time,
+		bool got_tf_robot, ros::Time pc_time,
+		bool follow=false,
 		float leaf_size=0.06);
   
   // void visualize(ros::Publisher pub);
@@ -169,6 +170,7 @@ void get_clusters_stats(PointCloudT::ConstPtr cloud,
   void pub_debug_pose(ros::Publisher pub_db);
 
 private:
+  bool follow_mode_;
   bool occupied_;
 bool table_link;
 int person_id_; // the index of the person from the person clusters

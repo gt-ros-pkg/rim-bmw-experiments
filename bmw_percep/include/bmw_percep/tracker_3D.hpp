@@ -216,11 +216,15 @@ Tracker3d::Tracker3d(ros::NodeHandle& nh): cloud(new PointCloudT),
     //check if cloud empty
     if (cloud->points.size()<1)
       continue;
+    
+    bool follow_mode=false;
+    nh.getParam("follow_mode", follow_mode);
+
     //track
     ppl_tracker.estimate(cloud, 
 			 clusters,
 			 robo_loc, got_transform_,
-			 cur_pc_time);
+			 cur_pc_time, follow_mode);
 
     // set frame-id if first frame
     if(!ppl_frame_set){

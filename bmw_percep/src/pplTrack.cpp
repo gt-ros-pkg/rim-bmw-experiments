@@ -406,8 +406,11 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 			vector<vector<ClusterPoint> > &clusters,
 			const Eigen::Vector3f robo_loc,
 			bool got_tf_robot, ros::Time pc_time,
+			bool follow/*=false*/,
 			float leaf_size/*=0.06*/)
 {
+  follow_mode_ = follow;
+  
   reset_vals();
   
   pub_time_ = pc_time;
@@ -696,7 +699,7 @@ void PplTrack::workspace_limit(PointCloudT::Ptr& cloud)
   return;
 }
 
-PplTrack::PplTrack(float z){
+PplTrack::PplTrack(float z):follow_mode_(false){
   occupied_ = false;
   ground_coeffs_ =   Eigen::Vector4f(0.0,0.0,0.0,-z);
   table_link = true;
@@ -812,7 +815,6 @@ void PplTrack::merge_floor_clusters(const PointCloudT::Ptr cloud,
 }
 
 
-//TODO: Get these statistics yourself, no BOOST
 void PplTrack::get_clusters_stats(PointCloudT::ConstPtr cloud, 
 				 const vector<pcl::PointIndices> cluster_indices,
 				 vector<ClusterStats>& clusters_stats)
@@ -836,13 +838,11 @@ void PplTrack::get_clusters_stats(PointCloudT::ConstPtr cloud,
       y_acc(p.y);
       z_acc(p.z);
       
-      //debug
-      if(t_min>p.x)
-	t_min = p.x;
-      if(t_max<p.x)
-	t_max = p.x;
-
-      
+      // //debug
+      // if(t_min>p.x)
+      // 	t_min = p.x;
+      // if(t_max<p.x)
+      // 	t_max = p.x;
     }
 
     ClusterStats cluster_stats; //Stats for one cluster
@@ -956,6 +956,13 @@ void PplTrack::assign_ppl_clusters(PointCloudT::ConstPtr cloud,
     	pint!=cit->indices.end(); ++pint){
       PointT p = cloud->points[*pint];
       ClusterPoint cur_pt(p.x, p.y,p.z);
+      
+      
+      //if follow-mode
+      if (follow_mode_)
+	if (p.z > .95)
+	  continue;
+      
       cur_c.push_back(cur_pt);
     }
     per_cs_.push_back(cur_c);
