@@ -13,7 +13,8 @@
 #define SCANNING_DONE 1
 #define NO_SCANNING_NEEDED 0
 
-int bin1 = 1, bin2 = 0, bin3 = 3;
+int bin1 = 1, bin2 = 0, bin3 = 0;
+int scan1 = 1, scan2 = 0, scan3 = 0;
 int scanning_status = NO_SCANNING_NEEDED; 
 bool system_blocked = false;
 bool parts_ready = false;
@@ -46,6 +47,25 @@ void message_callback (const std_msgs::String::ConstPtr& msg){
 	message = msg->data;
 }
 
+void scanned_parts_callback (const std_msgs::Int8MultiArray::ConstPtr& msg){
+    switch(msg->data.size()){
+    case 0:
+        scan1 = 0; scan2 = 0; scan3 = 0;
+        break;
+
+    case 1:
+        scan1 = msg->data[0]; scan2 = 0; scan3 = 0;
+        break;
+
+    case 2:
+        scan1 = msg->data[0]; scan2 = msg->data[1]; scan3 = 0;
+        break;
+
+    case 3:
+        scan1 = msg->data[0]; scan2 = msg->data[1]; scan3 = msg->data[2] ;
+        break;
+    }
+}
 
 int main(int argc, char **argv)
 {
@@ -61,6 +81,7 @@ int main(int argc, char **argv)
 	ros::Subscriber system_blocked_sub = nh_.subscribe("display/system_blocked", 1, system_blocked_callback);
 	ros::Subscriber parts_ready_sub = nh_.subscribe("display/parts_ready", 1, parts_ready_callback);
 	ros::Subscriber message_sub = nh_.subscribe("display/message", 1, message_callback);
+    ros::Subscriber scanned_parts_sub = nh_.subscribe("display/scanned_parts", 1, scanned_parts_callback);
 
 	int w_width = 1920;
 	int w_height = 1080;
@@ -81,7 +102,7 @@ int main(int argc, char **argv)
 		cv::rectangle( image,cv::Point(0,0),cv::Point(2*w_width/5, w_height/5), blue, -1, 8);
 		cv::putText(image, "Parts needed :", cv::Point( 30, w_height/8), cv::FONT_HERSHEY_SIMPLEX, 2, yellow, 3);
 
-		// Numbers rectangles //
+        // Parts numbers rectangles //
 		std::ostringstream int_result;
 		if(bin1!=0){
 			int_result << bin1;
@@ -122,24 +143,56 @@ int main(int argc, char **argv)
 			cv::putText(image, "Parts not ready !", cv::Point( 30, w_height/2+w_height/8), cv::FONT_HERSHEY_SIMPLEX, 1.5, white, 2);
 		}
 
-		// Scanning rectangles //
+        // Scanning rectangle //
 		switch(scanning_status){
 		case SCANNING_REQUIRED:
-			cv::rectangle( image,cv::Point(w_width/2,0),cv::Point(w_width/2+w_width/4, w_height/4),grey, -1, 8);	
-			cv::rectangle( image,cv::Point(w_width/2+w_width/4,0),cv::Point(w_width, w_height/4),red, -1, 8);
+            cv::rectangle( image,cv::Point(w_width/2,0),cv::Point(w_width/2+w_width/4, w_height/5),grey, -1, 8);
+            cv::rectangle( image,cv::Point(w_width/2+w_width/4,0),cv::Point(w_width, w_height/5),red, -1, 8);
 			break;
 
 		case SCANNING_DONE:
-			cv::rectangle( image,cv::Point(w_width/2,0),cv::Point(w_width/2+w_width/4, w_height/4),green, -1, 8);	
-			cv::rectangle( image,cv::Point(w_width/2+w_width/4,0),cv::Point(w_width, w_height/4),grey, -1, 8);
+            cv::rectangle( image,cv::Point(w_width/2,0),cv::Point(w_width/2+w_width/4, w_height/5),green, -1, 8);
+            cv::rectangle( image,cv::Point(w_width/2+w_width/4,0),cv::Point(w_width, w_height/5),grey, -1, 8);
 			break;
 
 		case NO_SCANNING_NEEDED:
-			cv::rectangle( image,cv::Point(w_width/2,0),cv::Point(w_width/2+w_width/4, w_height/4),grey, -1, 8);	
-			cv::rectangle( image,cv::Point(w_width/2+w_width/4,0),cv::Point(w_width, w_height/4),grey, -1, 8);
+            cv::rectangle( image,cv::Point(w_width/2,0),cv::Point(w_width/2+w_width/4, w_height/5),grey, -1, 8);
+            cv::rectangle( image,cv::Point(w_width/2+w_width/4,0),cv::Point(w_width, w_height/5),grey, -1, 8);
 			break;
 		}
 		cv::putText(image, "Scanning", cv::Point( 0.65*w_width, w_height/8), cv::FONT_HERSHEY_SIMPLEX, 2, white, 3);
+
+        // Scanned parts numbers rectangles //
+        int_result.str("");
+        int_result.clear();
+        if(scan1!=0){
+            int_result << scan1;
+            cv::rectangle( image,cv::Point(w_width/2+2*w_width/35,0.28*w_height),cv::Point(w_width/2+4*w_width/35, 0.44*w_height),white, -1, 8);
+            cv::putText(image, int_result.str(), cv::Point(w_width/2+2.5*w_width/35,w_height/4+w_height/8), cv::FONT_HERSHEY_SIMPLEX, 2, black, 3);
+        }
+        else{
+            cv::rectangle( image,cv::Point(w_width/2+2*w_width/35,0.28*w_height),cv::Point(w_width/2+4*w_width/35, 0.44*w_height),black, -1, 8);
+        }
+        if(scan2!=0){
+            int_result.str("");
+            int_result.clear();
+            int_result << scan2;
+            cv::rectangle( image,cv::Point(w_width/2+6*w_width/35,0.28*w_height),cv::Point(w_width/2+8*w_width/35, 0.44*w_height),white, -1, 8);
+            cv::putText(image, int_result.str(), cv::Point(w_width/2+6.5*w_width/35,w_height/4+w_height/8), cv::FONT_HERSHEY_SIMPLEX, 2, black, 3);
+        }
+        else{
+            cv::rectangle( image,cv::Point(w_width/2+6*w_width/35,0.28*w_height),cv::Point(w_width/2+8*w_width/35, 0.44*w_height),black, -1, 8);
+        }
+        if(scan3!=0){
+            int_result.str("");
+            int_result.clear();
+            int_result << scan3;
+            cv::rectangle( image,cv::Point(w_width/2+10*w_width/35,0.28*w_height),cv::Point(w_width/2+12*w_width/35, 0.44*w_height),white, -1, 8);
+            cv::putText(image, int_result.str(), cv::Point(w_width/2+10.5*w_width/35,w_height/4+w_height/8), cv::FONT_HERSHEY_SIMPLEX, 2, black, 3);
+        }
+        else{
+            cv::rectangle( image,cv::Point(w_width/2+10*w_width/35,0.28*w_height),cv::Point(w_width/2+12*w_width/35, 0.44*w_height),black, -1, 8);
+        }
 
 		// System blocked rectangle //
 		if (system_blocked){
