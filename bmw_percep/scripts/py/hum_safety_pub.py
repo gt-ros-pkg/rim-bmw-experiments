@@ -53,9 +53,9 @@ class HumanSafetyPub:
         self.min_dist1 = .75#1.25
         self.min_dist2 = 1.25#1.75
 
-        self.min_dist_ee_go = 1.1
+        self.min_dist_ee_go = 1.2
         self.min_dist_base_go = 1.1
-        self.min_dist_ee_stop = 0.75
+        self.min_dist_ee_stop = 0.90
         self.min_dist_base_stop = 0.75
 
         #initialize to don't stop human
@@ -72,9 +72,8 @@ class HumanSafetyPub:
         joint_velocities = kinematics.velocities.data
         joint_jacobian = kinematics.jacobian.data
         
-       
-
-        
+        self.prev_time = rospy.Time.now()
+        self.past_rates = np.zeros([10,1])
     #callback receives person position and velocity
     def pers_cb(self, msg):
         try:
@@ -99,7 +98,11 @@ class HumanSafetyPub:
         self.cur_time_tf = rospy.Time(0)
         self.cur_time = rospy.Time.now()
 
-        
+        self.past_rates = np.roll(self.past_rates,1)
+        self.past_rates[0] = 1/(self.cur_time-self.prev_time).to_sec()
+        print np.mean(self.past_rates)
+
+        self.prev_time = self.cur_time
         
 
         #Get robot transform
@@ -124,7 +127,6 @@ class HumanSafetyPub:
                 
                 self.robo_ee_vel[0]  = temp[0]
                 self.robo_ee_vel[1]  = temp[1]
-                print self.robo_ee_vel
             
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             return
@@ -234,6 +236,7 @@ class HumanSafetyPub:
                 plt.plot(line1x, line1y,'r', line2x, line2y, 'b', pointx, pointy, 'go', markersize=20)
             plt.ylim(-2,3)
             plt.xlim(0,3)
+            plt.grid()
             plt.subplot(212)
             if self.stop_human_base:
                 plt.plot(self.dist2base, 0,'ro', fixl1x, fixl1y, 'r', fixl2x, fixl2y, 'b', markersize=20)
@@ -241,6 +244,7 @@ class HumanSafetyPub:
                 plt.plot(self.dist2base, 0,'go', fixl1x, fixl1y, 'r', fixl2x, fixl2y, 'b', markersize=20)
             plt.xlim(0,3)
             plt.ylim(-1,1)
+            plt.grid()
             plt.draw()
             time.sleep(.03)
         #plt.close()
