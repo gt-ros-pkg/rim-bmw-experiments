@@ -346,7 +346,7 @@ def main():
     rospy.init_node('human_safety_publisher')
     hum_pub = HumanSafetyPub()
     
-    ratey = rospy.Rate(LOOP_RATE)
+    ratey = rospy.Rate(30)
     while not rospy.is_shutdown():
         hum_pub.process_frame()
         ratey.sleep()

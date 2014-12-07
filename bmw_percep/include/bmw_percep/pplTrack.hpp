@@ -121,6 +121,7 @@ void estimate(vector<vector<ClusterPoint> > clusters);
   void estimate(PointCloudT::Ptr& cloud, 
 		vector<vector<ClusterPoint> > &clusters,
 		const Eigen::Vector3f robo_loc,
+		const Eigen::Vector3f robo_loc_ee,
 		bool got_tf_robot, ros::Time pc_time,
 		bool follow=false,
 		float leaf_size=0.06);
@@ -186,6 +187,8 @@ float max_height_, min_height_, max_dist_gr_;
 int max_c_size_, min_c_size_;
 bool more_than_one_;
   Eigen::Vector2f robo_loc_;
+Eigen::Vector2f robo_loc_ee_;
+  
 ros::Time pub_time_; //time-stamp associated with human estimation
   ros::Time prev_time_;
   float jerk_std_;

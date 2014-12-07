@@ -53,7 +53,7 @@ private:
   ros::NodeHandle nh_;
   // Globals
   ros::Time cur_pc_time;
-  string hum_frame, robo_frame, fixed_frame, conversion_frame_;
+  string hum_frame, robo_frame, robo_ee_frame, fixed_frame, conversion_frame_;
   string back_topic, front_topic;
   bool conversion_stored_; //is the conversion for front and back kinects present
   int frame_rate;
@@ -67,6 +67,7 @@ enum { COLS=640, ROWS=480};
   PointCloudT::Ptr cloud;
   //subscribes to the robots location
   Eigen::Vector3f robo_loc;
+  Eigen::Vector3f robo_loc_ee;
 
   bool got_transform_;
   bool new_cloud_available_flag;
@@ -121,6 +122,7 @@ Tracker3d::Tracker3d(ros::NodeHandle& nh): cloud(new PointCloudT),
   string raw_obs_topic = "/human/observations/visuals";
   string pkg_dir = "/home/shray/dev/hydro_ws/src/rim_bmw_experiments/bmw_percep/";
   robo_frame = "base_link";
+  robo_ee_frame = "wrist_3_link";
   string obs_pose_topic = "/human/observations/position";
   string est_pose_topic = "/human/estimated/pose";
   string debug_pos_topic = "/debug/pose";
@@ -223,7 +225,7 @@ Tracker3d::Tracker3d(ros::NodeHandle& nh): cloud(new PointCloudT),
     //track
     ppl_tracker.estimate(cloud, 
 			 clusters,
-			 robo_loc, got_transform_,
+			 robo_loc, robo_loc_ee, got_transform_,
 			 cur_pc_time, follow_mode);
 
     // set frame-id if first frame
@@ -300,12 +302,17 @@ void Tracker3d::pc_call(const PointCloudT::ConstPtr& temp_cloud)
   
   //also listen to robot--right now
   tf::StampedTransform robo_form;
+  tf::StampedTransform robo_form_ee;
+
   try{
     ros::Time a = ros::Time(0);
     // tf_listener.waitForTransform(hum_frame, robo_frame, a,
     // 				 ros::Duration(1.0));
     tf_listener.lookupTransform(hum_frame, robo_frame, a,
   				      robo_form);
+
+    tf_listener.lookupTransform(hum_frame, robo_ee_frame, a,
+  				      robo_form_ee);
   }
   catch(tf::TransformException &ex){
     cout << ex.what() << endl;
@@ -317,8 +324,12 @@ void Tracker3d::pc_call(const PointCloudT::ConstPtr& temp_cloud)
   got_transform_ = true;
 
   Eigen::Vector3d temp_vec;
+  Eigen::Vector3d temp_vec_ee;
   tf::vectorTFToEigen(robo_form.getOrigin(), temp_vec);
+  tf::vectorTFToEigen(robo_form_ee.getOrigin(), temp_vec_ee);
+
   robo_loc = temp_vec.cast<float>();
+  robo_loc_ee = temp_vec_ee.cast<float>();
   // //debug
   // cout << "Get here? Robot location: " << robo_loc <<  endl;
 

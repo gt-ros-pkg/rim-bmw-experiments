@@ -88,6 +88,11 @@ int PplTrack::getOneCluster(const vector<vector<ClusterPoint> > clusters)
 
     	get_head_center(i, h_cent);
     	float cur_err = (h_cent-robo_loc_).norm();
+	float dist_ee = (h_cent-robo_loc_ee_).norm();
+
+	//check if closer to end-effector than base
+	if (dist_ee < cur_err)
+	  cur_err = dist_ee;
 
     	if ( cur_err < min_dist){
     	  min_dist = cur_err;
@@ -405,6 +410,7 @@ void PplTrack::visualize(ros::Publisher pub, Eigen::Vector3f color, PersProp per
 void PplTrack::estimate(PointCloudT::Ptr& cloud, 
 			vector<vector<ClusterPoint> > &clusters,
 			const Eigen::Vector3f robo_loc,
+			const Eigen::Vector3f robo_loc_ee,
 			bool got_tf_robot, ros::Time pc_time,
 			bool follow/*=false*/,
 			float leaf_size/*=0.06*/)
@@ -430,6 +436,7 @@ void PplTrack::estimate(PointCloudT::Ptr& cloud,
 
     if (got_tf_robot){ // in case the robots location is known
       robo_loc_ = Eigen::Vector2f(robo_loc(0), robo_loc(1));
+      robo_loc_ee_ = Eigen::Vector2f(robo_loc_ee(0), robo_loc_ee(1));
       robot_remove(cloud, robo_loc);
     }
     else{
