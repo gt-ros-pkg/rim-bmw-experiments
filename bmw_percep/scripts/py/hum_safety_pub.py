@@ -96,7 +96,7 @@ class HumanSafetyPub:
         try:
             human_safety_mode = rospy.get_param("human_safety_mode")
         except KeyError:
-            human_safety_mode = 1
+            human_safety_mode = 3
         
         print human_safety_mode
         

@@ -94,11 +94,19 @@ int PplTrack::getOneCluster(const vector<vector<ClusterPoint> > clusters)
 	if (dist_ee < cur_err)
 	  cur_err = dist_ee;
 
-    	if ( cur_err < min_dist){
+    	if (cur_err < min_dist){
     	  min_dist = cur_err;
     	  best_id = i;
     	}
+	
+	cout << "ID, Loc: " << i << ',' << h_cent << endl; 
       }
+
+      //debug
+      // cout << "Robot Base: " << robo_loc << endl;
+      // cout MM 
+      // for(int i=0; i<)
+
       return best_id;
     }
       
