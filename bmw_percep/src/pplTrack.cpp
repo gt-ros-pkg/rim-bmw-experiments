@@ -1246,7 +1246,7 @@ void PplTrack::pub_obs_est(ros::Publisher pub_o, ros::Publisher pub_e_p)
   obs_p.orientation.x = 0.;
   obs_p.orientation.y = 0.;
   obs_p.orientation.z = 0.;
-  obs_p.orientation.w = 0.;
+  obs_p.orientation.w = 1.;
 
   est_p = obs_p;
   est_v = obs_p;

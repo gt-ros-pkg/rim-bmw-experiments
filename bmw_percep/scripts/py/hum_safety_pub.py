@@ -20,6 +20,9 @@ import threading
 
 from excel_servers.srv import KinematicsInfo
 
+
+LOOP_RATE = 30
+
 class HumanSafetyPub:
     def __init__(self):
 
@@ -74,8 +77,22 @@ class HumanSafetyPub:
         
         self.prev_time = rospy.Time.now()
         self.past_rates = np.zeros([10,1])
+
+        self.msg = PoseArray()
+        self.first_msg = True
     #callback receives person position and velocity
     def pers_cb(self, msg):
+        self.msg = msg
+        if self.first_msg:
+            self.first_msg = False
+
+    def process_frame(self):
+        
+        msg = self.msg
+        
+        if self.first_msg:
+            return
+
         try:
             human_safety_mode = rospy.get_param("human_safety_mode")
         except KeyError:
@@ -128,7 +145,7 @@ class HumanSafetyPub:
                 self.robo_ee_vel[0]  = temp[0]
                 self.robo_ee_vel[1]  = temp[1]
             
-        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+        except(Exception):# (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             return
 
         if (not ((np.isnan(self.hum_pos)).any() or (np.isnan(self.hum_vel)).any())):
@@ -328,7 +345,13 @@ class HumanSafetyPub:
 def main():
     rospy.init_node('human_safety_publisher')
     hum_pub = HumanSafetyPub()
-    rospy.spin()
+    
+    ratey = rospy.Rate(LOOP_RATE)
+    while not rospy.is_shutdown():
+        hum_pub.process_frame()
+        ratey.sleep()
+    
+    # rospy.spin()
 
 #MAIN
 if __name__=='__main__':
