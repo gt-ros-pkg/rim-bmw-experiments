@@ -5,6 +5,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <std_msgs/Int8MultiArray.h>
 #include <std_msgs/Int8.h>
+#include <std_msgs/Int32.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Bool.h>
 #include <sstream>
@@ -14,11 +15,12 @@
 #define NO_SCANNING_NEEDED 0
 
 int bin1 = 1, bin2 = 0, bin3 = 0;
-int scan1 = 1, scan2 = 0, scan3 = 0;
+int scan[] = {0,0,0};
 int scanning_status = NO_SCANNING_NEEDED; 
 bool system_blocked = false;
 bool parts_ready = false;
 std::string message = "";
+int scan_region=0; //part of screen for scanning
 
 void bins_required_callback (const std_msgs::Int8MultiArray::ConstPtr& msg){
 	bin1 = msg->data[0];
@@ -47,24 +49,23 @@ void message_callback (const std_msgs::String::ConstPtr& msg){
 	message = msg->data;
 }
 
-void scanned_parts_callback (const std_msgs::Int8MultiArray::ConstPtr& msg){
-    switch(msg->data.size()){
-    case 0:
-        scan1 = 0; scan2 = 0; scan3 = 0;
-        break;
-
-    case 1:
-        scan1 = msg->data[0]; scan2 = 0; scan3 = 0;
-        break;
-
-    case 2:
-        scan1 = msg->data[0]; scan2 = msg->data[1]; scan3 = 0;
-        break;
-
-    case 3:
-        scan1 = msg->data[0]; scan2 = msg->data[1]; scan3 = msg->data[2] ;
-        break;
-    }
+void clear_parts(){
+  for(int i=0;i<3;i++)
+    scan[i] = 0;
+  scan_region = 0;
+}
+void scanned_parts_callback (const std_msgs::Int8::ConstPtr& msg){
+  
+  if (msg->data == 0) {//clear
+    clear_parts();
+    return;
+  }
+   
+  scan_region++;
+  if(scan_region>2)
+    clear_parts(); 
+  
+  scan[scan_region] = msg->data;
 }
 
 int main(int argc, char **argv)
@@ -165,28 +166,28 @@ int main(int argc, char **argv)
         // Scanned parts numbers rectangles //
         int_result.str("");
         int_result.clear();
-        if(scan1!=0){
-            int_result << scan1;
+        if(scan[0]!=0){
+            int_result << scan[0];
             cv::rectangle( image,cv::Point(w_width/2+2*w_width/35,0.28*w_height),cv::Point(w_width/2+4*w_width/35, 0.44*w_height),white, -1, 8);
             cv::putText(image, int_result.str(), cv::Point(w_width/2+2.5*w_width/35,w_height/4+w_height/8), cv::FONT_HERSHEY_SIMPLEX, 2, black, 3);
         }
         else{
             cv::rectangle( image,cv::Point(w_width/2+2*w_width/35,0.28*w_height),cv::Point(w_width/2+4*w_width/35, 0.44*w_height),black, -1, 8);
         }
-        if(scan2!=0){
+        if(scan[1]!=0){
             int_result.str("");
             int_result.clear();
-            int_result << scan2;
+            int_result << scan[1];
             cv::rectangle( image,cv::Point(w_width/2+6*w_width/35,0.28*w_height),cv::Point(w_width/2+8*w_width/35, 0.44*w_height),white, -1, 8);
             cv::putText(image, int_result.str(), cv::Point(w_width/2+6.5*w_width/35,w_height/4+w_height/8), cv::FONT_HERSHEY_SIMPLEX, 2, black, 3);
         }
         else{
             cv::rectangle( image,cv::Point(w_width/2+6*w_width/35,0.28*w_height),cv::Point(w_width/2+8*w_width/35, 0.44*w_height),black, -1, 8);
         }
-        if(scan3!=0){
+        if(scan[2]!=0){
             int_result.str("");
             int_result.clear();
-            int_result << scan3;
+            int_result << scan[2];
             cv::rectangle( image,cv::Point(w_width/2+10*w_width/35,0.28*w_height),cv::Point(w_width/2+12*w_width/35, 0.44*w_height),white, -1, 8);
             cv::putText(image, int_result.str(), cv::Point(w_width/2+10.5*w_width/35,w_height/4+w_height/8), cv::FONT_HERSHEY_SIMPLEX, 2, black, 3);
         }
