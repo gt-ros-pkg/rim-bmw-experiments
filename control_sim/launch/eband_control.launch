@@ -1,0 +1,49 @@
+<launch>
+
+    <arg name="costmap_name" value="ecostmap"/>
+    <arg name="eband_planner_name" value="eband_planner"/>
+    <arg name="human_pose_topic" default="/human_pose"/>
+    <arg name="robot_pose_topic" default="/robot_pose"/>
+	
+    <node name="static_tf0" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 /map /table_link 100"/>
+
+    <node pkg="control_sim" type="eband_control_node" name="eband_control" output="screen">
+	<param name="robot_pose_topic" value="$(arg robot_pose_topic)"/>
+	<param name="human_pose_topic" value="$(arg human_pose_topic)"/>
+	<param name="costmap_name" value="$(arg costmap_name)"/>
+	<param name="eband_planner_name" value="$(arg eband_planner_name)"/>
+
+	<param name="$(arg costmap_name)/global_frame" value="map"/>
+        <param name="$(arg costmap_name)/robot_base_frame" value="ee_link"/>
+        <param name="$(arg costmap_name)/update_frequency" value="100"/>
+        <param name="$(arg costmap_name)/publish_frequency" value="100"/>
+        <param name="$(arg costmap_name)/static_map" value="false"/>
+        <param name="$(arg costmap_name)/rolling_window" value="false"/>
+        <param name="$(arg costmap_name)/width" value="10.0"/>
+        <param name="$(arg costmap_name)/height" value="10.0"/>
+        <param name="$(arg costmap_name)/resolution" value="0.05"/>
+        <param name="$(arg costmap_name)/origin_x" value="0"/>
+        <param name="$(arg costmap_name)/origin_y" value="0"/>
+        <param name="$(arg costmap_name)/transform_tolerance" value="2.0"/>
+        <param name="$(arg costmap_name)/publish_voxel_grid" value="false"/>
+        <param name="$(arg costmap_name)/footprint" value="[[0.05,0.05],[0.05,-0.05],[-0.05,-0.05],[-0.05,0.05]]"/>
+	<param name="$(arg costmap_name)/robot_radius" value="0.1"/>
+	<param name="$(arg costmap_name)/inflation_layer/enabled" value="false"/>
+
+	<param name="$(arg eband_planner_name)/eband_min_relative_bubble_overlap" value="0.7"/>
+        <param name="$(arg eband_planner_name)/eband_tiny_bubble_distance" value="0.01"/>
+        <param name="$(arg eband_planner_name)/eband_tiny_bubble_expansion" value="0.01"/>
+        <param name="$(arg eband_planner_name)/eband_internal_force_gain" value="1.0"/>
+        <param name="$(arg eband_planner_name)/eband_external_force_gain" value="2.0"/>
+        <param name="$(arg eband_planner_name)/num_iterations_eband_optimization" value="3"/>
+        <param name="$(arg eband_planner_name)/eband_equilibrium_approx_max_recursion_depth" value="4"/>
+        <param name="$(arg eband_planner_name)/eband_equilibrium_relative_overshoot" value="0.75"/>
+        <param name="$(arg eband_planner_name)/eband_significant_force_lower_bound" value="0.15"/>
+        <param name="$(arg eband_planner_name)/xy_goal_tolerance" value="0.05"/>
+        <param name="$(arg eband_planner_name)/yaw_goal_tolerance" value="0.1"/>
+        <param name="$(arg eband_planner_name)/rot_stopped_vel" value="1e-2"/>
+        <param name="$(arg eband_planner_name)/trans_stopped_vel" value="1e-2"/>
+
+    </node>
+
+</launch>
