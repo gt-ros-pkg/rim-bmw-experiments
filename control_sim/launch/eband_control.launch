@@ -8,13 +8,14 @@
     <node name="static_tf0" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 /map /table_link 100"/>
 
     <node pkg="control_sim" type="eband_control_node" name="eband_control" output="screen">
-	<param name="robot_pose_topic" value="$(arg robot_pose_topic)"/>
+<!--	<param name="robot_pose_topic" value="$(arg robot_pose_topic)"/> -->
+	<remap from="odom" to="$(arg eband_planner_name)/robot_pose"/>
 	<param name="human_pose_topic" value="$(arg human_pose_topic)"/>
 	<param name="costmap_name" value="$(arg costmap_name)"/>
 	<param name="eband_planner_name" value="$(arg eband_planner_name)"/>
 
 	<param name="$(arg costmap_name)/global_frame" value="map"/>
-        <param name="$(arg costmap_name)/robot_base_frame" value="ee_link"/>
+        <param name="$(arg costmap_name)/robot_base_frame" value="robot_frame"/>
         <param name="$(arg costmap_name)/update_frequency" value="100"/>
         <param name="$(arg costmap_name)/publish_frequency" value="100"/>
         <param name="$(arg costmap_name)/static_map" value="false"/>
@@ -39,10 +40,30 @@
         <param name="$(arg eband_planner_name)/eband_equilibrium_approx_max_recursion_depth" value="4"/>
         <param name="$(arg eband_planner_name)/eband_equilibrium_relative_overshoot" value="0.75"/>
         <param name="$(arg eband_planner_name)/eband_significant_force_lower_bound" value="0.15"/>
+	<param name="$(arg eband_planner_name)/costmap_weight" value="10.0"/>
+
         <param name="$(arg eband_planner_name)/xy_goal_tolerance" value="0.05"/>
         <param name="$(arg eband_planner_name)/yaw_goal_tolerance" value="0.1"/>
         <param name="$(arg eband_planner_name)/rot_stopped_vel" value="1e-2"/>
         <param name="$(arg eband_planner_name)/trans_stopped_vel" value="1e-2"/>
+
+        <param name="$(arg eband_planner_name)/max_vel_lin" value="0.75"/>
+        <param name="$(arg eband_planner_name)/max_vel_th" value="1.0"/>
+        <param name="$(arg eband_planner_name)/min_vel_lin" value="0.1"/>
+        <param name="$(arg eband_planner_name)/min_vel_th" value="0.0"/>
+        <param name="$(arg eband_planner_name)/min_in_place_vel_th" value="0.0"/>
+        <param name="$(arg eband_planner_name)/in_place_trans_vel" value="0.0"/>
+        <param name="$(arg eband_planner_name)/tolerance_timeout" value="0.5"/>
+        <param name="$(arg eband_planner_name)/k_prop" value="4.0"/>
+        <param name="$(arg eband_planner_name)/k_damp" value="3.5"/>
+        <param name="$(arg eband_planner_name)/Ctrl_rate" value="10.0"/>
+        <param name="$(arg eband_planner_name)/max_acceleration" value="0.5"/>
+        <param name="$(arg eband_planner_name)/virtual_mass" value="0.75"/>
+        <param name="$(arg eband_planner_name)/max_translational_acceleration" value="0.5"/>
+        <param name="$(arg eband_planner_name)/max_rotational_acceleration" value="1.5"/>
+        <param name="$(arg eband_planner_name)/rotation_correction_threshold" value="0.5"/>
+	<param name="$(arg eband_planner_name)/differential_drive" value="false"/>
+	<!-- There is more options if differential_drive is true -->
 
     </node>
 

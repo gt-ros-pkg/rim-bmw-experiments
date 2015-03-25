@@ -106,9 +106,11 @@ include_directories(
 
 # Declare a cpp library
 add_library(eband_control src/eband_control.cpp)
+add_library(robot_frame_broadcaster src/robot_frame_broadcaster.cpp)
 
 ## Declare a cpp executable
 add_executable(eband_control_node src/eband_control.cpp)
+add_executable(robot_frame_broadcaster_node src/robot_frame_broadcaster.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -116,6 +118,7 @@ add_executable(eband_control_node src/eband_control.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(eband_control_node ${catkin_LIBRARIES})
+target_link_libraries(robot_frame_broadcaster_node ${catkin_LIBRARIES})
 
 #############
 ## Install ##

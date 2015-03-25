@@ -1,4 +1,5 @@
 #include "eband_control.h"
+#include <tf/transform_broadcaster.h>
 
 EbandControl::EbandControl() : spinner_(1)//, costmap_ros_("ecostmap", new tf::TransformListener())//, eband_planner_("eband_planner", &tf_listener_, &costmap_ros_)
 {
@@ -8,7 +9,7 @@ EbandControl::EbandControl() : spinner_(1)//, costmap_ros_("ecostmap", new tf::T
     std::string costmap_name, eband_planner_name, robot_pose_topic, human_pose_topic;
     nh_param_.getParam("costmap_name", costmap_name);
     nh_param_.getParam("eband_planner_name", eband_planner_name);
-    nh_param_.getParam("robot_pose_topic", robot_pose_topic);
+    //nh_param_.getParam("robot_pose_topic", robot_pose_topic);
     nh_param_.getParam("human_pose_topic", human_pose_topic);
 
     std::cout << costmap_name << std::endl;
@@ -38,7 +39,7 @@ EbandControl::EbandControl() : spinner_(1)//, costmap_ros_("ecostmap", new tf::T
     eband_local_planner::EBandPlannerROS eband_planner(eband_planner_name, &tf_listener_, costmap_ros_);
     eband_planner_ = &eband_planner;
 */
-    robot_pose_sub_ = nh_.subscribe<geometry_msgs::Pose>(robot_pose_topic, 1, boost::bind(&EbandControl::robotPoseCallback, this, _1));
+    //robot_pose_sub_ = nh_.subscribe<geometry_msgs::Pose>(robot_pose_topic, 1, boost::bind(&EbandControl::robotPoseCallback, this, _1));
     human_pose_sub_ = nh_.subscribe<geometry_msgs::Pose>(human_pose_topic, 1, boost::bind(&EbandControl::humanPoseCallback, this, _1));
 }
 
@@ -64,22 +65,34 @@ void EbandControl::humanPoseCallback(const geometry_msgs::Pose::ConstPtr& msg){
     costmap_ros_->getCostmap()->setConvexPolygonCost(human_poly, costmap_2d::LETHAL_OBSTACLE);
 }
 
+/*
 void EbandControl::robotPoseCallback(const geometry_msgs::Pose::ConstPtr& msg){
     std::cout << "Robot Callback" << std::endl;
     robot_pose_ = *msg;
 }
-
+*/
 
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "eband_control");
+    ros::NodeHandle nodeHandle;
+    ros::Publisher wrenchPub = nodeHandle.advertise<geometry_msgs::WrenchStamped>("wrench",1);
     usleep(1000*1000);
+
+    /*
+    tf::TransformBroadcaster br;
+    tf::Transform simple_transform;
+    simple_transform.setOrigin( tf::Vector3(0.0, 0.0, 0.0));
+    simple_transform.setRotation( tf::Quaternion(0,0,0,1));
+    br.sendTransform(tf::StampedTransform(simple_transform, ros::Time::now(), "table_link", "wrench_frame"));
+    */
 
     EbandControl ebandcontrol;
     tf::TransformListener tf_listener;
     costmap_2d::Costmap2DROS costmap_ros("ecostmap", tf_listener);
     eband_local_planner::EBandPlannerROS eband_planner("eband_planner", &tf_listener, &costmap_ros);
     ebandcontrol.initialize(&costmap_ros, &eband_planner);
+
 
 
     tf::StampedTransform transform;
@@ -103,15 +116,26 @@ int main(int argc, char **argv)
     first_point.pose.orientation.z = transform.getRotation().getZ();
     orig_global_plan.push_back(first_point);
     for(int i=0; i<10; i++){
-        first_point.pose.position.x += 0.2;
+        first_point.pose.position.x += 0.5;
         orig_global_plan.push_back(first_point);
     }
 
 
     geometry_msgs::Twist vel;
     eband_planner.setPlan(orig_global_plan);
-    while(ros::ok()){
+
+    geometry_msgs::WrenchStamped wrench;
+    wrench.header.frame_id = "robot_frame";
+    while(!eband_planner.isGoalReached()){
         eband_planner.computeVelocityCommands(vel);
+        ROS_INFO_STREAM(""<< vel<<std::endl<<"------------------"<<std::endl);
+        wrench.header.stamp = ros::Time::now();
+        wrench.wrench.force.x = vel.linear.x ;
+        wrench.wrench.force.y = vel.linear.y;
+        wrenchPub.publish(wrench);
+
+
+        //usleep(1000);
     }
 
     ros::shutdown();

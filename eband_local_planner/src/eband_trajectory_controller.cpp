@@ -41,145 +41,146 @@
 
 namespace eband_local_planner{
 
-  using std::min;
-  using std::max;
+using std::min;
+using std::max;
 
 
-  EBandTrajectoryCtrl::EBandTrajectoryCtrl() : costmap_ros_(NULL), initialized_(false), band_set_(false), visualization_(false) {}
+EBandTrajectoryCtrl::EBandTrajectoryCtrl() : costmap_ros_(NULL), initialized_(false), band_set_(false), visualization_(false) {}
 
 
-  EBandTrajectoryCtrl::EBandTrajectoryCtrl(std::string name, costmap_2d::Costmap2DROS* costmap_ros)
+EBandTrajectoryCtrl::EBandTrajectoryCtrl(std::string name, costmap_2d::Costmap2DROS* costmap_ros)
     : costmap_ros_(NULL), initialized_(false), band_set_(false), visualization_(false)
-  {
+{
     // initialize planner
     initialize(name, costmap_ros);
 
     // Initialize pid object (note we'll be further clamping its output)
     pid_.initPid(1, 0, 0, 10, -10);
-  }
+}
 
 
-  EBandTrajectoryCtrl::~EBandTrajectoryCtrl() {}
+EBandTrajectoryCtrl::~EBandTrajectoryCtrl() {}
 
 
-  void EBandTrajectoryCtrl::initialize(std::string name, costmap_2d::Costmap2DROS* costmap_ros)
-  {
+void EBandTrajectoryCtrl::initialize(std::string name, costmap_2d::Costmap2DROS* costmap_ros)
+{
 
     // check if trajectory controller is already initialized
     if(!initialized_)
     {
-      // create Node Handle with name of plugin (as used in move_base for loading)
-      ros::NodeHandle node_private("~/" + name);
+        // create Node Handle with name of plugin (as used in move_base for loading)
+        ros::NodeHandle node_private("~/" + name);
 
-      // read parameters from parameter server
-      node_private.param("max_vel_lin", max_vel_lin_, 0.75);
-      node_private.param("max_vel_th", max_vel_th_, 1.0);
+        // read parameters from parameter server
+        node_private.param("max_vel_lin", max_vel_lin_, 0.75);
+        node_private.param("max_vel_th", max_vel_th_, 1.0);
 
-      node_private.param("min_vel_lin", min_vel_lin_, 0.1);
-      node_private.param("min_vel_th", min_vel_th_, 0.0);
+        node_private.param("min_vel_lin", min_vel_lin_, 0.1);
+        node_private.param("min_vel_th", min_vel_th_, 0.0);
 
-      node_private.param("min_in_place_vel_th", min_in_place_vel_th_, 0.0);
-      node_private.param("in_place_trans_vel", in_place_trans_vel_, 0.0);
+        node_private.param("min_in_place_vel_th", min_in_place_vel_th_, 0.0);
+        node_private.param("in_place_trans_vel", in_place_trans_vel_, 0.0);
 
-      node_private.param("xy_goal_tolerance", tolerance_trans_, 0.02);
-      node_private.param("yaw_goal_tolerance", tolerance_rot_, 0.04);
-      node_private.param("tolerance_timeout", tolerance_timeout_, 0.5);
+        node_private.param("xy_goal_tolerance", tolerance_trans_, 0.02);
+        node_private.param("yaw_goal_tolerance", tolerance_rot_, 0.04);
+        node_private.param("tolerance_timeout", tolerance_timeout_, 0.5);
 
-      node_private.param("k_prop", k_p_, 4.0);
-      node_private.param("k_damp", k_nu_, 3.5);
+        node_private.param("k_prop", k_p_, 4.0);
+        node_private.param("k_damp", k_nu_, 3.5);
 
-      node_private.param("Ctrl_Rate", ctrl_freq_, 10.0); // TODO retrieve this from move base parameters
+        node_private.param("Ctrl_Rate", ctrl_freq_, 10.0); // TODO retrieve this from move base parameters
 
-      node_private.param("max_acceleration", acc_max_, 0.5);
-      node_private.param("virtual_mass", virt_mass_, 0.75);
+        node_private.param("max_acceleration", acc_max_, 0.5);
+        node_private.param("virtual_mass", virt_mass_, 0.75);
 
-      node_private.param("max_translational_acceleration", acc_max_trans_, 0.5);
-      node_private.param("max_rotational_acceleration", acc_max_rot_, 1.5);
+        node_private.param("max_translational_acceleration", acc_max_trans_, 0.5);
+        node_private.param("max_rotational_acceleration", acc_max_rot_, 1.5);
 
-      node_private.param("rotation_correction_threshold", rotation_correction_threshold_, 0.5);
+        node_private.param("rotation_correction_threshold", rotation_correction_threshold_, 0.5);
 
-      // diffferential drive parameters
-      node_private.param("differential_drive", differential_drive_hack_, true);
-      node_private.param("k_int", k_int_, 0.005);
-      node_private.param("k_diff", k_diff_, -0.005);
-      node_private.param("bubble_velocity_multiplier", bubble_velocity_multiplier_, 2.0);
-      node_private.param("rotation_threshold_multiplier", rotation_threshold_multiplier_, 1.0); //0.75);
-      // Ctrl_rate, k_prop, max_vel_lin, max_vel_th, tolerance_trans, tolerance_rot, min_in_place_vel_th
+        // diffferential drive parameters
+        node_private.param("differential_drive", differential_drive_hack_, true);
+        node_private.param("k_int", k_int_, 0.005);
+        node_private.param("k_diff", k_diff_, -0.005);
+        node_private.param("bubble_velocity_multiplier", bubble_velocity_multiplier_, 2.0);
+        node_private.param("rotation_threshold_multiplier", rotation_threshold_multiplier_, 1.0); //0.75);
+        // Ctrl_rate, k_prop, max_vel_lin, max_vel_th, tolerance_trans, tolerance_rot, min_in_place_vel_th
 
-      // copy adress of costmap and Transform Listener (handed over from move_base)
-      costmap_ros_ = costmap_ros;
+        // copy adress of costmap and Transform Listener (handed over from move_base)
+        costmap_ros_ = costmap_ros;
 
-      // init velocity for interpolation
-      last_vel_.linear.x = 0.0;
-      last_vel_.linear.y = 0.0;
-      last_vel_.linear.z = 0.0;
-      last_vel_.angular.x = 0.0;
-      last_vel_.angular.y = 0.0;
-      last_vel_.angular.z = 0.0;
+        // init velocity for interpolation
+        last_vel_.linear.x = 0.0;
+        last_vel_.linear.y = 0.0;
+        last_vel_.linear.z = 0.0;
+        last_vel_.angular.x = 0.0;
+        last_vel_.angular.y = 0.0;
+        last_vel_.angular.z = 0.0;
 
-      // set the general refernce frame to that in which the band is given
-      geometry_msgs::Pose2D tmp_pose2D;
-      tmp_pose2D.x = 0.0;
-      tmp_pose2D.y = 0.0;
-      tmp_pose2D.theta = 0.0;
-      Pose2DToPose(ref_frame_band_, tmp_pose2D);
+        // set the general refernce frame to that in which the band is given
+        geometry_msgs::Pose2D tmp_pose2D;
+        tmp_pose2D.x = 0.0;
+        tmp_pose2D.y = 0.0;
+        tmp_pose2D.theta = 0.0;
+        Pose2DToPose(ref_frame_band_, tmp_pose2D);
 
-      // set initialized flag
-      initialized_ = true;
+        // set initialized flag
+        initialized_ = true;
     }
     else
     {
-      ROS_WARN("This planner has already been initialized, doing nothing.");
+        ROS_WARN("This planner has already been initialized, doing nothing.");
     }
-  }
+}
 
 
-  void EBandTrajectoryCtrl::setVisualization(boost::shared_ptr<EBandVisualization> target_visual)
-  {
+void EBandTrajectoryCtrl::setVisualization(boost::shared_ptr<EBandVisualization> target_visual)
+{
     target_visual_ = target_visual;
 
     visualization_ = true;
-  }
+}
 
-  bool EBandTrajectoryCtrl::setBand(const std::vector<Bubble>& elastic_band)
-  {
+bool EBandTrajectoryCtrl::setBand(const std::vector<Bubble>& elastic_band)
+{
     elastic_band_ = elastic_band;
     band_set_ = true;
     return true;
-  }
+}
 
 
-  bool EBandTrajectoryCtrl::setOdometry(const nav_msgs::Odometry& odometry)
-  {
+bool EBandTrajectoryCtrl::setOdometry(const nav_msgs::Odometry& odometry)
+{
     odom_vel_.linear.x = odometry.twist.twist.linear.x;
     odom_vel_.linear.y = odometry.twist.twist.linear.y;
     odom_vel_.linear.z = 0.0;
     odom_vel_.angular.x = 0.0;
     odom_vel_.angular.y = 0.0;
-    odom_vel_.angular.z = odometry.twist.twist.angular.z;
-
+    //CHANGED//
+    //odom_vel_.angular.z = odometry.twist.twist.angular.z;
+    odom_vel_.angular.z = 0.0;
     return true;
-  }
+}
 
-  // Return the angular difference between the direction we're pointing
-  // and the direction we want to move in
-  double angularDiff (const geometry_msgs::Twist& heading,
-      const geometry_msgs::Pose& pose)
-  {
+// Return the angular difference between the direction we're pointing
+// and the direction we want to move in
+double angularDiff (const geometry_msgs::Twist& heading,
+                    const geometry_msgs::Pose& pose)
+{
     const double pi = 3.14159265;
     const double t1 = atan2(heading.linear.y, heading.linear.x);
     const double t2 = tf::getYaw(pose.orientation);
     const double d = t1-t2;
 
     if (fabs(d)<pi)
-      return d;
+        return d;
     else if (d<0)
-      return d+2*pi;
+        return d+2*pi;
     else
-      return d-2*pi;
-  }
+        return d-2*pi;
+}
 
-  bool EBandTrajectoryCtrl::getTwistDifferentialDrive(geometry_msgs::Twist& twist_cmd, bool& goal_reached) {
+bool EBandTrajectoryCtrl::getTwistDifferentialDrive(geometry_msgs::Twist& twist_cmd, bool& goal_reached) {
     goal_reached = false;
 
     geometry_msgs::Twist robot_cmd, bubble_diff;
@@ -190,163 +191,164 @@ namespace eband_local_planner{
 
     // check if plugin initialized
     if(!initialized_)	{
-      ROS_ERROR("Requesting feedforward command from not initialized planner. Please call initialize() before using this planner");
-      return false;
+        ROS_ERROR("Requesting feedforward command from not initialized planner. Please call initialize() before using this planner");
+        return false;
     }
 
     // check there is a plan at all (minimum 1 frame in this case, as robot + goal = plan)
     if( (!band_set_) || (elastic_band_.size() < 2) ) {
-      ROS_WARN("Requesting feedforward command from empty band.");
-      return false;
+        ROS_WARN("Requesting feedforward command from empty band.");
+        return false;
     }
 
     // Get the differences between the first 2 bubbles in the robot's frame
     bubble_diff = getFrame1ToFrame2InRefFrameNew(
-        elastic_band_.at(0).center.pose,
-        elastic_band_.at(1).center.pose,
-        elastic_band_.at(0).center.pose);
+                elastic_band_.at(0).center.pose,
+                elastic_band_.at(1).center.pose,
+                elastic_band_.at(0).center.pose);
 
     // Check 1
     // We need to check if we are within the threshold of the final destination
     if (!command_provided) {
-      int curr_target_bubble = 1;
+        int curr_target_bubble = 1;
 
-      while(curr_target_bubble < ((int) elastic_band_.size()) - 1) {
-        curr_target_bubble++;
-        bubble_diff = 
-          getFrame1ToFrame2InRefFrameNew(
-              elastic_band_.at(0).center.pose, 
-              elastic_band_.at(curr_target_bubble).center.pose,
-              elastic_band_.at(0).center.pose);
-      }
-
-      // if you go past tolerance, then try to get closer again
-      if(fabs(bubble_diff.linear.x) > tolerance_trans_ ||
-          fabs(bubble_diff.linear.y) > tolerance_trans_) {
-        in_final_goal_turn_ = false;
-      }
-
-      // Get the differences between the first 2 bubbles in the robot's frame
-      int goal_bubble = (((int) elastic_band_.size()) - 1);
-      bubble_diff = getFrame1ToFrame2InRefFrameNew(
-          elastic_band_.at(0).center.pose,
-          elastic_band_.at(goal_bubble).center.pose,
-          elastic_band_.at(0).center.pose);
-
-      // Get closer to the goal than the tolerance requires before starting the 
-      // final turn. The final turn may cause you to move slightly out of
-      // position
-      if((fabs(bubble_diff.linear.x) <= 0.6 * tolerance_trans_ &&
-          fabs(bubble_diff.linear.y) <= 0.6 * tolerance_trans_) ||
-          in_final_goal_turn_) {
-        // Calculate orientation difference to goal orientation (not captured in bubble_diff)
-        double robot_yaw = tf::getYaw(elastic_band_.at(0).center.pose.orientation);
-        double goal_yaw = tf::getYaw(elastic_band_.at((int)elastic_band_.size() - 1).center.pose.orientation);
-        float orientation_diff = angles::normalize_angle(goal_yaw - robot_yaw);
-        if (fabs(orientation_diff) > tolerance_rot_) {
-          in_final_goal_turn_ = true;
-          ROS_DEBUG("Performing in place rotation for goal (diff): %f", orientation_diff);
-          double rotation_sign = -2 * (orientation_diff < 0) + 1;
-          robot_cmd.angular.z = 
-            rotation_sign * min_in_place_vel_th_ + k_p_ * orientation_diff;
-          if (fabs(robot_cmd.angular.z) > max_vel_th_) { // limit max rotation
-            robot_cmd.angular.z = rotation_sign * max_vel_th_;
-          }
-        } else {
-          in_final_goal_turn_ = false; // Goal reached
-          ROS_INFO ("TrajectoryController: Goal reached with distance %.2f, %.2f (od = %.2f)"
-              "; sending zero velocity",
-              bubble_diff.linear.x, bubble_diff.linear.y, orientation_diff);
-          // goal position reached
-          robot_cmd.linear.x = 0.0;
-          robot_cmd.angular.z = 0.0;
-          goal_reached = true;
+        while(curr_target_bubble < ((int) elastic_band_.size()) - 1) {
+            curr_target_bubble++;
+            bubble_diff =
+                    getFrame1ToFrame2InRefFrameNew(
+                        elastic_band_.at(0).center.pose,
+                        elastic_band_.at(curr_target_bubble).center.pose,
+                        elastic_band_.at(0).center.pose);
         }
-        command_provided = true;
-      }
+
+        // if you go past tolerance, then try to get closer again
+        if(fabs(bubble_diff.linear.x) > tolerance_trans_ ||
+                fabs(bubble_diff.linear.y) > tolerance_trans_) {
+            in_final_goal_turn_ = false;
+        }
+
+        // Get the differences between the first 2 bubbles in the robot's frame
+        int goal_bubble = (((int) elastic_band_.size()) - 1);
+        bubble_diff = getFrame1ToFrame2InRefFrameNew(
+                    elastic_band_.at(0).center.pose,
+                    elastic_band_.at(goal_bubble).center.pose,
+                    elastic_band_.at(0).center.pose);
+
+        // Get closer to the goal than the tolerance requires before starting the
+        // final turn. The final turn may cause you to move slightly out of
+        // position
+        if((fabs(bubble_diff.linear.x) <= 0.6 * tolerance_trans_ &&
+            fabs(bubble_diff.linear.y) <= 0.6 * tolerance_trans_) ||
+                in_final_goal_turn_) {
+            // Calculate orientation difference to goal orientation (not captured in bubble_diff)
+            double robot_yaw = tf::getYaw(elastic_band_.at(0).center.pose.orientation);
+            double goal_yaw = tf::getYaw(elastic_band_.at((int)elastic_band_.size() - 1).center.pose.orientation);
+            float orientation_diff = angles::normalize_angle(goal_yaw - robot_yaw);
+            if (fabs(orientation_diff) > tolerance_rot_) {
+                in_final_goal_turn_ = true;
+                ROS_DEBUG("Performing in place rotation for goal (diff): %f", orientation_diff);
+                double rotation_sign = -2 * (orientation_diff < 0) + 1;
+                robot_cmd.angular.z =
+                        rotation_sign * min_in_place_vel_th_ + k_p_ * orientation_diff;
+                if (fabs(robot_cmd.angular.z) > max_vel_th_) { // limit max rotation
+                    robot_cmd.angular.z = rotation_sign * max_vel_th_;
+                }
+            } else {
+                in_final_goal_turn_ = false; // Goal reached
+                ROS_INFO ("TrajectoryController: Goal reached with distance %.2f, %.2f (od = %.2f)"
+                          "; sending zero velocity",
+                          bubble_diff.linear.x, bubble_diff.linear.y, orientation_diff);
+                // goal position reached
+                robot_cmd.linear.x = 0.0;
+                robot_cmd.angular.z = 0.0;
+                goal_reached = true;
+            }
+            command_provided = true;
+        }
     }
 
     // Get the differences between the first 2 bubbles in the robot's frame
     bubble_diff = getFrame1ToFrame2InRefFrameNew(
-        elastic_band_.at(0).center.pose,
-        elastic_band_.at(1).center.pose,
-        elastic_band_.at(0).center.pose);
+                elastic_band_.at(0).center.pose,
+                elastic_band_.at(1).center.pose,
+                elastic_band_.at(0).center.pose);
 
     // Check 1 - check if the robot's current pose is too misaligned with the next bubble
     if (!command_provided) {
-      ROS_DEBUG("Goal has not been reached, performing checks to move towards goal");
+        ROS_DEBUG("Goal has not been reached, performing checks to move towards goal");
 
-      // calculate an estimate of the in-place rotation threshold
-      double distance_to_next_bubble = sqrt(
-          bubble_diff.linear.x * bubble_diff.linear.x + 
-          bubble_diff.linear.y * bubble_diff.linear.y);
-      double radius_of_next_bubble = 0.7 * elastic_band_.at(1).expansion;
-      double in_place_rotation_threshold = 
-        rotation_threshold_multiplier_ * 
-        fabs(atan2(radius_of_next_bubble,distance_to_next_bubble));
-      ROS_DEBUG("In-place rotation threshold: %f(%f,%f)", 
-          in_place_rotation_threshold, radius_of_next_bubble, distance_to_next_bubble);
+        // calculate an estimate of the in-place rotation threshold
+        double distance_to_next_bubble = sqrt(
+                    bubble_diff.linear.x * bubble_diff.linear.x +
+                    bubble_diff.linear.y * bubble_diff.linear.y);
+        double radius_of_next_bubble = 0.7 * elastic_band_.at(1).expansion;
+        double in_place_rotation_threshold =
+                rotation_threshold_multiplier_ *
+                fabs(atan2(radius_of_next_bubble,distance_to_next_bubble));
+        ROS_DEBUG("In-place rotation threshold: %f(%f,%f)",
+                  in_place_rotation_threshold, radius_of_next_bubble, distance_to_next_bubble);
 
-      // check if we are above this threshold, if so then perform in-place rotation
-      if (fabs(bubble_diff.angular.z) > in_place_rotation_threshold) {
-        robot_cmd.angular.z = k_p_ * bubble_diff.angular.z;
-        double rotation_sign = (bubble_diff.angular.z < 0) ? -1.0 : +1.0;
-        if (fabs(robot_cmd.angular.z) < min_in_place_vel_th_) {
-          robot_cmd.angular.z = rotation_sign * min_in_place_vel_th_;
+        // check if we are above this threshold, if so then perform in-place rotation
+        if (fabs(bubble_diff.angular.z) > in_place_rotation_threshold) {
+            robot_cmd.angular.z = k_p_ * bubble_diff.angular.z;
+            double rotation_sign = (bubble_diff.angular.z < 0) ? -1.0 : +1.0;
+            if (fabs(robot_cmd.angular.z) < min_in_place_vel_th_) {
+                robot_cmd.angular.z = rotation_sign * min_in_place_vel_th_;
+            }
+            if (fabs(robot_cmd.angular.z) > max_vel_th_) { // limit max rotation
+                robot_cmd.angular.z = rotation_sign * max_vel_th_;
+            }
+            ROS_DEBUG("Performing in place rotation for start (diff): %f", bubble_diff.angular.z, robot_cmd.angular.z);
+            command_provided = true;
         }
-        if (fabs(robot_cmd.angular.z) > max_vel_th_) { // limit max rotation
-          robot_cmd.angular.z = rotation_sign * max_vel_th_;
-        }
-        ROS_DEBUG("Performing in place rotation for start (diff): %f", bubble_diff.angular.z, robot_cmd.angular.z);
-        command_provided = true;
-      }
     }
 
-    // Check 3 - If we reach here, it means we need to use our PID controller to 
+    // Check 3 - If we reach here, it means we need to use our PID controller to
     // move towards the next bubble
     if (!command_provided) {
 
-      // Select a linear velocity (based on the current bubble radius)
-      double forward_sign = -2 * (bubble_diff.linear.x < 0) + 1;
-      double bubble_radius = 0.7 * elastic_band_.at(0).expansion;
-      double velocity_multiplier = bubble_velocity_multiplier_ * bubble_radius;
-      double linear_velocity = velocity_multiplier * max_vel_lin_;
-      linear_velocity *= cos(bubble_diff.angular.z); //decrease while turning 
-      if (fabs(linear_velocity) > max_vel_lin_) {
-        linear_velocity = forward_sign * max_vel_lin_;
-      } else if (fabs(linear_velocity) < min_vel_lin_) {
-        linear_velocity = forward_sign * min_vel_lin_;
-      }
+        // Select a linear velocity (based on the current bubble radius)
+        double forward_sign = -2 * (bubble_diff.linear.x < 0) + 1;
+        double bubble_radius = 0.7 * elastic_band_.at(0).expansion;
+        double velocity_multiplier = bubble_velocity_multiplier_ * bubble_radius;
+        double linear_velocity = velocity_multiplier * max_vel_lin_;
+        linear_velocity *= cos(bubble_diff.angular.z); //decrease while turning
+        if (fabs(linear_velocity) > max_vel_lin_) {
+            linear_velocity = forward_sign * max_vel_lin_;
+        } else if (fabs(linear_velocity) < min_vel_lin_) {
+            linear_velocity = forward_sign * min_vel_lin_;
+        }
 
-      // Select an angular velocity (based on PID controller)
-      double error = bubble_diff.angular.z;
-      double rotation_sign = -2 * (bubble_diff.angular.z < 0) + 1;
-      double angular_velocity = k_p_ * error;
-      if (fabs(angular_velocity) > max_vel_th_) {
-        angular_velocity = rotation_sign * max_vel_th_;
-      } else if (fabs(angular_velocity) < min_vel_th_) {
-        angular_velocity = rotation_sign * min_vel_th_;
-      }
+        // Select an angular velocity (based on PID controller)
+        double error = bubble_diff.angular.z;
+        double rotation_sign = -2 * (bubble_diff.angular.z < 0) + 1;
+        double angular_velocity = k_p_ * error;
+        if (fabs(angular_velocity) > max_vel_th_) {
+            angular_velocity = rotation_sign * max_vel_th_;
+        } else if (fabs(angular_velocity) < min_vel_th_) {
+            angular_velocity = rotation_sign * min_vel_th_;
+        }
 
-      ROS_DEBUG("Selected velocity: lin: %f, ang: %f", 
-          linear_velocity, angular_velocity);
+        ROS_DEBUG("Selected velocity: lin: %f, ang: %f",
+                  linear_velocity, angular_velocity);
 
-      robot_cmd.linear.x = linear_velocity;
-      robot_cmd.angular.z = angular_velocity;
-      command_provided = true;
+        robot_cmd.linear.x = linear_velocity;
+        robot_cmd.angular.z = angular_velocity;
+        command_provided = true;
     }
 
     twist_cmd = robot_cmd;
     ROS_DEBUG("Final command: %f, %f", twist_cmd.linear.x, twist_cmd.angular.z);
     return true;
-  }
+}
 
-
-  bool EBandTrajectoryCtrl::getTwist(geometry_msgs::Twist& twist_cmd, bool& goal_reached)
-  {
+bool EBandTrajectoryCtrl::getTwist(geometry_msgs::Twist& twist_cmd, bool& goal_reached)
+{
     goal_reached = false;
     if (differential_drive_hack_) {
-      return getTwistDifferentialDrive(twist_cmd, goal_reached);
+        //CHANGED//
+        ROS_WARN("WARNING: DifferentialDrive mode is ON");
+        return getTwistDifferentialDrive(twist_cmd, goal_reached);
     }
 
     // init twist cmd to be handed back to caller
@@ -365,15 +367,15 @@ namespace eband_local_planner{
     // check if plugin initialized
     if(!initialized_)
     {
-      ROS_ERROR("Requesting feedforward command from not initialized planner. Please call initialize() before using this planner");
-      return false;
+        ROS_ERROR("Requesting feedforward command from not initialized planner. Please call initialize() before using this planner");
+        return false;
     }
 
     // check there is a plan at all (minimum 1 frame in this case, as robot + goal = plan)
     if( (!band_set_) || (elastic_band_.size() < 2) )
     {
-      ROS_WARN("Requesting feedforward command from empty band.");
-      return false;
+        ROS_WARN("Requesting feedforward command from empty band.");
+        return false;
     }
 
     // calc intersection of bubble-radius with sequence of vector connecting the bubbles
@@ -384,16 +386,20 @@ namespace eband_local_planner{
     // get difference and distance between bubbles in odometry frame
     double bubble_distance, ang_pseudo_dist;
     bubble_diff = getFrame1ToFrame2InRefFrame(elastic_band_.at(0).center.pose,
-        elastic_band_.at(1).center.pose,
-        ref_frame_band_);
+                                              elastic_band_.at(1).center.pose,
+                                              ref_frame_band_);
+    //CHANGED//
+    bubble_diff.angular.z = 0.0;
     ang_pseudo_dist = bubble_diff.angular.z * getCircumscribedRadius(*costmap_ros_);
+    //CHANGED//
+    ang_pseudo_dist = 0.0;
     bubble_distance = sqrt( (bubble_diff.linear.x * bubble_diff.linear.x) + (bubble_diff.linear.y * bubble_diff.linear.y) +
-        (ang_pseudo_dist * ang_pseudo_dist) );
+                            (ang_pseudo_dist * ang_pseudo_dist) );
 
     if(visualization_)
     {
-      target_visual_->publishBubble("ctrl_target", 1, target_visual_->blue, elastic_band_.at(0));
-      target_visual_->publishBubble("ctrl_target", 2, target_visual_->blue, elastic_band_.at(1));
+        target_visual_->publishBubble("ctrl_target", 1, target_visual_->blue, elastic_band_.at(0));
+        target_visual_->publishBubble("ctrl_target", 2, target_visual_->blue, elastic_band_.at(1));
     }
 
     // by default our control deviation is the difference between the bubble centers
@@ -402,119 +408,135 @@ namespace eband_local_planner{
 
 
     ang_pseudo_dist = control_deviation.angular.z * getCircumscribedRadius(*costmap_ros_);
+    //CHANGED//
+    ang_pseudo_dist = 0.0;
     abs_ctrl_dev = sqrt( (control_deviation.linear.x * control_deviation.linear.x) +
-        (control_deviation.linear.y * control_deviation.linear.y) +
-        (ang_pseudo_dist * ang_pseudo_dist) );
+                         (control_deviation.linear.y * control_deviation.linear.y) +
+                         (ang_pseudo_dist * ang_pseudo_dist) );
 
     // yet depending on the expansion of our bubble we might want to adapt this point
     if(scaled_radius < bubble_distance)
     {
-      // triviale case - simply scale bubble_diff
-      double scale_difference = scaled_radius / bubble_distance;
-      bubble_diff.linear.x *= scale_difference;
-      bubble_diff.linear.y *= scale_difference;
-      bubble_diff.angular.z *= scale_difference;
-      // set controls
-      control_deviation = bubble_diff;
+        // triviale case - simply scale bubble_diff
+        double scale_difference = scaled_radius / bubble_distance;
+        bubble_diff.linear.x *= scale_difference;
+        bubble_diff.linear.y *= scale_difference;
+        bubble_diff.angular.z *= scale_difference;
+        // set controls
+        control_deviation = bubble_diff;
     }
 
     // if scaled_radius = bubble_distance -- we have nothing to do at all
 
     if(scaled_radius > bubble_distance)
     {
-      // o.k. now we have to do a little bit more -> check next but one bubble
-      if(elastic_band_.size() > 2)
-      {
-        // get difference between next and next but one bubble
-        double next_bubble_distance;
-        geometry_msgs::Twist next_bubble_diff;
-        next_bubble_diff = getFrame1ToFrame2InRefFrame(elastic_band_.at(1).center.pose,
-            elastic_band_.at(2).center.pose,
-            ref_frame_band_);
-        ang_pseudo_dist = next_bubble_diff.angular.z * getCircumscribedRadius(*costmap_ros_);
-        next_bubble_distance = sqrt( (next_bubble_diff.linear.x * next_bubble_diff.linear.x) +
-            (next_bubble_diff.linear.y * next_bubble_diff.linear.y) +
-            (ang_pseudo_dist * ang_pseudo_dist) );
-
-        if(scaled_radius > (bubble_distance + next_bubble_distance) )
+        // o.k. now we have to do a little bit more -> check next but one bubble
+        if(elastic_band_.size() > 2)
         {
-          // we should normally not end up here - but just to be sure
-          control_deviation.linear.x = bubble_diff.linear.x + next_bubble_diff.linear.x;
-          control_deviation.linear.y = bubble_diff.linear.y + next_bubble_diff.linear.y;
-          control_deviation.angular.z = bubble_diff.angular.z + next_bubble_diff.angular.z;
-          // done
-          if(visualization_)
-            target_visual_->publishBubble("ctrl_target", 3, target_visual_->red, elastic_band_.at(2));
+            // get difference between next and next but one bubble
+            double next_bubble_distance;
+            geometry_msgs::Twist next_bubble_diff;
+            next_bubble_diff = getFrame1ToFrame2InRefFrame(elastic_band_.at(1).center.pose,
+                                                           elastic_band_.at(2).center.pose,
+                                                           ref_frame_band_);
+            //CHANGED//
+            next_bubble_diff.angular.z = 0;
+            ang_pseudo_dist = next_bubble_diff.angular.z * getCircumscribedRadius(*costmap_ros_);
+            //CHANGED//
+            ang_pseudo_dist = 0;
+            next_bubble_distance = sqrt( (next_bubble_diff.linear.x * next_bubble_diff.linear.x) +
+                                         (next_bubble_diff.linear.y * next_bubble_diff.linear.y) +
+                                         (ang_pseudo_dist * ang_pseudo_dist) );
+
+            if(scaled_radius > (bubble_distance + next_bubble_distance) )
+            {
+                // we should normally not end up here - but just to be sure
+                control_deviation.linear.x = bubble_diff.linear.x + next_bubble_diff.linear.x;
+                control_deviation.linear.y = bubble_diff.linear.y + next_bubble_diff.linear.y;
+                control_deviation.angular.z = bubble_diff.angular.z + next_bubble_diff.angular.z;
+                //CHANGED//
+                control_deviation.angular.z = 0;
+                // done
+                if(visualization_)
+                    target_visual_->publishBubble("ctrl_target", 3, target_visual_->red, elastic_band_.at(2));
+            }
+            else
+            {
+                if(visualization_)
+                    target_visual_->publishBubble("ctrl_target", 3, target_visual_->red, elastic_band_.at(2));
+
+                // we want to calculate intersection point of bubble ...
+                // ... and vector connecting the following bubbles
+                double b_distance, cosine_at_bub;
+                double vec_prod, norm_vec1, norm_vec2;
+                double ang_pseudo_dist1, ang_pseudo_dist2;
+
+                // get distance between next bubble center and intersection point
+                ang_pseudo_dist1 = bubble_diff.angular.z * getCircumscribedRadius(*costmap_ros_);
+                //CHANGED//
+                ang_pseudo_dist1 = 0;
+                ang_pseudo_dist2 = next_bubble_diff.angular.z * getCircumscribedRadius(*costmap_ros_);
+                //CHANGED//
+                ang_pseudo_dist2 = 0;
+                // careful! - we need this sign because of the direction of the vectors and the definition of the vector-product
+                vec_prod = - ( (bubble_diff.linear.x * next_bubble_diff.linear.x) +
+                               (bubble_diff.linear.y * next_bubble_diff.linear.y) +
+                               (ang_pseudo_dist1 * ang_pseudo_dist2) );
+
+                norm_vec1 = sqrt( (bubble_diff.linear.x * bubble_diff.linear.x) +
+                                  (bubble_diff.linear.y * bubble_diff.linear.y) +
+                                  (ang_pseudo_dist1 * ang_pseudo_dist1) );
+
+                norm_vec2 = sqrt( (next_bubble_diff.linear.x * next_bubble_diff.linear.x) +
+                                  (next_bubble_diff.linear.y * next_bubble_diff.linear.y) +
+                                  (ang_pseudo_dist2 * ang_pseudo_dist2) );
+
+                // reform the cosine-rule
+                cosine_at_bub = vec_prod / norm_vec1 / norm_vec2;
+                b_distance = bubble_distance * cosine_at_bub + sqrt( scaled_radius*scaled_radius -
+                                                                     bubble_distance*bubble_distance * (1.0 - cosine_at_bub*cosine_at_bub) );
+
+                // get difference vector from next_bubble to intersection point
+                double scale_next_difference = b_distance / next_bubble_distance;
+                next_bubble_diff.linear.x *= scale_next_difference;
+                next_bubble_diff.linear.y *= scale_next_difference;
+                next_bubble_diff.angular.z *= scale_next_difference;
+
+                // and finally get the control deviation
+                control_deviation.linear.x = bubble_diff.linear.x + next_bubble_diff.linear.x;
+                control_deviation.linear.y = bubble_diff.linear.y + next_bubble_diff.linear.y;
+                control_deviation.angular.z = bubble_diff.angular.z + next_bubble_diff.angular.z;
+                //CHANGED//
+                control_deviation.angular.z = 0;
+                // done
+            }
         }
-        else
-        {
-          if(visualization_)
-            target_visual_->publishBubble("ctrl_target", 3, target_visual_->red, elastic_band_.at(2));
-
-          // we want to calculate intersection point of bubble ...
-          // ... and vector connecting the following bubbles
-          double b_distance, cosine_at_bub;
-          double vec_prod, norm_vec1, norm_vec2;
-          double ang_pseudo_dist1, ang_pseudo_dist2;
-
-          // get distance between next bubble center and intersection point
-          ang_pseudo_dist1 = bubble_diff.angular.z * getCircumscribedRadius(*costmap_ros_);
-          ang_pseudo_dist2 = next_bubble_diff.angular.z * getCircumscribedRadius(*costmap_ros_);
-          // careful! - we need this sign because of the direction of the vectors and the definition of the vector-product
-          vec_prod = - ( (bubble_diff.linear.x * next_bubble_diff.linear.x) +
-              (bubble_diff.linear.y * next_bubble_diff.linear.y) +
-              (ang_pseudo_dist1 * ang_pseudo_dist2) );
-
-          norm_vec1 = sqrt( (bubble_diff.linear.x * bubble_diff.linear.x) +
-              (bubble_diff.linear.y * bubble_diff.linear.y) +
-              (ang_pseudo_dist1 * ang_pseudo_dist1) );
-
-          norm_vec2 = sqrt( (next_bubble_diff.linear.x * next_bubble_diff.linear.x) +
-              (next_bubble_diff.linear.y * next_bubble_diff.linear.y) +
-              (ang_pseudo_dist2 * ang_pseudo_dist2) );
-
-          // reform the cosine-rule
-          cosine_at_bub = vec_prod / norm_vec1 / norm_vec2;
-          b_distance = bubble_distance * cosine_at_bub + sqrt( scaled_radius*scaled_radius -
-              bubble_distance*bubble_distance * (1.0 - cosine_at_bub*cosine_at_bub) );
-
-          // get difference vector from next_bubble to intersection point
-          double scale_next_difference = b_distance / next_bubble_distance;
-          next_bubble_diff.linear.x *= scale_next_difference;
-          next_bubble_diff.linear.y *= scale_next_difference;
-          next_bubble_diff.angular.z *= scale_next_difference;
-
-          // and finally get the control deviation
-          control_deviation.linear.x = bubble_diff.linear.x + next_bubble_diff.linear.x;
-          control_deviation.linear.y = bubble_diff.linear.y + next_bubble_diff.linear.y;
-          control_deviation.angular.z = bubble_diff.angular.z + next_bubble_diff.angular.z;
-          // done
-        }
-      }
     }
 
     // plot control deviation
     ang_pseudo_dist = control_deviation.angular.z * getCircumscribedRadius(*costmap_ros_);
+    //CHANGED//
+    ang_pseudo_dist = 0;
     abs_ctrl_dev = sqrt( (control_deviation.linear.x * control_deviation.linear.x) +
-        (control_deviation.linear.y * control_deviation.linear.y) +
-        (ang_pseudo_dist * ang_pseudo_dist) );
+                         (control_deviation.linear.y * control_deviation.linear.y) +
+                         (ang_pseudo_dist * ang_pseudo_dist) );
 
 
     if(visualization_)
     {
-      // compose bubble from ctrl-target
-      geometry_msgs::Pose2D tmp_bubble_2d, curr_bubble_2d;
-      geometry_msgs::Pose tmp_pose;
-      // init bubble for visualization
-      Bubble new_bubble = elastic_band_.at(0);
-      PoseToPose2D(elastic_band_.at(0).center.pose, curr_bubble_2d);
-      tmp_bubble_2d.x = curr_bubble_2d.x + control_deviation.linear.x;
-      tmp_bubble_2d.y = curr_bubble_2d.y + control_deviation.linear.y;
-      tmp_bubble_2d.theta = curr_bubble_2d.theta + control_deviation.angular.z;
-      Pose2DToPose(tmp_pose, tmp_bubble_2d);
-      new_bubble.center.pose = tmp_pose;
-      new_bubble.expansion = 0.1; // just draw a small bubble
-      target_visual_->publishBubble("ctrl_target", 0, target_visual_->red, new_bubble);
+        // compose bubble from ctrl-target
+        geometry_msgs::Pose2D tmp_bubble_2d, curr_bubble_2d;
+        geometry_msgs::Pose tmp_pose;
+        // init bubble for visualization
+        Bubble new_bubble = elastic_band_.at(0);
+        PoseToPose2D(elastic_band_.at(0).center.pose, curr_bubble_2d);
+        tmp_bubble_2d.x = curr_bubble_2d.x + control_deviation.linear.x;
+        tmp_bubble_2d.y = curr_bubble_2d.y + control_deviation.linear.y;
+        tmp_bubble_2d.theta = curr_bubble_2d.theta + control_deviation.angular.z;
+        Pose2DToPose(tmp_pose, tmp_bubble_2d);
+        new_bubble.center.pose = tmp_pose;
+        new_bubble.expansion = 0.1; // just draw a small bubble
+        target_visual_->publishBubble("ctrl_target", 0, target_visual_->red, new_bubble);
     }
 
 
@@ -527,36 +549,34 @@ namespace eband_local_planner{
     // we're facing the right way
     if (dist_to_goal > rotation_correction_threshold_)
     {
+        //CHANGED//
+        //const double angular_diff = angularDiff(control_deviation, elastic_band_.at(0).center.pose);
+        const double angular_diff = 0;
+        const double vel = pid_.computeCommand(angular_diff, ros::Duration(1/ctrl_freq_));
+        const double mult = fabs(vel) > max_vel_th_ ? max_vel_th_/fabs(vel) : 1.0;
+        control_deviation.angular.z = vel*mult;
+        const double abs_vel = fabs(control_deviation.angular.z);
 
-      const double angular_diff = angularDiff(control_deviation, elastic_band_.at(0).center.pose);
-      const double vel = pid_.computeCommand(angular_diff, ros::Duration(1/ctrl_freq_));
-      const double mult = fabs(vel) > max_vel_th_ ? max_vel_th_/fabs(vel) : 1.0;
-      control_deviation.angular.z = vel*mult;
-      const double abs_vel = fabs(control_deviation.angular.z);
-
-      ROS_DEBUG_THROTTLE_NAMED (1.0, "angle_correction",
-          "Angular diff is %.2f and desired angular "
-          "vel is %.2f.  Initial translation velocity "
-          "is %.2f, %.2f", angular_diff,
-          control_deviation.angular.z,
-          control_deviation.linear.x,
-          control_deviation.linear.y);
-      const double trans_mult = max(0.01, 1.0 - abs_vel/max_vel_th_); // There are some weird tf errors if I let it be 0
-      control_deviation.linear.x *= trans_mult;
-      control_deviation.linear.y *= trans_mult;
-      ROS_DEBUG_THROTTLE_NAMED (1.0, "angle_correction",
-          "Translation multiplier is %.2f and scaled "
-          "translational velocity is %.2f, %.2f",
-          trans_mult, control_deviation.linear.x,
-          control_deviation.linear.y);
+        ROS_DEBUG_THROTTLE_NAMED (1.0, "angle_correction",
+                                  "Angular diff is %.2f and desired angular "
+                                  "vel is %.2f.  Initial translation velocity "
+                                  "is %.2f, %.2f", angular_diff,
+                                  control_deviation.angular.z,
+                                  control_deviation.linear.x,
+                                  control_deviation.linear.y);
+        const double trans_mult = max(0.01, 1.0 - abs_vel/max_vel_th_); // There are some weird tf errors if I let it be 0
+        control_deviation.linear.x *= trans_mult;
+        control_deviation.linear.y *= trans_mult;
+        ROS_DEBUG_THROTTLE_NAMED (1.0, "angle_correction",
+                                  "Translation multiplier is %.2f and scaled "
+                                  "translational velocity is %.2f, %.2f",
+                                  trans_mult, control_deviation.linear.x,
+                                  control_deviation.linear.y);
     }
     else
-      ROS_DEBUG_THROTTLE_NAMED (1.0, "angle_correction",
-          "Not applying angle correction because "
-          "distance to goal is %.2f", dist_to_goal);
-
-
-
+        ROS_DEBUG_THROTTLE_NAMED (1.0, "angle_correction",
+                                  "Not applying angle correction because "
+                                  "distance to goal is %.2f", dist_to_goal);
 
     // now the actual control procedure start (using attractive Potentials)
     geometry_msgs::Twist desired_velocity, currbub_maxvel_dir;
@@ -569,6 +589,8 @@ namespace eband_local_planner{
     desired_velocity.linear.x = k_p_/k_nu_ * control_deviation.linear.x;
     desired_velocity.linear.y = k_p_/k_nu_ * control_deviation.linear.y;
     desired_velocity.angular.z = k_p_/k_nu_ * control_deviation.angular.z;
+    //CHANGED//
+    desired_velocity.angular.z = 0;
 
     //robot_cmd = desired_velocity;
 
@@ -578,15 +600,17 @@ namespace eband_local_planner{
 
     // if neccessarry scale desired vel to stay lower than currbub_maxvel_abs
     ang_pseudo_dist = desired_velocity.angular.z * getCircumscribedRadius(*costmap_ros_);
+    //CHANGED//
+    ang_pseudo_dist = 0;
     desvel_abs = sqrt( (desired_velocity.linear.x * desired_velocity.linear.x) +
-        (desired_velocity.linear.y * desired_velocity.linear.y) +
-        (ang_pseudo_dist * ang_pseudo_dist) );
+                       (desired_velocity.linear.y * desired_velocity.linear.y) +
+                       (ang_pseudo_dist * ang_pseudo_dist) );
     if(desvel_abs > currbub_maxvel_abs)
     {
-      scale_des_vel = currbub_maxvel_abs / desvel_abs;
-      desired_velocity.linear.x *= scale_des_vel;
-      desired_velocity.linear.y *= scale_des_vel;
-      desired_velocity.angular.z *= scale_des_vel;
+        scale_des_vel = currbub_maxvel_abs / desvel_abs;
+        desired_velocity.linear.x *= scale_des_vel;
+        desired_velocity.linear.y *= scale_des_vel;
+        desired_velocity.angular.z *= scale_des_vel;
     }
 
     // make sure to stay within velocity bounds for the robot
@@ -594,21 +618,21 @@ namespace eband_local_planner{
     // for translation
     if(desvel_abs_trans > max_vel_lin_)
     {
-      scale_des_vel = max_vel_lin_ / desvel_abs_trans;
-      desired_velocity.linear.x *= scale_des_vel;
-      desired_velocity.linear.y *= scale_des_vel;
-      // to make sure we are staying inside the bubble also scale rotation
-      desired_velocity.angular.z *= scale_des_vel;
+        scale_des_vel = max_vel_lin_ / desvel_abs_trans;
+        desired_velocity.linear.x *= scale_des_vel;
+        desired_velocity.linear.y *= scale_des_vel;
+        // to make sure we are staying inside the bubble also scale rotation
+        desired_velocity.angular.z *= scale_des_vel;
     }
 
     // for rotation
     if(fabs(desired_velocity.angular.z) > max_vel_th_)
     {
-      scale_des_vel = max_vel_th_ / fabs(desired_velocity.angular.z);
-      desired_velocity.angular.z *= scale_des_vel;
-      // to make sure we are staying inside the bubble also scale translation
-      desired_velocity.linear.x *= scale_des_vel;
-      desired_velocity.linear.y *= scale_des_vel;
+        scale_des_vel = max_vel_th_ / fabs(desired_velocity.angular.z);
+        desired_velocity.angular.z *= scale_des_vel;
+        // to make sure we are staying inside the bubble also scale translation
+        desired_velocity.linear.x *= scale_des_vel;
+        desired_velocity.linear.y *= scale_des_vel;
     }
 
     // calculate resulting force (accel. resp.) (Khatib86 - Realtime Obstacle Avoidance)
@@ -617,32 +641,36 @@ namespace eband_local_planner{
     acc_desired.linear.x = (1.0/virt_mass_) * k_nu_ * (desired_velocity.linear.x - last_vel_.linear.x);
     acc_desired.linear.y = (1.0/virt_mass_) * k_nu_ * (desired_velocity.linear.y - last_vel_.linear.y);
     acc_desired.angular.z = (1.0/virt_mass_) * k_nu_ * (desired_velocity.angular.z - last_vel_.angular.z);
+    //CHANGED//
+    acc_desired.angular.z = 0;
 
     // constrain acceleration
     double scale_acc;
     double abs_acc_trans = sqrt( (acc_desired.linear.x*acc_desired.linear.x) + (acc_desired.linear.y*acc_desired.linear.y) );
     if(abs_acc_trans > acc_max_trans_)
     {
-      scale_acc = acc_max_trans_ / abs_acc_trans;
-      acc_desired.linear.x *= scale_acc;
-      acc_desired.linear.y *= scale_acc;
-      // again - keep relations - stay in bubble
-      acc_desired.angular.z *= scale_acc;
+        scale_acc = acc_max_trans_ / abs_acc_trans;
+        acc_desired.linear.x *= scale_acc;
+        acc_desired.linear.y *= scale_acc;
+        // again - keep relations - stay in bubble
+        acc_desired.angular.z *= scale_acc;
     }
 
     if(fabs(acc_desired.angular.z) > acc_max_rot_)
     {
-      scale_acc = fabs(acc_desired.angular.z) / acc_max_rot_;
-      acc_desired.angular.z *= scale_acc;
-      // again - keep relations - stay in bubble
-      acc_desired.linear.x *= scale_acc;
-      acc_desired.linear.y *= scale_acc;
+        scale_acc = fabs(acc_desired.angular.z) / acc_max_rot_;
+        acc_desired.angular.z *= scale_acc;
+        // again - keep relations - stay in bubble
+        acc_desired.linear.x *= scale_acc;
+        acc_desired.linear.y *= scale_acc;
     }
 
     // and get velocity-cmds by integrating them over one time-step
     last_vel_.linear.x = last_vel_.linear.x + acc_desired.linear.x / ctrl_freq_;
     last_vel_.linear.y = last_vel_.linear.y + acc_desired.linear.y / ctrl_freq_;
     last_vel_.angular.z = last_vel_.angular.z + acc_desired.angular.z / ctrl_freq_;
+    //CHANGED//
+    last_vel_.angular.z = 0;
 
 
     // we are almost done now take into accoun stick-slip and similar nasty things
@@ -655,49 +683,53 @@ namespace eband_local_planner{
 
     // now convert into robot-body frame
     robot_cmd = transformTwistFromFrame1ToFrame2(robot_cmd, ref_frame_band_, elastic_band_.at(0).center.pose);
+    //CHANGED//
+    robot_cmd.angular.z = 0;
 
     // check whether we reached the end of the band
     int curr_target_bubble = 1;
     while(fabs(bubble_diff.linear.x) <= tolerance_trans_ &&
-        fabs(bubble_diff.linear.y) <= tolerance_trans_ &&
-        fabs(bubble_diff.angular.z) <= tolerance_rot_)
+          fabs(bubble_diff.linear.y) <= tolerance_trans_ &&
+          fabs(bubble_diff.angular.z) <= tolerance_rot_)
     {
-      if(curr_target_bubble < ((int) elastic_band_.size()) - 1)
-      {
-        curr_target_bubble++;
-        // transform next target bubble into robot-body frame
-        // and get difference to robot bubble
-        bubble_diff = getFrame1ToFrame2InRefFrame(elastic_band_.at(0).center.pose, elastic_band_.at(curr_target_bubble).center.pose,
-            ref_frame_band_);
-      }
-      else
-      {
-        ROS_DEBUG_THROTTLE_NAMED (1.0, "controller_state",
-            "Goal reached with distance %.2f, %.2f, %.2f"
-            "; sending zero velocity",
-            bubble_diff.linear.x, bubble_diff.linear.y,
-            bubble_diff.angular.z);
-        // goal position reached
-        robot_cmd.linear.x = 0.0;
-        robot_cmd.linear.y = 0.0;
-        robot_cmd.angular.z = 0.0;
-        // reset velocity
-        last_vel_.linear.x = 0.0;
-        last_vel_.linear.y = 0.0;
-        last_vel_.angular.z = 0.0;
-        goal_reached = true;
-        break;
-      }
+        if(curr_target_bubble < ((int) elastic_band_.size()) - 1)
+        {
+            curr_target_bubble++;
+            // transform next target bubble into robot-body frame
+            // and get difference to robot bubble
+            bubble_diff = getFrame1ToFrame2InRefFrame(elastic_band_.at(0).center.pose, elastic_band_.at(curr_target_bubble).center.pose,
+                                                      ref_frame_band_);
+            //CHANGED//
+            bubble_diff.angular.z = 0;
+        }
+        else
+        {
+            ROS_DEBUG_THROTTLE_NAMED (1.0, "controller_state",
+                                      "Goal reached with distance %.2f, %.2f, %.2f"
+                                      "; sending zero velocity",
+                                      bubble_diff.linear.x, bubble_diff.linear.y,
+                                      bubble_diff.angular.z);
+            // goal position reached
+            robot_cmd.linear.x = 0.0;
+            robot_cmd.linear.y = 0.0;
+            robot_cmd.angular.z = 0.0;
+            // reset velocity
+            last_vel_.linear.x = 0.0;
+            last_vel_.linear.y = 0.0;
+            last_vel_.angular.z = 0.0;
+            goal_reached = true;
+            break;
+        }
     }
 
     twist_cmd = robot_cmd;
 
     return true;
-  }
+}
 
 
-  double EBandTrajectoryCtrl::getBubbleTargetVel(const int& target_bub_num, const std::vector<Bubble>& band, geometry_msgs::Twist& VelDir)
-  {
+double EBandTrajectoryCtrl::getBubbleTargetVel(const int& target_bub_num, const std::vector<Bubble>& band, geometry_msgs::Twist& VelDir)
+{
     // init reference for direction vector
     VelDir.linear.x = 0.0;
     VelDir.linear.y = 0.0;
@@ -708,7 +740,7 @@ namespace eband_local_planner{
 
     // if we are looking at the last bubble - target vel is always zero
     if(target_bub_num >= ((int) band.size() - 1))
-      return 0.0;
+        return 0.0;
 
 
     // otherwise check for max_vel calculated from current bubble size
@@ -722,11 +754,11 @@ namespace eband_local_planner{
     // get distance to next bubble center
     ROS_ASSERT( (target_bub_num >= 0) && ((target_bub_num +1) < (int) band.size()) );
     bubble_diff = getFrame1ToFrame2InRefFrame(band.at(target_bub_num).center.pose, band.at(target_bub_num + 1).center.pose,
-        ref_frame_band_);
+                                              ref_frame_band_);
     angle_to_pseudo_vel = bubble_diff.angular.z * getCircumscribedRadius(*costmap_ros_);
 
     bubble_distance = sqrt( (bubble_diff.linear.x * bubble_diff.linear.x) + (bubble_diff.linear.y * bubble_diff.linear.y) +
-        (angle_to_pseudo_vel * angle_to_pseudo_vel) );
+                            (angle_to_pseudo_vel * angle_to_pseudo_vel) );
 
     // calculate direction vector - norm of diference
     VelDir.linear.x =bubble_diff.linear.x/bubble_distance;
@@ -735,7 +767,7 @@ namespace eband_local_planner{
 
     // if next bubble outside this one we will always be able to break fast enough
     if(bubble_distance > band.at(target_bub_num).expansion )
-      return v_max_curr_bub;
+        return v_max_curr_bub;
 
 
     // next bubble center inside this bubble - take into account restrictions on next bubble
@@ -745,7 +777,7 @@ namespace eband_local_planner{
 
     // if velocity at next bubble bigger (or equal) than our velocity - we are on the safe side
     if(v_max_next_bub >= v_max_curr_bub)
-      return v_max_curr_bub;
+        return v_max_curr_bub;
 
 
     // otherwise max. allowed vel is next vel + plus possible reduction on the way between the bubble-centers
@@ -753,11 +785,10 @@ namespace eband_local_planner{
     v_max_curr_bub = v_max_next_bub + delta_vel_max;
 
     return v_max_curr_bub;
-  }
+}
 
-
-  geometry_msgs::Twist EBandTrajectoryCtrl::getFrame1ToFrame2InRefFrame(const geometry_msgs::Pose& frame1, const geometry_msgs::Pose& frame2, const geometry_msgs::Pose& ref_frame)
-  {
+geometry_msgs::Twist EBandTrajectoryCtrl::getFrame1ToFrame2InRefFrame(const geometry_msgs::Pose& frame1, const geometry_msgs::Pose& frame2, const geometry_msgs::Pose& ref_frame)
+{
 
     geometry_msgs::Pose2D frame1_pose2D, frame2_pose2D, ref_frame_pose2D;
     geometry_msgs::Pose2D frame1_pose2D_rf, frame2_pose2D_rf;
@@ -770,16 +801,16 @@ namespace eband_local_planner{
 
     // transform frame1 into ref frame
     frame1_pose2D_rf.x = (frame1_pose2D.x - ref_frame_pose2D.x) * cos(ref_frame_pose2D.theta) +
-      (frame1_pose2D.y - ref_frame_pose2D.y) * sin(ref_frame_pose2D.theta);
+            (frame1_pose2D.y - ref_frame_pose2D.y) * sin(ref_frame_pose2D.theta);
     frame1_pose2D_rf.y = -(frame1_pose2D.x - ref_frame_pose2D.x) * sin(ref_frame_pose2D.theta) +
-      (frame1_pose2D.y - ref_frame_pose2D.y) * cos(ref_frame_pose2D.theta);
+            (frame1_pose2D.y - ref_frame_pose2D.y) * cos(ref_frame_pose2D.theta);
     frame1_pose2D_rf.theta = frame1_pose2D.theta - ref_frame_pose2D.theta;
     frame1_pose2D_rf.theta = angles::normalize_angle(frame1_pose2D_rf.theta);
     // transform frame2 into ref frame
     frame2_pose2D_rf.x = (frame2_pose2D.x - ref_frame_pose2D.x) * cos(ref_frame_pose2D.theta) +
-      (frame2_pose2D.y - ref_frame_pose2D.y) * sin(ref_frame_pose2D.theta);
+            (frame2_pose2D.y - ref_frame_pose2D.y) * sin(ref_frame_pose2D.theta);
     frame2_pose2D_rf.y = -(frame2_pose2D.x - ref_frame_pose2D.x) * sin(ref_frame_pose2D.theta) +
-      (frame2_pose2D.y - ref_frame_pose2D.y) * cos(ref_frame_pose2D.theta);
+            (frame2_pose2D.y - ref_frame_pose2D.y) * cos(ref_frame_pose2D.theta);
     frame2_pose2D_rf.theta = frame2_pose2D.theta - ref_frame_pose2D.theta;
     frame2_pose2D_rf.theta = angles::normalize_angle(frame2_pose2D_rf.theta);
 
@@ -792,12 +823,11 @@ namespace eband_local_planner{
     frame_diff.angular.z = frame2_pose2D_rf.theta - frame1_pose2D_rf.theta;
     // normalize angle
     frame_diff.angular.z = angles::normalize_angle(frame_diff.angular.z);
-
     return frame_diff;
-  }
+}
 
-  geometry_msgs::Twist EBandTrajectoryCtrl::getFrame1ToFrame2InRefFrameNew(const geometry_msgs::Pose& frame1, const geometry_msgs::Pose& frame2, const geometry_msgs::Pose& ref_frame)
-  {
+geometry_msgs::Twist EBandTrajectoryCtrl::getFrame1ToFrame2InRefFrameNew(const geometry_msgs::Pose& frame1, const geometry_msgs::Pose& frame2, const geometry_msgs::Pose& ref_frame)
+{
 
     double x1 = frame1.position.x - ref_frame.position.x;
     double y1 = frame1.position.y - ref_frame.position.y;
@@ -820,12 +850,12 @@ namespace eband_local_planner{
     twist_msg.angular.z = angles::normalize_angle(theta_diff - yaw_ref);
 
     return twist_msg;
-  }
+}
 
 
-  geometry_msgs::Twist EBandTrajectoryCtrl::transformTwistFromFrame1ToFrame2(const geometry_msgs::Twist& curr_twist,
-      const geometry_msgs::Pose& frame1, const geometry_msgs::Pose& frame2)
-  {
+geometry_msgs::Twist EBandTrajectoryCtrl::transformTwistFromFrame1ToFrame2(const geometry_msgs::Twist& curr_twist,
+                                                                           const geometry_msgs::Pose& frame1, const geometry_msgs::Pose& frame2)
+{
     geometry_msgs::Pose2D frame1_pose2D, frame2_pose2D;
     geometry_msgs::Twist tmp_transformed;
     double delta_ang;
@@ -845,58 +875,58 @@ namespace eband_local_planner{
     tmp_transformed.linear.y = -curr_twist.linear.x * sin(delta_ang) + curr_twist.linear.y * cos(delta_ang);
 
     return tmp_transformed;
-  }
+}
 
 
-  geometry_msgs::Twist EBandTrajectoryCtrl::limitTwist(const geometry_msgs::Twist& twist)
-  {
+geometry_msgs::Twist EBandTrajectoryCtrl::limitTwist(const geometry_msgs::Twist& twist)
+{
     geometry_msgs::Twist res = twist;
 
     //make sure to bound things by our velocity limits
     double lin_overshoot = sqrt(res.linear.x * res.linear.x + res.linear.y * res.linear.y) / max_vel_lin_;
     double lin_undershoot = min_vel_lin_ / sqrt(res.linear.x * res.linear.x + res.linear.y * res.linear.y);
-    if (lin_overshoot > 1.0) 
+    if (lin_overshoot > 1.0)
     {
-      res.linear.x /= lin_overshoot;
-      res.linear.y /= lin_overshoot;
-      // keep relations
-      res.angular.z /= lin_overshoot;
+        res.linear.x /= lin_overshoot;
+        res.linear.y /= lin_overshoot;
+        // keep relations
+        res.angular.z /= lin_overshoot;
     }
 
     //we only want to enforce a minimum velocity if we're not rotating in place
     if(lin_undershoot > 1.0)
     {
-      res.linear.x *= lin_undershoot;
-      res.linear.y *= lin_undershoot;
-      // we cannot keep relations here for stability reasons
+        res.linear.x *= lin_undershoot;
+        res.linear.y *= lin_undershoot;
+        // we cannot keep relations here for stability reasons
     }
 
     if (fabs(res.angular.z) > max_vel_th_)
     {
-      double scale = max_vel_th_/fabs(res.angular.z);
-      //res.angular.z = max_vel_th_ * sign(res.angular.z);
-      res.angular.z *= scale;
-      // keep relations
-      res.linear.x *= scale;
-      res.linear.y *= scale;
+        double scale = max_vel_th_/fabs(res.angular.z);
+        //res.angular.z = max_vel_th_ * sign(res.angular.z);
+        res.angular.z *= scale;
+        // keep relations
+        res.linear.x *= scale;
+        res.linear.y *= scale;
     }
 
     if (fabs(res.angular.z) < min_vel_th_) res.angular.z = min_vel_th_ * sign(res.angular.z);
     // we cannot keep relations here for stability reasons
 
-    //we want to check for whether or not we're desired to rotate in place
+    //we want /**to check for whether or not we're desired to rotate in place
     if(sqrt(twist.linear.x * twist.linear.x + twist.linear.y * twist.linear.y) < in_place_trans_vel_)
     {
-      if (fabs(res.angular.z) < min_in_place_vel_th_)
-        res.angular.z = min_in_place_vel_th_ * sign(res.angular.z);
+        if (fabs(res.angular.z) < min_in_place_vel_th_)
+            res.angular.z = min_in_place_vel_th_ * sign(res.angular.z);
 
-      res.linear.x = 0.0;
-      res.linear.y = 0.0;
+        res.linear.x = 0.0;
+        res.linear.y = 0.0;
     }
 
     ROS_DEBUG("Angular command %f", res.angular.z);
     return res;
-  }
+}
 
 
 }
