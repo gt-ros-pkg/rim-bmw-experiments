@@ -3,6 +3,7 @@
 
 #include <ros/ros.h>
 #include <eband_local_planner/eband_local_planner_ros.h>
+#include <tf/transform_broadcaster.h>
 
 class EbandControl
 {
@@ -12,7 +13,6 @@ public:
 
     // Getters //
     geometry_msgs::Pose getLastHumanPose();
-    geometry_msgs::Pose getLastRobotPose();
     costmap_2d::Costmap2DROS* getCostmapROS();
 
 private:
@@ -21,19 +21,14 @@ private:
     geometry_msgs::Pose human_pose_, robot_pose_;
     costmap_2d::Costmap2DROS* costmap_ros_;
     eband_local_planner::EBandPlannerROS* eband_planner_;
-    ros::Subscriber robot_pose_sub_, human_pose_sub_;
+    ros::Subscriber human_pose_sub_;
     std::vector<geometry_msgs::Point> polygon_;
 
     void humanPoseCallback(const geometry_msgs::Pose::ConstPtr& msg);
-    void robotPoseCallback(const geometry_msgs::Pose::ConstPtr& msg);
 };
 
 geometry_msgs::Pose EbandControl::getLastHumanPose(){
     return this->human_pose_;
-}
-
-geometry_msgs::Pose EbandControl::getLastRobotPose(){
-    return this->robot_pose_;
 }
 
 costmap_2d::Costmap2DROS* EbandControl::getCostmapROS(){

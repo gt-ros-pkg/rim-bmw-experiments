@@ -17,7 +17,7 @@ int main(int argc, char** argv){
         ROS_ERROR("%s",ex.what());
     }
 
-    ros::Rate rate(10.0);
+    ros::Rate rate(50.0);
     while (node.ok()){
         try {
             tf_listener.waitForTransform("table_link", "ee_link", ros::Time(0), ros::Duration(10.0) );

@@ -50,6 +50,8 @@
   <build_depend>rospy</build_depend>
   <build_depend>xacro</build_depend>
   <build_depend>eband_local_planner</build_depend>
+  <build_depend>joint_trajectory_controller</build_depend>
+  <build_depend>eigen</build_depend>
   <run_depend>geometry_msgs</run_depend>
   <run_depend>joint_state_publisher</run_depend>
   <run_depend>moveit_planners_ompl</run_depend>
@@ -60,6 +62,8 @@
   <run_depend>rospy</run_depend>
   <run_depend>xacro</run_depend>
   <run_depend>eband_local_planner</run_depend>
+  <run_depend>joint_trajectory_controller</run_depend>
+  <run_depend>eigen</run_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
